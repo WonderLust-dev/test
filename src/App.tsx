@@ -3,7 +3,7 @@ import { getPaperById, savePaper, getPapers, getAttempts } from './services/data
 import { DEMO_PAPER } from './utils/demoData';
 import { Paper, QuestionJSON } from './types';
 import AuthGate, { useAuthModal } from './components/AuthGate';
-import Dashboard from './components/Dashboard';
+import Dashboard, { DashboardTab } from './components/Dashboard';
 import JsonImporter from './components/JsonImporter';
 import ExamInterface from './components/ExamInterface';
 import ResultsPage from './components/ResultsPage';
@@ -11,7 +11,7 @@ import ReviewSession from './components/ReviewSession';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
-import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2 } from 'lucide-react';
+import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
@@ -22,6 +22,7 @@ function AppContent() {
   const { isInstallable, isOffline, install, dismissInstall, updateAvailable, update } = usePWA();
 
   const [view, setView] = useState<View>('dashboard');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
   const [activePaper, setActivePaper] = useState<Paper | null>(null);
   const [examMode, setExamMode] = useState<'exam' | 'practice'>('exam');
   const [lastAttemptId, setLastAttemptId] = useState('');
@@ -182,166 +183,218 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans">
-      {/* Unified Modern Navigation Bar */}
+    <div className="min-h-screen bg-[#F4F5F7] flex flex-col md:flex-row font-sans text-gray-900">
+      {/* Desktop Left Sidebar (Matching Image 2) */}
       {view !== 'exam' && view !== 'review' && (
-        <header className="glass sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm transition-all">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16 gap-3">
-              {/* Brand Logo & Title */}
-              <button onClick={handleBackToDashboard} className="flex items-center gap-3 group text-left">
-                <div
-                  className="flex items-center justify-center w-10 h-10 rounded-xl shadow-medium group-hover:scale-105 transition-all"
-                  style={{ background: 'var(--gradient-brand)' }}
-                >
-                  <BookOpen size={20} className="text-white" />
+        <aside className="hidden md:flex flex-col w-64 shrink-0 bg-[#F4F5F7] p-5 border-r border-gray-200/80 sticky top-0 h-screen justify-between z-30 select-none">
+          <div>
+            {/* Brand Logo & Title */}
+            <button
+              onClick={() => { setView('dashboard'); setDashboardTab('overview'); }}
+              className="flex items-center gap-3 px-2 py-3 mb-6 w-full text-left group"
+            >
+              <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs group-hover:scale-105 transition-transform">
+                <BookOpen size={20} className="text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-sm font-extrabold tracking-tight text-gray-900 leading-tight">
+                  SSC CGL Prep
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-gradient leading-none">SSC CGL Prep</span>
-                    <span className="badge badge-accent hidden sm:inline-flex">Tier 1 & 2</span>
-                  </div>
-                  <span className="block text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                    AI-Powered Mock Platform
-                  </span>
-                </div>
-              </button>
-
-              {/* Actions & Auth Controls */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                {view === 'import' && (
-                  <button onClick={handleBackToDashboard} className="btn btn-ghost text-xs">
-                    <ArrowLeft size={15} /> Dashboard
-                  </button>
-                )}
-                {view === 'results' && (
-                  <button onClick={handleBackToDashboard} className="btn btn-ghost text-xs">
-                    <Home size={15} /> Dashboard
-                  </button>
-                )}
-                {view === 'dashboard' && (
-                  <button onClick={() => setView('import')} className="btn btn-primary text-xs py-2 px-3.5 shadow-soft">
-                    <PlusCircle size={15} /> <span className="hidden sm:inline">Import Paper</span>
-                  </button>
-                )}
-
-                {/* Account / Sync Status Pill */}
-                <div className="border-l border-slate-200 dark:border-slate-800 pl-2 sm:pl-3 flex items-center gap-2">
-                  {user ? (
-                    <div className="flex items-center gap-2">
-                      <div className="hidden md:flex flex-col text-right">
-                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
-                          {user.user_metadata?.display_name || user.email?.split('@')[0]}
-                        </span>
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 justify-end">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => signOut()}
-                        className="p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
-                        title="Sign Out"
-                      >
-                        <LogOut size={14} />
-                        <span className="hidden sm:inline">Logout</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <span className="hidden lg:inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-full">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                        Guest Mode (Offline)
-                      </span>
-                      <button
-                        onClick={openLogin}
-                        className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
-                      >
-                        <LogIn size={13} /> Sign In
-                      </button>
-                      <button
-                        onClick={openSignup}
-                        className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-soft hidden sm:flex items-center gap-1"
-                      >
-                        <UserPlus size={13} /> Sign Up
-                      </button>
-                    </div>
-                  )}
+                <div className="text-[11px] font-semibold text-gray-400">
+                  Tier 1 & 2 Platform
                 </div>
               </div>
-            </div>
+            </button>
+
+            {/* Nav Items (Matching Image 2 left navigation) */}
+            <nav className="space-y-1.5">
+              {[
+                { id: 'overview' as const, label: 'Dashboard', icon: LayoutDashboard },
+                { id: 'library' as const, label: 'Exam Library', icon: BookOpen },
+                { id: 'practice' as const, label: 'Practice Hub', icon: Target },
+                { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle },
+                { id: 'bookmarks' as const, label: 'Bookmarks', icon: Bookmark },
+                { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
+              ].map(item => {
+                const isActive = view === 'dashboard' && dashboardTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-semibold transition-all ${
+                      isActive
+                        ? 'bg-white text-gray-900 shadow-xs'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                    }`}
+                  >
+                    <item.icon size={18} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-        </header>
+
+          {/* Bottom of Sidebar: Profile / Status */}
+          <div className="pt-4 border-t border-gray-200/80 space-y-3">
+            {user ? (
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white border border-gray-100 shadow-2xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    {(user.user_metadata?.display_name || user.email || 'U')[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-gray-900 truncate">
+                      {user.user_metadata?.display_name || user.email?.split('@')[0]}
+                    </div>
+                    <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => signOut()}
+                  className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition-colors"
+                  title="Logout"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="p-2.5 rounded-2xl bg-white border border-gray-100 text-center">
+                  <div className="text-[11px] font-bold text-amber-600 flex items-center justify-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Guest Mode
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">Local Storage Active</div>
+                </div>
+                <button
+                  onClick={openLogin}
+                  className="w-full btn btn-outline text-xs py-2 rounded-full font-bold"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
       )}
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 sm:py-8" style={{ background: 'var(--gradient-soft)' }}>
-        {view === 'dashboard' && (
-          <Dashboard
-            userId={effectiveUserId}
-            onStartExam={handleStartExam}
-            onPractice={handleStartPractice}
-            onStartCustomPractice={handleStartCustomPractice}
-            onImport={() => setView('import')}
-            onStartReview={handleStartReview}
-            refreshKey={refreshKey}
-          />
-        )}
-        {view === 'import' && (
-          <JsonImporter
-            userId={effectiveUserId}
-            onImported={() => { setView('dashboard'); setRefreshKey(k => k + 1); }}
-          />
-        )}
-        {view === 'exam' && activePaper && (
-          <ExamInterface
-            paper={activePaper}
-            userId={effectiveUserId}
-            mode={examMode}
-            onComplete={handleExamComplete}
-            onExit={handleBackToDashboard}
-          />
-        )}
-        {view === 'results' && (
-          <ResultsPage
-            attemptId={lastAttemptId}
-            onRetake={handleRetake}
-            onBack={handleBackToDashboard}
-            onPractice={handlePracticeTopic}
-          />
-        )}
-        {view === 'review' && (
-          <ReviewSession
-            userId={effectiveUserId}
-            onComplete={handleReviewComplete}
-            onExit={handleBackToDashboard}
-          />
-        )}
-      </main>
+      {/* Main Workspace Area */}
+      <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-8">
+        {/* Top Header Bar (Matching Image 2) */}
+        {view !== 'exam' && view !== 'review' && (
+          <header className="sticky top-0 z-20 bg-[#F4F5F7]/90 backdrop-blur-md px-4 sm:px-8 py-4 flex items-center justify-between gap-4 border-b border-gray-200/50">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+                {view === 'dashboard'
+                  ? (dashboardTab === 'overview' ? 'Dashboard' : dashboardTab.charAt(0).toUpperCase() + dashboardTab.slice(1))
+                  : view === 'import' ? 'Import Paper' : 'Exam Results'}
+              </h1>
+            </div>
 
-      {/* Unified Modern Footer */}
-      {view !== 'exam' && view !== 'review' && (
-        <footer className="glass-panel border-t border-slate-200/60 dark:border-slate-800/60 py-6 mt-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white" style={{ background: 'var(--gradient-brand)' }}>
-                  <BookOpen size={12} />
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              {view === 'import' ? (
+                <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-2 px-4 rounded-full flex items-center gap-1.5">
+                  <ArrowLeft size={14} /> Back
+                </button>
+              ) : (
+                <button
+                  onClick={() => setView('import')}
+                  className="btn btn-primary text-xs py-2 px-4.5 rounded-full shadow-xs flex items-center gap-1.5"
+                >
+                  <PlusCircle size={14} />
+                  <span>Import Paper</span>
+                </button>
+              )}
+
+              {/* User Avatar Pill */}
+              <div className="relative">
+                <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs border-2 border-white">
+                  {user ? (user.user_metadata?.display_name || user.email || 'U')[0].toUpperCase() : 'G'}
                 </div>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">SSC CGL Prep 2026</span>
-                <span>•</span>
-                <span>Spaced Repetition & Adaptive Practice</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Local Storage Active
-                </span>
-                <span>•</span>
-                <span>Tier-1 & Tier-2 Syllabus Ready</span>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
               </div>
             </div>
-          </div>
-        </footer>
+          </header>
+        )}
+
+        {/* Content Viewport */}
+        <main className={`flex-1 ${view === 'exam' || view === 'review' ? 'p-0' : 'px-4 sm:px-8 py-6'}`}>
+          {view === 'dashboard' && (
+            <Dashboard
+              userId={effectiveUserId}
+              onStartExam={handleStartExam}
+              onPractice={handleStartPractice}
+              onStartCustomPractice={handleStartCustomPractice}
+              onImport={() => setView('import')}
+              onStartReview={handleStartReview}
+              refreshKey={refreshKey}
+              activeTab={dashboardTab}
+              onTabChange={setDashboardTab}
+            />
+          )}
+          {view === 'import' && (
+            <JsonImporter
+              userId={effectiveUserId}
+              onImported={() => { setView('dashboard'); setRefreshKey(k => k + 1); }}
+            />
+          )}
+          {view === 'exam' && activePaper && (
+            <ExamInterface
+              paper={activePaper}
+              userId={effectiveUserId}
+              mode={examMode}
+              onComplete={handleExamComplete}
+              onExit={handleBackToDashboard}
+            />
+          )}
+          {view === 'results' && (
+            <ResultsPage
+              attemptId={lastAttemptId}
+              onRetake={handleRetake}
+              onBack={handleBackToDashboard}
+              onPractice={handlePracticeTopic}
+            />
+          )}
+          {view === 'review' && (
+            <ReviewSession
+              userId={effectiveUserId}
+              onComplete={handleReviewComplete}
+              onExit={handleBackToDashboard}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* Mobile Bottom Navigation Bar (< 768px) */}
+      {view !== 'exam' && view !== 'review' && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-2 py-2 flex items-center justify-around shadow-lg">
+          {[
+            { id: 'overview' as const, label: 'Home', icon: LayoutDashboard },
+            { id: 'library' as const, label: 'Library', icon: BookOpen },
+            { id: 'practice' as const, label: 'Drills', icon: Target },
+            { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle },
+            { id: 'analytics' as const, label: 'Stats', icon: BarChart3 },
+          ].map(item => {
+            const isActive = view === 'dashboard' && dashboardTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
+                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                  isActive ? 'text-gray-900 font-bold' : 'text-gray-400 font-medium'
+                }`}
+              >
+                <item.icon size={19} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                <span className="text-[10px] leading-none">{item.label}</span>
+                {isActive && (
+                  <span className="w-1 h-1 rounded-full bg-gray-900"></span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       )}
 
       {/* PWA Components */}

@@ -61,90 +61,114 @@ export default function ReviewDashboard({ userId, onStartReview }: ReviewDashboa
   const hasDueReviews = stats.due_count > 0;
 
   return (
-    <div className="glass-card rounded-2xl p-6 mb-6">
+    <div className="bento-card p-6 sm:p-7 mb-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Brain size={24} className="text-indigo-600" />
-            Spaced Repetition
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Review mistakes at optimal intervals for better retention
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-900 shrink-0">
+            <Brain size={20} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              Spaced Repetition
+              <span className="badge badge-accent">SM-2 Algorithm</span>
+            </h2>
+            <p className="text-xs text-gray-500">
+              Review mistakes at optimal intervals for maximum memory retention
+            </p>
+          </div>
         </div>
         {hasDueReviews && (
           <button
             onClick={onStartReview}
-            className="btn btn-primary"
+            className="btn btn-primary text-xs self-start sm:self-auto"
           >
-            Start Review
-            <ArrowRight size={16} className="ml-2" />
+            Start Review ({stats.due_count} Due)
+            <ArrowRight size={14} className="ml-1" />
           </button>
         )}
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/30 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock size={20} className="text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Due Today</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="bento-subcard">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">Due Today</span>
+            <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-indigo-600 shadow-xs">
+              <Clock size={14} />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-indigo-900 dark:text-indigo-100">
+          <div className="text-2xl sm:text-3xl font-extrabold text-gray-900">
             {stats.due_count}
           </div>
+          <span className="text-[11px] font-medium text-indigo-600 mt-1 inline-block">
+            {stats.due_count > 0 ? 'Requires attention' : 'All caught up'}
+          </span>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-4 border border-green-200 dark:border-green-800">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle size={20} className="text-green-600 dark:text-green-400" />
-            <span className="text-xs font-medium text-green-700 dark:text-green-300">Today</span>
+        <div className="bento-subcard">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">Today</span>
+            <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-emerald-600 shadow-xs">
+              <CheckCircle size={14} />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-green-900 dark:text-green-100">
+          <div className="text-2xl sm:text-3xl font-extrabold text-gray-900">
             {stats.today_reviews}
           </div>
+          <span className="text-[11px] font-medium text-emerald-600 mt-1 inline-block">
+            Questions reviewed
+          </span>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp size={20} className="text-purple-600 dark:text-purple-400" />
-            <span className="text-xs font-medium text-purple-700 dark:text-purple-300">This Week</span>
+        <div className="bento-subcard">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">This Week</span>
+            <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-blue-600 shadow-xs">
+              <TrendingUp size={14} />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-purple-900 dark:text-purple-100">
+          <div className="text-2xl sm:text-3xl font-extrabold text-gray-900">
             {stats.week_reviews}
           </div>
+          <span className="text-[11px] font-medium text-blue-600 mt-1 inline-block">
+            Past 7 days
+          </span>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Flame size={20} className="text-orange-600 dark:text-orange-400" />
-            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Streak</span>
+        <div className="bento-subcard">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">Streak</span>
+            <div className="w-7 h-7 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-amber-500 shadow-xs">
+              <Flame size={14} />
+            </div>
           </div>
-          <div className="text-3xl font-bold text-orange-900 dark:text-orange-100">
-            {stats.streak_days}
-            <span className="text-lg ml-1">days</span>
+          <div className="text-2xl sm:text-3xl font-extrabold text-gray-900">
+            {stats.streak_days} <span className="text-xs font-semibold text-gray-400">days</span>
           </div>
+          <span className="text-[11px] font-medium text-amber-600 mt-1 inline-block">
+            Daily consistency
+          </span>
         </div>
       </div>
 
       {/* Average Quality */}
-      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
+      <div className="bento-subcard p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Award size={20} className="text-gray-600 dark:text-gray-400" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Average Recall Quality</span>
+            <Award size={18} className="text-gray-500" />
+            <span className="text-xs font-semibold text-gray-700">Average Recall Quality</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex items-center gap-1.5">
+            <span className="text-lg font-bold text-gray-900">
               {stats.avg_quality.toFixed(1)}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">/ 5.0</div>
+            </span>
+            <span className="text-xs text-gray-400">/ 5.0</span>
           </div>
         </div>
-        <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="mt-2.5 h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-300"
+            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
             style={{ width: `${(stats.avg_quality / 5) * 100}%` }}
           ></div>
         </div>
@@ -153,36 +177,36 @@ export default function ReviewDashboard({ userId, onStartReview }: ReviewDashboa
       {/* Due Reviews Preview */}
       {hasDueReviews && dueReviews.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-            <Calendar size={16} />
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Calendar size={14} className="text-gray-400" />
             Upcoming Reviews ({stats.due_count} total)
           </h3>
           <div className="space-y-2">
-            {dueReviews.slice(0, 3).map((review, index) => (
+            {dueReviews.slice(0, 3).map((review) => (
               <div
                 key={review.mistake_id}
-                className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                className="flex items-center justify-between p-3.5 bg-gray-50/70 hover:bg-white rounded-xl border border-gray-100 transition-all hover:shadow-xs"
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <div className="flex-1 min-w-0 pr-3">
+                  <p className="text-xs font-semibold text-gray-900 truncate">
                     {review.question_text}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{review.subject}</span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{review.topic}</span>
+                    <span className="text-[11px] font-medium text-gray-500">{review.subject}</span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-[11px] text-gray-400">{review.topic}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 ml-4">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Interval</div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <div className="text-[10px] text-gray-400 font-medium">Interval</div>
+                    <div className="text-xs font-bold text-gray-900">
                       {review.interval_days}d
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Reviews</div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <div className="text-[10px] text-gray-400 font-medium">Reviews</div>
+                    <div className="text-xs font-bold text-gray-900">
                       {review.review_count}
                     </div>
                   </div>
@@ -193,7 +217,7 @@ export default function ReviewDashboard({ userId, onStartReview }: ReviewDashboa
           {stats.due_count > 3 && (
             <button
               onClick={onStartReview}
-              className="w-full mt-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+              className="w-full mt-3 py-2 text-xs font-semibold text-gray-700 hover:text-black transition-colors"
             >
               View all {stats.due_count} due reviews →
             </button>
@@ -203,15 +227,15 @@ export default function ReviewDashboard({ userId, onStartReview }: ReviewDashboa
 
       {/* No Due Reviews */}
       {!hasDueReviews && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-600 dark:text-green-400" />
+        <div className="text-center py-6">
+          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-emerald-600">
+            <CheckCircle size={24} />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          <h3 className="text-sm font-bold text-gray-900 mb-1">
             All Caught Up!
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            No mistakes due for review. Keep practicing to add more!
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            No mistakes currently due for review. Take another mock test or custom drill to expand your memory graph!
           </p>
         </div>
       )}
