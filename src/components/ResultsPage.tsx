@@ -48,93 +48,90 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
   const pct = Math.round((attempt.score / attempt.total_marks) * 100);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn pb-12 font-sans text-gray-900">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="btn btn-ghost text-xs gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold shadow-xs transition-all"
         >
           <ArrowLeft size={15} /> Back to Library
         </button>
-        <span className="badge badge-accent text-xs">
+        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
           SSC CGL Grader 2.0
         </span>
       </div>
 
       {/* Header */}
       <div className="text-center py-4">
-        <div
-          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-medium mb-3 transform hover:scale-105 transition-transform"
-          style={{ background: 'var(--gradient-brand)' }}
-        >
-          <Trophy size={32} className="text-white drop-shadow" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gray-900 text-white shadow-soft mb-3 transform hover:scale-105 transition-transform">
+          <Trophy size={30} className="text-emerald-400" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-1">
           Exam Completed!
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+        <p className="text-sm text-gray-500 font-medium">
           {attempt.paper_title}
         </p>
       </div>
 
       {/* Score Card */}
-      <div className="card card-elevated p-6 sm:p-8">
+      <div className="bento-card p-6 sm:p-8 shadow-soft border border-gray-200/80">
         <div className="text-center mb-6">
           <div className={`text-5xl sm:text-6xl font-black tracking-tight mb-1 ${getAccuracyColor(pct)}`}>
-            {attempt.score} <span className="text-2xl sm:text-3xl font-semibold text-slate-400">/ {attempt.total_marks}</span>
+            {attempt.score} <span className="text-2xl sm:text-3xl font-semibold text-gray-400">/ {attempt.total_marks}</span>
           </div>
           <div className="flex items-center justify-center gap-2 mt-2">
-            <span className={`text-xl font-bold px-3 py-0.5 rounded-full ${
-              pct >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
-              pct >= 40 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' :
-              'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+            <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+              pct >= 70 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' :
+              pct >= 40 ? 'bg-amber-50 text-amber-700 border border-amber-200/60' :
+              'bg-rose-50 text-rose-700 border border-rose-200/60'
             }`}>
               {pct}% Score
             </span>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full border border-gray-200/60">
               Accuracy: {attempt.accuracy}%
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="text-center p-3.5 bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 rounded-xl">
-            <CheckCircle size={20} className="mx-auto text-emerald-600 dark:text-emerald-400 mb-1.5" />
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{attempt.correct_count}</div>
-            <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Correct</div>
+          <div className="text-center p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl">
+            <CheckCircle size={20} className="mx-auto text-emerald-600 mb-1.5" />
+            <div className="text-2xl font-black text-emerald-800">{attempt.correct_count}</div>
+            <div className="text-xs font-bold text-emerald-700">Correct</div>
           </div>
-          <div className="text-center p-3.5 bg-rose-50/80 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 rounded-xl">
-            <XCircle size={20} className="mx-auto text-rose-600 dark:text-rose-400 mb-1.5" />
-            <div className="text-2xl font-bold text-rose-700 dark:text-rose-300">{attempt.incorrect_count}</div>
-            <div className="text-xs font-semibold text-rose-600 dark:text-rose-400">Incorrect</div>
+          <div className="text-center p-4 bg-rose-50/70 border border-rose-100 rounded-2xl">
+            <XCircle size={20} className="mx-auto text-rose-600 mb-1.5" />
+            <div className="text-2xl font-black text-rose-800">{attempt.incorrect_count}</div>
+            <div className="text-xs font-bold text-rose-700">Incorrect</div>
           </div>
-          <div className="text-center p-3.5 bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 rounded-xl">
-            <MinusCircle size={20} className="mx-auto text-slate-500 mb-1.5" />
-            <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">{attempt.unanswered_count}</div>
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Unanswered</div>
+          <div className="text-center p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+            <MinusCircle size={20} className="mx-auto text-gray-500 mb-1.5" />
+            <div className="text-2xl font-black text-gray-800">{attempt.unanswered_count}</div>
+            <div className="text-xs font-bold text-gray-600">Unanswered</div>
           </div>
-          <div className="text-center p-3.5 bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 rounded-xl">
-            <Clock size={20} className="mx-auto text-blue-600 dark:text-blue-400 mb-1.5" />
-            <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatTime(attempt.time_spent_seconds)}</div>
-            <div className="text-xs font-semibold text-blue-600 dark:text-blue-400">Time Spent</div>
+          <div className="text-center p-4 bg-blue-50/70 border border-blue-100 rounded-2xl">
+            <Clock size={20} className="mx-auto text-blue-600 mb-1.5" />
+            <div className="text-2xl font-black text-blue-800">{formatTime(attempt.time_spent_seconds)}</div>
+            <div className="text-xs font-bold text-blue-700">Time Spent</div>
           </div>
         </div>
       </div>
 
       {/* Subject Performance */}
       {subjectPerf.length > 1 && (
-        <div className="card p-6">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <BarChart3 size={18} className="text-indigo-600 dark:text-indigo-400" /> Performance by Subject
+        <div className="bento-card p-6 shadow-soft border border-gray-200/80">
+          <h2 className="text-base font-extrabold text-gray-900 mb-4 flex items-center gap-2">
+            <BarChart3 size={18} className="text-indigo-600" /> Performance by Subject
           </h2>
           <div className="space-y-4">
             {subjectPerf.map(sp => (
               <div key={sp.subject} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs sm:text-sm font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">{sp.subject}</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm font-bold">
+                  <span className="text-gray-800">{sp.subject}</span>
                   <span className={getAccuracyColor(sp.accuracy)}>{sp.accuracy}% ({sp.correct}/{sp.total})</span>
                 </div>
-                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       sp.accuracy >= 70 ? 'bg-emerald-500' : sp.accuracy >= 40 ? 'bg-amber-500' : 'bg-rose-500'
@@ -150,35 +147,35 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
 
       {/* Topic Performance */}
       {topicPerf.length > 0 && (
-        <div className="card p-6">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-indigo-600 dark:text-indigo-400" /> Performance by Topic
+        <div className="bento-card p-6 shadow-soft border border-gray-200/80">
+          <h2 className="text-base font-extrabold text-gray-900 mb-4 flex items-center gap-2">
+            <TrendingUp size={18} className="text-indigo-600" /> Performance by Topic
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {topicPerf.sort((a, b) => a.accuracy - b.accuracy).map(tp => (
               <div
                 key={tp.topic}
-                className="p-3.5 bg-slate-50/80 dark:bg-slate-850/60 border border-slate-200/70 dark:border-slate-800 rounded-xl flex flex-col justify-between gap-2"
+                className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col justify-between gap-3 shadow-xs"
               >
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{tp.topic}</span>
+                    <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{tp.topic}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      tp.accuracy >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                      tp.accuracy >= 40 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
-                      'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                      tp.accuracy >= 70 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                      tp.accuracy >= 40 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                      'bg-rose-50 text-rose-700 border border-rose-100'
                     }`}>
                       {tp.accuracy}%
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  <p className="text-[11px] text-gray-500 font-medium">
                     {tp.subject} • {tp.correct}/{tp.total} correct • Avg {tp.avgTime}s
                   </p>
                 </div>
                 {tp.accuracy < 60 && (
                   <button
                     onClick={() => onPractice(tp.subject, tp.topic)}
-                    className="self-start text-[11px] font-semibold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors border border-indigo-200/50 dark:border-indigo-800/50"
+                    className="self-start text-[11px] font-bold px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200/60"
                   >
                     Practice this topic →
                   </button>
@@ -190,15 +187,15 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
       )}
 
       {/* Question Analysis */}
-      <div className="card p-6">
+      <div className="bento-card p-6 shadow-soft border border-gray-200/80">
         <button
           onClick={() => setShowDetail(!showDetail)}
           className="w-full flex items-center justify-between text-left group"
         >
-          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <BookOpen size={18} className="text-indigo-600 dark:text-indigo-400" /> Question-by-Question Analysis
+          <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+            <BookOpen size={18} className="text-indigo-600" /> Question-by-Question Analysis
           </h2>
-          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 group-hover:underline">
+          <span className="text-xs font-bold text-indigo-600 group-hover:underline">
             {showDetail ? 'Hide details' : 'Show details'}
           </span>
         </button>
@@ -213,51 +210,51 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
               return (
                 <div
                   key={idx}
-                  className={`p-4 rounded-xl border transition-all ${
+                  className={`p-4 rounded-2xl border transition-all ${
                     aq.is_correct === true
-                      ? 'border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/15'
+                      ? 'border-emerald-200 bg-emerald-50/40'
                       : aq.is_correct === false
-                      ? 'border-rose-200/80 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/15'
-                      : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40'
+                      ? 'border-rose-200 bg-rose-50/40'
+                      : 'border-gray-200 bg-gray-50/50'
                   }`}
                 >
                   <button onClick={() => setExpandedQ(isExpanded ? null : idx)} className="w-full text-left">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2.5 min-w-0">
-                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0 ${
-                          aq.is_correct === true ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300' :
-                          aq.is_correct === false ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300' :
-                          'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        <span className={`flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold shrink-0 ${
+                          aq.is_correct === true ? 'bg-emerald-600 text-white' :
+                          aq.is_correct === false ? 'bg-rose-600 text-white' :
+                          'bg-gray-200 text-gray-700'
                         }`}>
                           {idx + 1}
                         </span>
-                        <p className="text-sm text-slate-900 dark:text-white font-medium line-clamp-1">{q.question}</p>
+                        <p className="text-sm text-gray-900 font-bold line-clamp-1">{q.question}</p>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="text-xs font-mono text-slate-400">{formatTime(aq.time_spent_seconds)}</span>
-                        {aq.is_correct === true && <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400" />}
-                        {aq.is_correct === false && <XCircle size={16} className="text-rose-600 dark:text-rose-400" />}
-                        {aq.is_correct === null && <MinusCircle size={16} className="text-slate-400" />}
+                        <span className="text-xs font-mono text-gray-500 font-semibold">{formatTime(aq.time_spent_seconds)}</span>
+                        {aq.is_correct === true && <CheckCircle size={17} className="text-emerald-600" />}
+                        {aq.is_correct === false && <XCircle size={17} className="text-rose-600" />}
+                        {aq.is_correct === null && <MinusCircle size={17} className="text-gray-400" />}
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-1.5 ml-8.5">
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{q.subject} • {q.topic}</span>
+                    <div className="flex gap-2 mt-1.5 ml-9.5">
+                      <span className="text-[11px] text-gray-500 font-semibold">{q.subject} • {q.topic}</span>
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="mt-4 ml-8.5 space-y-3 text-xs sm:text-sm pt-3 border-t border-slate-200/60 dark:border-slate-800">
+                    <div className="mt-4 ml-9.5 space-y-3 text-xs sm:text-sm pt-3 border-t border-gray-200/70">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div className="p-2.5 rounded-lg bg-slate-100/70 dark:bg-slate-800/60">
-                          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">Your answer:</span>
-                          <span className={aq.is_correct ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-rose-700 dark:text-rose-400 font-semibold'}>
+                        <div className="p-3 rounded-xl bg-white border border-gray-200">
+                          <span className="text-gray-500 block mb-0.5 font-medium">Your answer:</span>
+                          <span className={aq.is_correct ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>
                             {aq.selected_answer !== null ? `${String.fromCharCode(65 + aq.selected_answer)}) ${q.options[aq.selected_answer]}` : 'Not attempted'}
                           </span>
                         </div>
                         {aq.is_correct !== true && (
-                          <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-900/40">
-                            <span className="text-emerald-700 dark:text-emerald-400 block mb-0.5 font-medium">Correct answer:</span>
-                            <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
+                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                            <span className="text-emerald-700 block mb-0.5 font-medium">Correct answer:</span>
+                            <span className="text-emerald-800 font-bold">
                               {String.fromCharCode(65 + q.answerIndex)}) {q.options[q.answerIndex]}
                             </span>
                           </div>
@@ -265,30 +262,30 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
                       </div>
 
                       {q.hint && (
-                        <div className="p-2.5 bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-900/30 rounded-lg">
-                          <p className="text-xs font-medium text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                        <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl text-blue-900">
+                          <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
                             <Lightbulb size={13} /> Hint: {q.hint}
                           </p>
                         </div>
                       )}
                       {q.solution && (
-                        <div className="p-3 bg-slate-100/80 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                          <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-                            <strong className="text-slate-900 dark:text-white block mb-1">Solution Explanation:</strong> {q.solution}
+                        <div className="p-3.5 bg-white rounded-xl border border-gray-200">
+                          <p className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                            <strong className="text-gray-900 block mb-1 font-bold">Solution Explanation:</strong> {q.solution}
                           </p>
                         </div>
                       )}
                       {q.shortcut && (
-                        <div className="p-2.5 bg-purple-50/80 dark:bg-purple-950/20 border border-purple-200/50 dark:border-purple-900/30 rounded-lg">
-                          <p className="text-xs text-purple-800 dark:text-purple-300 flex items-start gap-1.5">
-                            <Zap size={13} className="shrink-0 mt-0.5 text-purple-600 dark:text-purple-400" />
+                        <div className="p-3 bg-purple-50/80 border border-purple-100 rounded-xl text-purple-900">
+                          <p className="text-xs text-purple-800 flex items-start gap-1.5">
+                            <Zap size={13} className="shrink-0 mt-0.5 text-purple-600" />
                             <span><strong>Exam Shortcut:</strong> {q.shortcut}</span>
                           </p>
                         </div>
                       )}
                       {q.learningSuggestion && (
-                        <div className="p-2.5 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-lg">
-                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                        <div className="p-3 bg-amber-50/80 border border-amber-100 rounded-xl text-amber-900">
+                          <p className="text-xs text-amber-800">
                             <strong>📌 Revision Note:</strong> {q.learningSuggestion}
                           </p>
                         </div>
@@ -306,13 +303,13 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
       <div className="flex flex-wrap items-center gap-3 justify-center pt-2">
         <button
           onClick={onRetake}
-          className="btn btn-primary px-8 py-3.5 shadow-medium font-semibold text-sm flex items-center gap-2"
+          className="flex items-center gap-2 px-7 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-xs transition-all text-sm active:scale-95"
         >
           <RotateCcw size={16} /> Retake Test
         </button>
         <button
           onClick={onBack}
-          className="btn btn-secondary px-8 py-3.5 font-semibold text-sm"
+          className="px-7 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold rounded-xl shadow-xs transition-all text-sm"
         >
           Back to Library
         </button>

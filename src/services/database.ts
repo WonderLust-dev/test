@@ -100,12 +100,34 @@ async function sbWithResult<T>(fn: () => Promise<{ data: T | null; error: any }>
 // Papers Service
 // ============================================================
 export async function getPapers(userId?: string): Promise<Paper[]> {
+  const localPapers = lsGet<Paper>(LS_KEYS.papers);
+
   if (!isRemoteUser(userId)) {
-    return lsGet<Paper>(LS_KEYS.papers);
+    // For guest/visitor: load local papers and fetch all public papers from Supabase
+    if (isSupabaseConfigured && supabase) {
+      return cachedFetch<Paper[]>('papers_public', 10000, async () => {
+        const result = await sb(async () => {
+          const { data, error } = await supabase!
+            .from('papers')
+            .select('*')
+            .eq('visibility', 'public')
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          return (data || []) as Paper[];
+        });
+        if (result && result.length > 0) {
+          const localIds = new Set(localPapers.map(p => p.id));
+          return [...localPapers, ...result.filter(p => !localIds.has(p.id))];
+        }
+        return localPapers;
+      });
+    }
+    return localPapers;
   }
+
+  // Authenticated user: fetch own papers AND all public papers
   return cachedFetch<Paper[]>(`papers_${userId}`, 8000, async () => {
     const result = await sb(async () => {
-      // Fetch user's own papers AND all public papers
       const { data, error } = await supabase!
         .from('papers')
         .select('*')
@@ -114,8 +136,13 @@ export async function getPapers(userId?: string): Promise<Paper[]> {
       if (error) throw error;
       return (data || []) as Paper[];
     });
-    if (result) return result;
-    return lsGet<Paper>(LS_KEYS.papers);
+    if (result) {
+      // Merge with any local-only papers
+      const remoteIds = new Set(result.map(p => p.id));
+      const localOnly = localPapers.filter(p => !remoteIds.has(p.id));
+      return [...localOnly, ...result];
+    }
+    return localPapers;
   });
 }
 
@@ -159,6 +186,7 @@ export async function savePaper(paper: Omit<Paper, 'id' | 'created_at' | 'update
 }
 
 export async function updatePaper(paperId: string, updates: Partial<Paper>): Promise<void> {
+  invalidateCache('papers');
   if (isSupabaseConfigured && supabase) {
     await sb(async () => {
       const { error } = await supabase!.from('papers').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', paperId);
@@ -174,38 +202,68 @@ export async function updatePaper(paperId: string, updates: Partial<Paper>): Pro
   }
 }
 
-export async function updatePaperVisibility(paperId: string, visibility: 'private' | 'public'): Promise<{ success: boolean; error?: string }> {
+export async function updatePaperVisibility(
+  paperId: string,
+  visibility: 'private' | 'public',
+  userId?: string
+): Promise<{ success: boolean; error?: string }> {
+  invalidateCache('papers');
+
+  const localPapers = lsGet<Paper>(LS_KEYS.papers);
+  const localPaper = localPapers.find(p => p.id === paperId);
+
   if (isSupabaseConfigured && supabase) {
-    const result = await sbWithResult<void>(async () => {
-      const { error } = await supabase!
+    if (isRemoteUser(userId)) {
+      // Check if paper already exists in Supabase
+      const { data: existing, error: checkError } = await supabase!
         .from('papers')
-        .update({ visibility, updated_at: new Date().toISOString() })
-        .eq('id', paperId);
-      return { data: null, error };
-    });
-    
-    if (result.success) {
-      // Update localStorage too
-      const papers = lsGet<Paper>(LS_KEYS.papers);
-      const idx = papers.findIndex(p => p.id === paperId);
-      if (idx >= 0) {
-        papers[idx].visibility = visibility;
-        lsSet(LS_KEYS.papers, papers);
+        .select('id, user_id')
+        .eq('id', paperId)
+        .limit(1);
+
+      if (!checkError && existing && existing.length > 0) {
+        // Exists in Supabase — update its visibility
+        const { error } = await supabase!
+          .from('papers')
+          .update({ visibility, updated_at: new Date().toISOString() })
+          .eq('id', paperId);
+        
+        if (error) {
+          return { success: false, error: error.message };
+        }
+      } else if (localPaper) {
+        // Exists locally only — insert into Supabase so it becomes accessible to all
+        const cloudPaper: Paper = {
+          ...localPaper,
+          user_id: userId!,
+          visibility,
+          updated_at: new Date().toISOString(),
+        };
+        const { error: insertError } = await supabase!
+          .from('papers')
+          .insert(cloudPaper);
+
+        if (insertError) {
+          return { success: false, error: insertError.message };
+        }
       }
-      return { success: true };
+    } else if (visibility === 'public') {
+      return {
+        success: false,
+        error: 'Please sign in to publish this test to the public community.',
+      };
     }
-    return { success: false, error: result.error };
   }
-  
-  // Fallback to localStorage
-  const papers = lsGet<Paper>(LS_KEYS.papers);
-  const idx = papers.findIndex(p => p.id === paperId);
-  if (idx >= 0) {
-    papers[idx].visibility = visibility;
-    lsSet(LS_KEYS.papers, papers);
+
+  // Update in localStorage
+  if (localPaper) {
+    localPaper.visibility = visibility;
+    localPaper.updated_at = new Date().toISOString();
+    lsSet(LS_KEYS.papers, localPapers);
     return { success: true };
   }
-  return { success: false, error: 'Paper not found' };
+
+  return { success: true };
 }
 
 export async function deletePaper(paperId: string): Promise<void> {

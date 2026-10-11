@@ -227,7 +227,10 @@ export default function Dashboard({
           onStartExam={onStartExam}
           onPractice={onPractice}
           onImport={onImport}
-          onRefresh={() => setPapers([...papers])}
+          onRefresh={async () => {
+            const p = await getPapers(effectiveUserId);
+            setPapers(p);
+          }}
           userId={effectiveUserId}
         />
       )}
@@ -353,32 +356,29 @@ function OverviewBento({
             </div>
           </div>
 
-          {/* Bottom user row (matching Image 2) */}
+          {/* Bottom Exam Readiness Row */}
           <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-bold text-gray-900">
-                857 aspirants practicing today!
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 border border-emerald-100">
+                <Flame size={20} />
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Practice daily drills to stay ahead in Tier 1 & Tier 2 rankings.
+              <div>
+                <div className="text-xs font-bold text-gray-900">
+                  Target: SSC CGL Tier 1 & 2
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  Consistent practice builds speed, accuracy, and negative-marking discipline.
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">M</div>
-                <div className="w-8 h-8 rounded-full bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">R</div>
-                <div className="w-8 h-8 rounded-full bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">S</div>
-                <div className="w-8 h-8 rounded-full bg-purple-500 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-xs">A</div>
-              </div>
-              <button
-                onClick={() => onSelectTab('practice')}
-                className="w-8 h-8 rounded-full border border-gray-200 hover:border-gray-900 flex items-center justify-center text-gray-600 hover:text-black transition-colors"
-                title="View Drills"
-              >
-                <ArrowUpRight size={14} />
-              </button>
-            </div>
+            <button
+              onClick={() => onSelectTab('practice')}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0 self-start sm:self-auto"
+            >
+              <span>Practice Drills</span>
+              <ArrowUpRight size={14} />
+            </button>
           </div>
         </div>
 
@@ -644,11 +644,11 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
 
   const handleToggleVisibility = async (paper: Paper) => {
     const newVisibility = paper.visibility === 'private' ? 'public' : 'private';
-    const result = await updatePaperVisibility(paper.id, newVisibility);
+    const result = await updatePaperVisibility(paper.id, newVisibility, userId);
     if (result.success) {
-      onRefresh();
+      await onRefresh();
     } else {
-      alert(`Failed to update visibility: ${result.error}`);
+      alert(`Visibility update: ${result.error || 'Failed to update visibility'}`);
     }
   };
 

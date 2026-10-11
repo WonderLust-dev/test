@@ -257,11 +257,11 @@ function AppContent() {
               <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white border border-gray-100 shadow-2xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    {(user.user_metadata?.display_name || user.email || 'U')[0].toUpperCase()}
+                    {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-gray-900 truncate">
-                      {user.user_metadata?.display_name || user.email?.split('@')[0]}
+                      {user.user_metadata?.display_name || 'SSC Aspirant'}
                     </div>
                     <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
@@ -327,7 +327,7 @@ function AppContent() {
               {/* User Avatar Pill */}
               <div className="relative">
                 <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs border-2 border-white">
-                  {user ? (user.user_metadata?.display_name || user.email || 'U')[0].toUpperCase() : 'G'}
+                  {user ? (user.user_metadata?.display_name || 'A')[0].toUpperCase() : 'G'}
                 </div>
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
               </div>
