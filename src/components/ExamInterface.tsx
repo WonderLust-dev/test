@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Paper, QuestionJSON, ExamSession, AttemptQuestion } from '../types';
 import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake, addBookmark, removeBookmark, getBookmarks } from '../services/database';
 import { gradeQuestions, formatTime } from '../utils/grader';
-import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 
 interface ExamInterfaceProps {
@@ -27,6 +27,8 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showLearning, setShowLearning] = useState<number | null>(null);
+  const [instantFeedback, setInstantFeedback] = useState<boolean>(mode === 'practice');
+  const [revealedQuestions, setRevealedQuestions] = useState<Record<number, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const startTimeRef = useRef(startTime);
   const lastQRef = useRef(0);
@@ -276,14 +278,21 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   const isTimerCritical = timeLeft < 60;
 
   const getStatusCounts = () => {
-    let answered = 0, markedCount = 0, unanswered = 0, notVisited = 0;
+    let answered = 0, markedCount = 0, unanswered = 0, notVisited = 0, correctCount = 0, incorrectCount = 0;
     questions.forEach((_, idx) => {
       if (marked[idx]) { markedCount++; return; }
-      if (answers[idx] !== undefined && answers[idx] !== null) { answered++; }
+      if (answers[idx] !== undefined && answers[idx] !== null) {
+        answered++;
+        if (answers[idx] === questions[idx].answerIndex) {
+          correctCount++;
+        } else {
+          incorrectCount++;
+        }
+      }
       else if (idx <= Math.max(currentQ, ...Object.keys(answers).map(Number))) { unanswered++; }
       else { notVisited++; }
     });
-    return { answered, marked: markedCount, unanswered, notVisited };
+    return { answered, marked: markedCount, unanswered, notVisited, correct: correctCount, incorrect: incorrectCount };
   };
 
   const counts = getStatusCounts();
@@ -296,9 +305,14 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
     subjectGroups.get(subj)!.push(idx);
   });
 
-  const getQStatus = (idx: number): 'answered' | 'marked' | 'unanswered' | 'not_visited' => {
+  const getQStatus = (idx: number): 'answered' | 'marked' | 'unanswered' | 'not_visited' | 'correct' | 'incorrect' => {
     if (marked[idx]) return 'marked';
-    if (answers[idx] !== undefined && answers[idx] !== null) return 'answered';
+    if (answers[idx] !== undefined && answers[idx] !== null) {
+      if (instantFeedback || revealedQuestions[idx]) {
+        return answers[idx] === questions[idx].answerIndex ? 'correct' : 'incorrect';
+      }
+      return 'answered';
+    }
     const maxVisited = Math.max(currentQ, ...Object.keys(answers).map(Number), -1);
     if (idx <= maxVisited) return 'unanswered';
     return 'not_visited';
@@ -334,12 +348,36 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              {/* Instant Check Toggle Button */}
+              <button
+                onClick={() => {
+                  const nextVal = !instantFeedback;
+                  setInstantFeedback(nextVal);
+                  if (nextVal) {
+                    setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  instantFeedback
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-1 ring-emerald-400/40'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                }`}
+                title={instantFeedback ? 'Instant answer checking is ON (answers are shown immediately)' : 'Turn ON instant answer check to verify correctness immediately'}
+                aria-pressed={instantFeedback}
+              >
+                <Zap size={14} className={instantFeedback ? 'text-amber-300 fill-amber-300' : 'text-amber-500'} />
+                <span className="hidden sm:inline">Instant Check:</span>
+                <span className={instantFeedback ? 'text-amber-200 font-extrabold' : 'text-gray-500'}>
+                  {instantFeedback ? 'ON' : 'OFF'}
+                </span>
+              </button>
+
               {/* Theme Switcher Compact Pill */}
               <ThemeSwitcher variant="compact" />
 
               {/* Timer Pill */}
-              <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono text-sm sm:text-base font-bold shadow-xs transition-all ${
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-sm sm:text-base font-bold shadow-xs transition-all ${
                 isTimerCritical
                   ? 'bg-rose-50 border border-rose-200 text-rose-600 animate-pulse'
                   : isTimerWarning
@@ -353,10 +391,11 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               {/* Submit Test Button */}
               <button
                 onClick={() => setShowSubmit(true)}
-                className="flex items-center gap-2 px-4 sm:px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95"
+                className="flex items-center gap-2 px-3.5 sm:px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95"
               >
                 <Send size={15} />
-                <span>Submit Test</span>
+                <span className="hidden sm:inline">Submit Test</span>
+                <span className="sm:hidden">Submit</span>
               </button>
             </div>
           </div>
@@ -417,9 +456,11 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                         const status = getQStatus(idx);
                         const isCurrent = idx === currentQ;
                         let bgClasses = 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/50';
-                        if (status === 'answered') bgClasses = 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-xs';
+                        if (status === 'correct') bgClasses = 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs ring-1 ring-emerald-400';
+                        else if (status === 'incorrect') bgClasses = 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs ring-1 ring-rose-400';
+                        else if (status === 'answered') bgClasses = 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs';
                         else if (status === 'marked') bgClasses = 'bg-purple-600 text-white hover:bg-purple-700 shadow-xs';
-                        else if (status === 'unanswered') bgClasses = 'bg-rose-500 text-white hover:bg-rose-600 shadow-xs';
+                        else if (status === 'unanswered') bgClasses = 'bg-amber-500 text-white hover:bg-amber-600 shadow-xs';
 
                         return (
                           <button
@@ -497,9 +538,11 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                             const status = getQStatus(idx);
                             const isCurrent = idx === currentQ;
                             let bgClasses = 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200';
-                            if (status === 'answered') bgClasses = 'bg-emerald-500 text-white shadow-xs';
+                            if (status === 'correct') bgClasses = 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400';
+                            else if (status === 'incorrect') bgClasses = 'bg-rose-600 text-white shadow-xs ring-1 ring-rose-400';
+                            else if (status === 'answered') bgClasses = 'bg-indigo-600 text-white shadow-xs';
                             else if (status === 'marked') bgClasses = 'bg-purple-600 text-white shadow-xs';
-                            else if (status === 'unanswered') bgClasses = 'bg-rose-500 text-white shadow-xs';
+                            else if (status === 'unanswered') bgClasses = 'bg-amber-500 text-white shadow-xs';
 
                             return (
                               <button
@@ -611,80 +654,153 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               <div className="space-y-3">
                 {q.options.map((opt, idx) => {
                   const isSelected = answers[currentQ] === idx;
+                  const hasAnswered = answers[currentQ] !== undefined && answers[currentQ] !== null;
+                  const isRevealed = instantFeedback || !!revealedQuestions[currentQ];
+                  const isCorrect = idx === q.answerIndex;
+
+                  let optionStyle = 'border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/70 text-gray-800';
+                  let badgeStyle = 'bg-gray-100 text-gray-700 group-hover:bg-gray-200 font-bold';
+
+                  if (hasAnswered && isRevealed) {
+                    if (isCorrect) {
+                      optionStyle = 'border-2 border-emerald-500 bg-emerald-50/90 text-emerald-950 font-bold shadow-xs ring-1 ring-emerald-500/20';
+                      badgeStyle = 'bg-emerald-600 text-white font-black shadow-2xs';
+                    } else if (isSelected && !isCorrect) {
+                      optionStyle = 'border-2 border-rose-500 bg-rose-50/90 text-rose-950 font-bold shadow-xs ring-1 ring-rose-500/20';
+                      badgeStyle = 'bg-rose-600 text-white font-black shadow-2xs';
+                    } else {
+                      optionStyle = 'border border-gray-200/60 bg-gray-50/40 text-gray-400 opacity-60';
+                      badgeStyle = 'bg-gray-100 text-gray-400';
+                    }
+                  } else if (isSelected) {
+                    optionStyle = 'border-2 border-indigo-600 bg-indigo-50/60 ring-1 ring-indigo-600/20 text-indigo-950 font-bold';
+                    badgeStyle = 'bg-indigo-600 text-white font-black';
+                  }
+
                   return (
                     <button
                       key={idx}
-                      onClick={() => selectAnswer(idx)}
-                      className={`w-full text-left p-3.5 sm:p-4 rounded-2xl transition-all shadow-xs group flex items-center gap-3.5 ${
-                        isSelected
-                          ? 'border-2 border-indigo-600 bg-indigo-50/60 ring-1 ring-indigo-600/20'
-                          : 'border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/70'
-                      }`}
+                      onClick={() => {
+                        selectAnswer(idx);
+                        if (instantFeedback) {
+                          setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
+                        }
+                      }}
+                      className={`w-full text-left p-3.5 sm:p-4 rounded-2xl transition-all shadow-xs group flex items-center gap-3.5 ${optionStyle}`}
                     >
-                      <span className={`w-8 h-8 rounded-xl text-xs font-black flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200'
-                      }`}>
+                      <span className={`w-8 h-8 rounded-xl text-xs flex items-center justify-center shrink-0 transition-colors ${badgeStyle}`}>
                         {String.fromCharCode(65 + idx)}
                       </span>
-                      <span className={`text-sm sm:text-base leading-relaxed flex-1 ${
-                        isSelected ? 'font-bold text-indigo-950' : 'font-medium text-gray-800'
-                      }`}>
+                      <span className="text-sm sm:text-base leading-relaxed flex-1">
                         {opt}
                       </span>
-                      {isSelected && (
+                      {hasAnswered && isRevealed && isCorrect && (
+                        <span className="flex items-center gap-1 text-xs font-extrabold text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2.5 py-1 rounded-full shrink-0">
+                          <CheckCircle size={14} className="text-emerald-600" />
+                          <span>Correct Answer</span>
+                        </span>
+                      )}
+                      {hasAnswered && isRevealed && isSelected && !isCorrect && (
+                        <span className="flex items-center gap-1 text-xs font-extrabold text-rose-700 bg-rose-100/90 border border-rose-300 px-2.5 py-1 rounded-full shrink-0">
+                          <XCircle size={14} className="text-rose-600" />
+                          <span>Your Choice</span>
+                        </span>
+                      )}
+                      {isSelected && !(hasAnswered && isRevealed) && (
                         <CheckCircle size={20} className="text-indigo-600 shrink-0 ml-auto" />
                       )}
                     </button>
                   );
                 })}
               </div>
+
+              {/* Instant Answer Check Trigger (when answer is selected but not yet revealed) */}
+              {answers[currentQ] !== undefined && answers[currentQ] !== null && !(instantFeedback || revealedQuestions[currentQ]) && (
+                <div className="mt-5 p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-indigo-900 text-xs font-semibold">
+                    <Zap size={16} className="text-indigo-600 shrink-0" />
+                    <span>Answer selected. Want to check if it's correct right away?</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
+                      setShowLearning(currentQ);
+                    }}
+                    className="w-full sm:w-auto btn btn-primary text-xs py-2 px-4 rounded-full flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <Zap size={13} className="text-amber-300 fill-amber-300" />
+                    <span>Check Answer Now</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Practice Mode: Learning Section */}
-            {mode === 'practice' && answers[currentQ] !== undefined && answers[currentQ] !== null && (
-              <div className="bento-card p-5 sm:p-6 mb-5 border-l-4 border-indigo-600 shadow-soft">
-                <button
-                  onClick={() => setShowLearning(showLearning === currentQ ? null : currentQ)}
-                  className="w-full flex items-center justify-between"
-                >
-                  <span className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                    {answers[currentQ] === q.answerIndex ? (
-                      <CheckCircle size={18} className="text-emerald-500" />
-                    ) : (
-                      <XCircle size={18} className="text-rose-500" />
-                    )}
-                    {answers[currentQ] === q.answerIndex ? 'Correct! Well done.' : 'Incorrect — Learn from this concept'}
-                  </span>
-                  <span className="text-xs font-bold text-indigo-600 hover:underline">
-                    {showLearning === currentQ ? 'Hide solution' : 'Show solution & notes'}
-                  </span>
-                </button>
-                {showLearning === currentQ && (
-                  <div className="mt-4 space-y-3 text-sm pt-3 border-t border-gray-100">
-                    {q.hint && (
-                      <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-100 text-blue-900">
-                        <p className="font-bold text-xs uppercase tracking-wider text-blue-700 mb-1">💡 Hint</p>
-                        <p className="text-blue-800">{q.hint}</p>
+            {/* Instant Feedback & Solution Section (revealed in practice mode OR when Instant Check is toggled/revealed) */}
+            {answers[currentQ] !== undefined && answers[currentQ] !== null && (instantFeedback || revealedQuestions[currentQ]) && (
+              <div className="bento-card p-5 sm:p-6 mb-5 shadow-soft border border-gray-200/80 transition-all">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-white shadow-xs shrink-0 ${
+                      answers[currentQ] === q.answerIndex ? 'bg-emerald-600' : 'bg-rose-600'
+                    }`}>
+                      {answers[currentQ] === q.answerIndex ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                    </div>
+                    <div>
+                      <div className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-2">
+                        {answers[currentQ] === q.answerIndex ? (
+                          <span className="text-emerald-700">Correct! (+{q.marks} Marks)</span>
+                        ) : (
+                          <span className="text-rose-700">Incorrect ({q.negativeMarks ? `-${q.negativeMarks}` : '-0.5'} Marks)</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 font-semibold mt-0.5">
+                        Correct Answer is <strong className="text-emerald-700">Option {String.fromCharCode(65 + q.answerIndex)}: {q.options[q.answerIndex]}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowLearning(showLearning === currentQ ? null : currentQ)}
+                    className="btn btn-outline text-xs py-1.5 px-3.5 rounded-full flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <BookOpen size={13} className="text-indigo-600" />
+                    <span>{showLearning === currentQ ? 'Hide Explanation' : 'View Full Solution'}</span>
+                  </button>
+                </div>
+
+                {/* Detailed Solution / Hints / Notes */}
+                {(showLearning === currentQ || instantFeedback) && (
+                  <div className="mt-4 space-y-3 text-sm animate-fadeIn">
+                    {q.solution && (
+                      <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-100 text-emerald-950">
+                        <p className="font-extrabold text-xs uppercase tracking-wider text-emerald-800 mb-1.5 flex items-center gap-1.5">
+                          <BookOpen size={14} className="text-emerald-600" /> Step-by-Step Solution
+                        </p>
+                        <p className="text-emerald-900 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-medium">{q.solution}</p>
                       </div>
                     )}
-                    {q.solution && (
-                      <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-100 text-emerald-900">
-                        <p className="font-bold text-xs uppercase tracking-wider text-emerald-700 mb-1">📖 Solution</p>
-                        <p className="text-emerald-800 whitespace-pre-wrap">{q.solution}</p>
+                    {q.hint && (
+                      <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-100 text-blue-900">
+                        <p className="font-extrabold text-xs uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1.5">
+                          <Lightbulb size={13} /> Key Hint
+                        </p>
+                        <p className="text-blue-800 text-xs sm:text-sm font-medium">{q.hint}</p>
                       </div>
                     )}
                     {q.shortcut && (
                       <div className="p-3.5 bg-purple-50/80 rounded-2xl border border-purple-100 text-purple-900">
-                        <p className="font-bold text-xs uppercase tracking-wider text-purple-700 mb-1">⚡ Shortcut</p>
-                        <p className="text-purple-800">{q.shortcut}</p>
+                        <p className="font-extrabold text-xs uppercase tracking-wider text-purple-700 mb-1 flex items-center gap-1.5">
+                          <Zap size={13} className="text-purple-600" /> Exam Speed Shortcut
+                        </p>
+                        <p className="text-purple-800 text-xs sm:text-sm font-medium">{q.shortcut}</p>
                       </div>
                     )}
                     {q.learningSuggestion && (
                       <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-100 text-amber-900">
-                        <p className="font-bold text-xs uppercase tracking-wider text-amber-700 mb-1">🎯 Takeaway</p>
-                        <p className="text-amber-800">{q.learningSuggestion}</p>
+                        <p className="font-extrabold text-xs uppercase tracking-wider text-amber-700 mb-1 flex items-center gap-1.5">
+                          <Target size={13} /> Concept Takeaway
+                        </p>
+                        <p className="text-amber-800 text-xs sm:text-sm font-medium">{q.learningSuggestion}</p>
                       </div>
                     )}
                   </div>

@@ -16,8 +16,10 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [attemptQs, setAttemptQs] = useState<AttemptQuestion[]>([]);
   const [paper, setPaper] = useState<Paper | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
-  const [expandedQ, setExpandedQ] = useState<number | null>(null);
+  const [showDetail, setShowDetail] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'unattempted'>('all');
+  const [expandedQs, setExpandedQs] = useState<Record<number, boolean>>({});
+  const [expandAll, setExpandAll] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -187,114 +189,249 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
       )}
 
       {/* Question Analysis */}
-      <div className="bento-card p-6 shadow-soft border border-gray-200/80">
-        <button
-          onClick={() => setShowDetail(!showDetail)}
-          className="w-full flex items-center justify-between text-left group"
-        >
-          <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-            <BookOpen size={18} className="text-indigo-600" /> Question-by-Question Analysis
-          </h2>
-          <span className="text-xs font-bold text-indigo-600 group-hover:underline">
-            {showDetail ? 'Hide details' : 'Show details'}
-          </span>
-        </button>
+      <div className="bento-card p-6 sm:p-7 shadow-soft border border-gray-200/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+              <BookOpen size={20} className="text-indigo-600" /> Question-by-Question Detailed Review
+            </h2>
+            <p className="text-xs text-gray-500 font-semibold mt-0.5">
+              Review all questions with correct answers, your choices, and step-by-step solutions
+            </p>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const next = !expandAll;
+                setExpandAll(next);
+                if (next) {
+                  const all: Record<number, boolean> = {};
+                  attemptQs.forEach((_, idx) => { all[idx] = true; });
+                  setExpandedQs(all);
+                } else {
+                  setExpandedQs({});
+                }
+              }}
+              className="btn btn-outline text-xs py-1.5 px-3 rounded-full"
+            >
+              {expandAll ? 'Collapse All Solutions' : 'Expand All Solutions'}
+            </button>
+            <button
+              onClick={() => setShowDetail(!showDetail)}
+              className="text-xs font-bold text-indigo-600 hover:underline px-2 py-1"
+            >
+              {showDetail ? 'Hide Section' : 'Show Section'}
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
         {showDetail && (
-          <div className="space-y-3 mt-4">
-            {attemptQs.map((aq, idx) => {
-              const q = questions[aq.question_index];
-              if (!q) return null;
-              const isExpanded = expandedQ === idx;
-
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {[
+              { id: 'all' as const, label: 'All Questions', count: attemptQs.length, color: 'text-gray-900' },
+              { id: 'correct' as const, label: 'Correct', count: attempt.correct_count, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+              { id: 'incorrect' as const, label: 'Incorrect', count: attempt.incorrect_count, color: 'text-rose-700 bg-rose-50 border-rose-200' },
+              { id: 'unattempted' as const, label: 'Unattempted', count: attempt.unanswered_count, color: 'text-gray-700 bg-gray-100 border-gray-200' },
+            ].map(tab => {
+              const isActive = filter === tab.id;
               return (
-                <div
-                  key={idx}
-                  className={`p-4 rounded-2xl border transition-all ${
-                    aq.is_correct === true
-                      ? 'border-emerald-200 bg-emerald-50/40'
-                      : aq.is_correct === false
-                      ? 'border-rose-200 bg-rose-50/40'
-                      : 'border-gray-200 bg-gray-50/50'
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id)}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                    isActive
+                      ? 'bg-gray-900 text-white border-gray-900 shadow-xs'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  <button onClick={() => setExpandedQ(isExpanded ? null : idx)} className="w-full text-left">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <span className={`flex items-center justify-center w-7 h-7 rounded-xl text-xs font-bold shrink-0 ${
-                          aq.is_correct === true ? 'bg-emerald-600 text-white' :
-                          aq.is_correct === false ? 'bg-rose-600 text-white' :
-                          'bg-gray-200 text-gray-700'
-                        }`}>
-                          {idx + 1}
-                        </span>
-                        <p className="text-sm text-gray-900 font-bold line-clamp-1">{q.question}</p>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="text-xs font-mono text-gray-500 font-semibold">{formatTime(aq.time_spent_seconds)}</span>
-                        {aq.is_correct === true && <CheckCircle size={17} className="text-emerald-600" />}
-                        {aq.is_correct === false && <XCircle size={17} className="text-rose-600" />}
-                        {aq.is_correct === null && <MinusCircle size={17} className="text-gray-400" />}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-1.5 ml-9.5">
-                      <span className="text-[11px] text-gray-500 font-semibold">{q.subject} • {q.topic}</span>
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-4 ml-9.5 space-y-3 text-xs sm:text-sm pt-3 border-t border-gray-200/70">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div className="p-3 rounded-xl bg-white border border-gray-200">
-                          <span className="text-gray-500 block mb-0.5 font-medium">Your answer:</span>
-                          <span className={aq.is_correct ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>
-                            {aq.selected_answer !== null ? `${String.fromCharCode(65 + aq.selected_answer)}) ${q.options[aq.selected_answer]}` : 'Not attempted'}
-                          </span>
-                        </div>
-                        {aq.is_correct !== true && (
-                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                            <span className="text-emerald-700 block mb-0.5 font-medium">Correct answer:</span>
-                            <span className="text-emerald-800 font-bold">
-                              {String.fromCharCode(65 + q.answerIndex)}) {q.options[q.answerIndex]}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {q.hint && (
-                        <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl text-blue-900">
-                          <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
-                            <Lightbulb size={13} /> Hint: {q.hint}
-                          </p>
-                        </div>
-                      )}
-                      {q.solution && (
-                        <div className="p-3.5 bg-white rounded-xl border border-gray-200">
-                          <p className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                            <strong className="text-gray-900 block mb-1 font-bold">Solution Explanation:</strong> {q.solution}
-                          </p>
-                        </div>
-                      )}
-                      {q.shortcut && (
-                        <div className="p-3 bg-purple-50/80 border border-purple-100 rounded-xl text-purple-900">
-                          <p className="text-xs text-purple-800 flex items-start gap-1.5">
-                            <Zap size={13} className="shrink-0 mt-0.5 text-purple-600" />
-                            <span><strong>Exam Shortcut:</strong> {q.shortcut}</span>
-                          </p>
-                        </div>
-                      )}
-                      {q.learningSuggestion && (
-                        <div className="p-3 bg-amber-50/80 border border-amber-100 rounded-xl text-amber-900">
-                          <p className="text-xs text-amber-800">
-                            <strong>📌 Revision Note:</strong> {q.learningSuggestion}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  <span>{tab.label}</span>
+                  <span className={`px-2 py-0.2 rounded-full text-[10px] font-black ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
               );
             })}
+          </div>
+        )}
+
+        {showDetail && (
+          <div className="space-y-4">
+            {attemptQs
+              .map((aq, originalIdx) => ({ aq, originalIdx }))
+              .filter(({ aq }) => {
+                if (filter === 'correct') return aq.is_correct === true;
+                if (filter === 'incorrect') return aq.is_correct === false;
+                if (filter === 'unattempted') return aq.is_correct === null || aq.selected_answer === null;
+                return true;
+              })
+              .map(({ aq, originalIdx }) => {
+                const q = questions[aq.question_index];
+                if (!q) return null;
+                const isExpanded = !!expandedQs[originalIdx];
+
+                return (
+                  <div
+                    key={originalIdx}
+                    className={`rounded-2xl border transition-all overflow-hidden ${
+                      aq.is_correct === true
+                        ? 'border-emerald-200 bg-emerald-50/20'
+                        : aq.is_correct === false
+                        ? 'border-rose-200 bg-rose-50/20'
+                        : 'border-gray-200 bg-gray-50/30'
+                    }`}
+                  >
+                    {/* Header Row */}
+                    <div
+                      onClick={() => setExpandedQs(prev => ({ ...prev, [originalIdx]: !prev[originalIdx] }))}
+                      className="p-4 sm:p-5 cursor-pointer hover:bg-black/[0.01] transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className={`flex items-center justify-center w-8 h-8 rounded-xl text-xs font-black shrink-0 ${
+                            aq.is_correct === true ? 'bg-emerald-600 text-white shadow-xs' :
+                            aq.is_correct === false ? 'bg-rose-600 text-white shadow-xs' :
+                            'bg-gray-200 text-gray-700'
+                          }`}>
+                            Q{originalIdx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm sm:text-base text-gray-900 font-extrabold leading-snug">
+                              {q.question}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                                {q.subject}
+                              </span>
+                              {q.topic && (
+                                <span className="text-[11px] font-medium text-gray-500">
+                                  • {q.topic}
+                                </span>
+                              )}
+                              <span className="text-[11px] font-mono text-gray-400 font-semibold flex items-center gap-1">
+                                <Clock size={11} /> {formatTime(aq.time_spent_seconds)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {aq.is_correct === true && (
+                            <span className="flex items-center gap-1 text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">
+                              <CheckCircle size={14} className="text-emerald-600" /> +{q.marks} Marks
+                            </span>
+                          )}
+                          {aq.is_correct === false && (
+                            <span className="flex items-center gap-1 text-xs font-extrabold text-rose-700 bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-full">
+                              <XCircle size={14} className="text-rose-600" /> -{q.negativeMarks || 0.5} Marks
+                            </span>
+                          )}
+                          {aq.is_correct === null && (
+                            <span className="flex items-center gap-1 text-xs font-extrabold text-gray-600 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full">
+                              <MinusCircle size={14} className="text-gray-400" /> Skipped (0 Marks)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* All Options Breakdown */}
+                    <div className="px-4 sm:px-5 pb-4 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                        {q.options.map((opt, optIdx) => {
+                          const isUserAnswer = aq.selected_answer === optIdx;
+                          const isCorrect = optIdx === q.answerIndex;
+
+                          let cardClasses = 'bg-white border-gray-200 text-gray-700';
+                          let badgeClasses = 'bg-gray-100 text-gray-600';
+
+                          if (isCorrect) {
+                            cardClasses = 'bg-emerald-50/90 border-emerald-500 text-emerald-950 font-bold shadow-xs';
+                            badgeClasses = 'bg-emerald-600 text-white font-black';
+                          } else if (isUserAnswer && !isCorrect) {
+                            cardClasses = 'bg-rose-50/90 border-rose-500 text-rose-950 font-bold shadow-xs';
+                            badgeClasses = 'bg-rose-600 text-white font-black';
+                          }
+
+                          return (
+                            <div
+                              key={optIdx}
+                              className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm ${cardClasses}`}
+                            >
+                              <span className={`w-6 h-6 rounded-lg text-xs flex items-center justify-center shrink-0 ${badgeClasses}`}>
+                                {String.fromCharCode(65 + optIdx)}
+                              </span>
+                              <span className="flex-1 leading-snug">{opt}</span>
+                              {isCorrect && (
+                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                  <CheckCircle size={11} /> Correct
+                                </span>
+                              )}
+                              {isUserAnswer && !isCorrect && (
+                                <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                  <XCircle size={11} /> Your Choice
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Toggle Solution details button */}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => setExpandedQs(prev => ({ ...prev, [originalIdx]: !prev[originalIdx] }))}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                        >
+                          <BookOpen size={13} />
+                          <span>{isExpanded ? 'Hide Solution' : 'View Full Solution & Explanation'}</span>
+                        </button>
+                      </div>
+
+                      {/* Expanded Solution Details */}
+                      {isExpanded && (
+                        <div className="mt-3 space-y-3 pt-3 border-t border-gray-200/80 text-xs sm:text-sm animate-fadeIn">
+                          {q.solution && (
+                            <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-100 text-emerald-950">
+                              <p className="font-extrabold text-xs uppercase tracking-wider text-emerald-800 mb-1 flex items-center gap-1.5">
+                                <BookOpen size={13} className="text-emerald-600" /> Step-by-Step Solution
+                              </p>
+                              <p className="text-emerald-900 whitespace-pre-wrap leading-relaxed font-medium">{q.solution}</p>
+                            </div>
+                          )}
+                          {q.hint && (
+                            <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-100 text-blue-900">
+                              <p className="font-extrabold text-xs uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1.5">
+                                <Lightbulb size={13} /> Helpful Hint
+                              </p>
+                              <p className="text-blue-800 font-medium">{q.hint}</p>
+                            </div>
+                          )}
+                          {q.shortcut && (
+                            <div className="p-3.5 bg-purple-50/80 rounded-2xl border border-purple-100 text-purple-900">
+                              <p className="font-extrabold text-xs uppercase tracking-wider text-purple-700 mb-1 flex items-center gap-1.5">
+                                <Zap size={13} className="text-purple-600" /> Exam Speed Shortcut
+                              </p>
+                              <p className="text-purple-800 font-medium">{q.shortcut}</p>
+                            </div>
+                          )}
+                          {q.learningSuggestion && (
+                            <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-100 text-amber-900">
+                              <p className="font-extrabold text-xs uppercase tracking-wider text-amber-700 mb-1 flex items-center gap-1.5">
+                                <Target size={13} /> Concept Takeaway
+                              </p>
+                              <p className="text-amber-800 font-medium">{q.learningSuggestion}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
