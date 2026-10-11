@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { DueReview, Mistake } from '../types';
-import { getDueReviews, submitReview, getReviewStats } from '../services/srs';
+import { getDueReviews, submitReview } from '../services/srs';
 import { getMistakes } from '../services/database';
-import { Clock, CheckCircle, XCircle, Brain, TrendingUp, Award, ArrowRight, RotateCcw } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Brain, TrendingUp, Award, ArrowRight, RotateCcw, ArrowLeft, Lightbulb, Zap } from 'lucide-react';
 
 interface ReviewSessionProps {
   userId?: string;
@@ -11,12 +11,14 @@ interface ReviewSessionProps {
 }
 
 export default function ReviewSession({ userId, onComplete, onExit }: ReviewSessionProps) {
+  const effectiveUserId = userId || 'guest';
   const [dueReviews, setDueReviews] = useState<DueReview[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mistake, setMistake] = useState<Mistake | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [showRating, setShowRating] = useState(false);
+  const [availableMistakes, setAvailableMistakes] = useState<Mistake[]>([]);
   const [sessionStats, setSessionStats] = useState({
     total: 0,
     correct: 0,
@@ -27,19 +29,21 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
   useEffect(() => {
     loadDueReviews();
-  }, [userId]);
+  }, [effectiveUserId]);
 
   const loadDueReviews = async () => {
-    if (!userId) return;
-    
     setLoading(true);
     try {
-      const reviews = await getDueReviews(userId, 20);
+      const [reviews, allMistakes] = await Promise.all([
+        getDueReviews(effectiveUserId, 20),
+        getMistakes(effectiveUserId),
+      ]);
+      setAvailableMistakes(allMistakes);
       setDueReviews(reviews);
       setSessionStats(prev => ({ ...prev, total: reviews.length }));
-      
+
       if (reviews.length > 0) {
-        await loadMistake(reviews[0].mistake_id);
+        await loadMistake(reviews[0].mistake_id, allMistakes);
       }
     } catch (error) {
       console.error('Failed to load due reviews:', error);
@@ -48,10 +52,30 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
     }
   };
 
-  const loadMistake = async (mistakeId: string) => {
-    const mistakes = await getMistakes(userId);
+  const loadMistake = async (mistakeId: string, cachedMistakes?: Mistake[]) => {
+    const mistakes = cachedMistakes || (await getMistakes(effectiveUserId));
     const found = mistakes.find(m => m.id === mistakeId);
     setMistake(found || null);
+  };
+
+  const startPracticeAllMistakes = () => {
+    if (availableMistakes.length === 0) return;
+    const syntheticReviews: DueReview[] = availableMistakes.map(m => ({
+      mistake_id: m.id,
+      question_text: m.question_text,
+      subject: m.subject,
+      topic: m.topic,
+      interval_days: m.interval_days || 1,
+      ease_factor: m.ease_factor || 2.5,
+      review_count: m.review_count || 0,
+      next_review_date: m.next_review_date || m.last_attempted_at,
+    }));
+    setDueReviews(syntheticReviews);
+    setCurrentIndex(0);
+    loadMistake(syntheticReviews[0].mistake_id, availableMistakes);
+    setSelectedAnswer(null);
+    setShowAnswer(false);
+    setShowRating(false);
   };
 
   const handleAnswerSelect = (answerIndex: number) => {
@@ -68,11 +92,11 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
     if (!mistake) return;
 
     const responseTime = Math.floor((Date.now() - sessionStats.startTime) / 1000);
-    const result = await submitReview(userId!, mistake.id, quality, responseTime);
+    const result = await submitReview(effectiveUserId, mistake.id, quality, responseTime);
 
     if (result.success) {
       const isCorrect = quality >= 3;
-      
+
       setSessionStats(prev => ({
         ...prev,
         correct: prev.correct + (isCorrect ? 1 : 0),
@@ -97,10 +121,10 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading review session...</p>
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading your review session...</p>
         </div>
       </div>
     );
@@ -108,23 +132,29 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
   if (dueReviews.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass-card rounded-2xl p-8 max-w-md text-center">
-          <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={40} className="text-green-600 dark:text-green-400" />
+      <div className="min-h-[70vh] flex items-center justify-center px-4">
+        <div className="glass-card rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center border border-white/40 shadow-strong">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-soft">
+            <CheckCircle size={40} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
             All Caught Up!
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            You have no mistakes due for review. Great job keeping up with your studies!
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+            {availableMistakes.length > 0
+              ? `You have no reviews strictly due today, but you have ${availableMistakes.length} question${availableMistakes.length > 1 ? 's' : ''} in your mistake notebook.`
+              : 'You have no pending mistakes scheduled for review right now. Excellent progress!'}
           </p>
-          <button
-            onClick={onExit}
-            className="btn btn-primary"
-          >
-            Back to Dashboard
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {availableMistakes.length > 0 && (
+              <button onClick={startPracticeAllMistakes} className="btn btn-primary">
+                <RotateCcw size={16} /> Review Mistakes Now
+              </button>
+            )}
+            <button onClick={onExit} className="btn btn-outline">
+              <ArrowLeft size={16} /> Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -132,9 +162,9 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
   if (!mistake) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400">Loading question...</p>
+          <p className="text-slate-600 dark:text-slate-400">Preparing next question...</p>
         </div>
       </div>
     );
@@ -142,6 +172,7 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
   const progress = ((currentIndex + 1) / dueReviews.length) * 100;
   const isCorrect = selectedAnswer === mistake.correct_answer;
+
 
   return (
     <div className="min-h-screen py-8">

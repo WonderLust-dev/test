@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory } from '../types';
+import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
 import { getPapers, getAttempts, getMistakes, getBookmarks, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
 import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock } from 'lucide-react';
@@ -13,12 +13,14 @@ interface DashboardProps {
   userId?: string;
   onStartExam: (paperId: string) => void;
   onPractice: (paperId: string) => void;
+  onStartCustomPractice: (paper: Paper) => void;
   onImport: () => void;
   onStartReview: () => void;
   refreshKey: number;
 }
 
-export default function Dashboard({ userId, onStartExam, onPractice, onImport, onStartReview, refreshKey }: DashboardProps) {
+export default function Dashboard({ userId, onStartExam, onPractice, onStartCustomPractice, onImport, onStartReview, refreshKey }: DashboardProps) {
+  const effectiveUserId = userId || 'guest';
   const [papers, setPapers] = useState<Paper[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [mistakes, setMistakes] = useState<Mistake[]>([]);
@@ -30,10 +32,10 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
   useEffect(() => {
     async function load() {
       const [p, a, m, b] = await Promise.all([
-        getPapers(userId),
-        getAttempts(userId),
-        getMistakes(userId),
-        getBookmarks(userId),
+        getPapers(effectiveUserId),
+        getAttempts(effectiveUserId),
+        getMistakes(effectiveUserId),
+        getBookmarks(effectiveUserId),
       ]);
       setPapers(p);
       setAttempts(a);
@@ -41,7 +43,7 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
       setBookmarks(b);
     }
     load();
-  }, [userId, refreshKey]);
+  }, [effectiveUserId, refreshKey]);
 
   const filteredPapers = useMemo(() => {
     let result = [...papers];
@@ -79,24 +81,24 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
     return Array.from(exams);
   }, [papers]);
 
+  const allQuestions = useMemo(() => {
+    const list: QuestionJSON[] = [];
+    papers.forEach(p => {
+      if (p.raw_json?.questions) {
+        list.push(...p.raw_json.questions);
+      }
+    });
+    return list;
+  }, [papers]);
+
   // Stats
   const totalAttempts = attempts.length;
   const totalQuestions = attempts.reduce((s, a) => s + a.attempted_count, 0);
   const overallAccuracy = totalAttempts > 0 ? Math.round(attempts.reduce((s, a) => s + a.accuracy, 0) / totalAttempts) : 0;
-  const avgScore = totalAttempts > 0 ? Math.round(attempts.reduce((s, a) => s + (a.score / a.total_marks) * 100, 0) / totalAttempts) : 0;
   const highestScore = totalAttempts > 0 ? Math.max(...attempts.map(a => Math.round((a.score / a.total_marks) * 100))) : 0;
 
-  // Weak areas
+  // Weak areas calculated from mistake notebook
   const weakTopics = useMemo(() => {
-    const topicMap = new Map<string, { correct: number; total: number }>();
-    attempts.forEach(a => {
-      const paper = papers.find(p => p.id === a.paper_id);
-      if (!paper) return;
-      paper.raw_json.questions.forEach((q, idx) => {
-        const aq = { selected_answer: null, is_correct: null, question_index: idx }; // simplified
-      });
-    });
-    // Simplified: use mistakes data
     const mistMap = new Map<string, number>();
     mistakes.forEach(m => {
       mistMap.set(m.topic, (mistMap.get(m.topic) || 0) + m.incorrect_count);
@@ -105,11 +107,44 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([topic, count]) => ({ topic, count }));
-  }, [mistakes, attempts, papers]);
+  }, [mistakes]);
+
+  const handlePracticeTopicClick = (topicName: string) => {
+    const matched = allQuestions.filter(q => q.topic.toLowerCase() === topicName.toLowerCase());
+    const questionsToUse = matched.length > 0 ? matched : allQuestions.slice(0, 10);
+    if (questionsToUse.length === 0) return;
+
+    const customPaper: Paper = {
+      id: `custom_drill_${Date.now()}`,
+      user_id: effectiveUserId,
+      exam: 'SSC CGL',
+      title: `${topicName} — Focused Drill`,
+      description: `Targeted revision drill for ${topicName} (${questionsToUse.length} questions)`,
+      difficulty: 'medium',
+      duration_minutes: Math.max(5, Math.ceil(questionsToUse.length * 1.5)),
+      total_marks: questionsToUse.length * 2,
+      negative_marking: 0.5,
+      question_count: questionsToUse.length,
+      subjects: Array.from(new Set(questionsToUse.map(q => q.subject))),
+      raw_json: {
+        exam: 'SSC CGL',
+        paperTitle: `${topicName} — Focused Drill`,
+        durationMinutes: Math.max(5, Math.ceil(questionsToUse.length * 1.5)),
+        totalMarks: questionsToUse.length * 2,
+        negativeMarking: 0.5,
+        subjects: Array.from(new Set(questionsToUse.map(q => q.subject))),
+        questions: questionsToUse,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      visibility: 'private',
+    };
+    onStartCustomPractice(customPaper);
+  };
 
   const tabs = [
     { id: 'library' as const, label: 'Exam Library', icon: BookOpen },
-    { id: 'practice' as const, label: 'Practice', icon: Target },
+    { id: 'practice' as const, label: 'Practice Hub', icon: Target },
     { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle, count: mistakes.length },
     { id: 'bookmarks' as const, label: 'Bookmarks', icon: BookmarkIcon, count: bookmarks.length },
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
@@ -117,18 +152,34 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
 
   return (
     <div className="max-w-7xl mx-auto animate-fadeIn">
-      {/* Welcome Header */}
-      <div className="glass-card rounded-2xl p-8 mb-8">
-        <h1 className="text-3xl font-bold text-gradient mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          Welcome to Your Exam Dashboard
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          Track your progress, practice weak areas, and ace your SSC CGL exam.
-        </p>
+      {/* Welcome Banner */}
+      <div className="glass-card rounded-3xl p-6 sm:p-8 mb-8 border border-white/40 shadow-soft">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="badge badge-accent">SSC CGL 2026</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Target Preparation Hub</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white" style={{ fontFamily: 'var(--font-heading)' }}>
+              Master Every Topic with Adaptive Drills
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              Real exam simulation, instant step-by-step shortcuts, and active spaced repetition recall.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setActiveTab('practice')} className="btn btn-primary text-xs py-2.5 px-4 shadow-soft">
+              <Target size={15} /> Quick Drill
+            </button>
+            <button onClick={onImport} className="btn btn-outline text-xs py-2.5 px-4">
+              <PlusCircle size={15} /> Import Paper
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-8">
         <StatCard icon={FileText} label="Papers" value={papers.length} color="primary" />
         <StatCard icon={Play} label="Attempts" value={totalAttempts} color="accent" />
         <StatCard icon={Target} label="Questions" value={totalQuestions} color="success" />
@@ -138,48 +189,62 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
       </div>
 
       {/* Spaced Repetition Review Dashboard */}
-      {userId && (
-        <ReviewDashboard userId={userId} onStartReview={onStartReview} />
-      )}
+      <ReviewDashboard userId={effectiveUserId} onStartReview={onStartReview} />
 
-      {/* Weak Areas */}
+      {/* Clickable Weak Areas Banner */}
       {weakTopics.length > 0 && (
-        <div className="glass-card rounded-xl p-4 mb-6" style={{ borderColor: 'var(--color-warning)', borderWidth: '1px' }}>
-          <h3 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: 'var(--color-warning)' }}>
-            <Brain size={16} /> Weak Areas — Focus Here
-          </h3>
+        <div className="glass-card rounded-2xl p-5 mb-8 border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Brain size={18} className="text-amber-600 dark:text-amber-400" />
+              Focus Areas (Based on your incorrect answers)
+            </h3>
+            <span className="text-xs text-amber-700/80 dark:text-amber-400/80">Click any topic to start a targeted drill</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {weakTopics.map(wt => (
-              <span key={wt.topic} className="badge badge-warning">
-                {wt.topic} ({wt.count} mistakes)
-              </span>
+              <button
+                key={wt.topic}
+                onClick={() => handlePracticeTopicClick(wt.topic)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/70 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60 transition-all hover:scale-105 flex items-center gap-1.5 shadow-soft cursor-pointer"
+                title={`Click to practice ${wt.topic}`}
+              >
+                <span>{wt.topic}</span>
+                <span className="px-1.5 py-0.5 bg-amber-200/80 dark:bg-amber-800/80 rounded-full text-[10px] font-bold">
+                  {wt.count} errors
+                </span>
+                <Play size={10} className="text-amber-700 dark:text-amber-400 fill-amber-700" />
+              </button>
             ))}
           </div>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="glass-card rounded-2xl mb-8 overflow-hidden">
-        <div className="flex overflow-x-auto border-b border-white/20">
+      <div className="glass-card rounded-3xl mb-8 overflow-hidden border border-white/40 shadow-soft">
+        <div className="flex overflow-x-auto border-b border-slate-200/70 dark:border-slate-800/70 bg-white/40 dark:bg-slate-900/40 px-2">
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-semibold whitespace-nowrap transition-all relative ${
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap transition-all relative ${
                 activeTab === tab.id
-                  ? 'text-primary'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-white/10'
-              }`}>
-              <tab.icon size={18} />
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/40'
+              }`}
+            >
+              <tab.icon size={17} />
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
-                <span className="ml-1 badge badge-danger">{tab.count}</span>
+                <span className="ml-1 badge badge-danger text-[10px] py-0.5 px-1.5">{tab.count}</span>
               )}
               {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: 'var(--gradient-brand)' }}></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--gradient-brand)' }}></div>
               )}
             </button>
           ))}
         </div>
-        <div className="p-6">
+        <div className="p-5 sm:p-7">
 
       {/* Tab Content */}
       {activeTab === 'library' && (
@@ -196,17 +261,34 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, o
           onPractice={onPractice}
           onImport={onImport}
           onRefresh={() => setPapers([...papers])}
-          userId={userId}
+          userId={effectiveUserId}
         />
       )}
       {activeTab === 'practice' && (
-        <PracticeTab papers={papers} mistakes={mistakes} onStartExam={onPractice} />
+        <PracticeTab
+          papers={papers}
+          mistakes={mistakes}
+          allQuestions={allQuestions}
+          onStartCustomPractice={onStartCustomPractice}
+          effectiveUserId={effectiveUserId}
+        />
       )}
       {activeTab === 'mistakes' && (
-        <MistakesTab mistakes={mistakes} onResolve={async (id) => { await resolveMistake(id); setMistakes(await getMistakes(userId)); }} />
+        <MistakesTab
+          mistakes={mistakes}
+          onResolve={async (id) => { await resolveMistake(id); setMistakes(await getMistakes(effectiveUserId)); }}
+          onStartCustomPractice={onStartCustomPractice}
+          effectiveUserId={effectiveUserId}
+        />
       )}
       {activeTab === 'bookmarks' && (
-        <BookmarksTab bookmarks={bookmarks} onRemove={async (id) => { await removeBookmark(id); setBookmarks(await getBookmarks(userId)); }} />
+        <BookmarksTab
+          bookmarks={bookmarks}
+          allQuestions={allQuestions}
+          onRemove={async (id) => { await removeBookmark(id); setBookmarks(await getBookmarks(effectiveUserId)); }}
+          onStartCustomPractice={onStartCustomPractice}
+          effectiveUserId={effectiveUserId}
+        />
       )}
       {activeTab === 'analytics' && (
         <AnalyticsTab attempts={attempts} papers={papers} />
@@ -463,50 +545,298 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
 }
 
 // ============================================================
-// Practice Tab
+// Practice Tab (Dynamic Custom Drills & Adaptive Modes)
 // ============================================================
-function PracticeTab({ papers, mistakes, onStartExam }: { papers: Paper[]; mistakes: Mistake[]; onStartExam: (id: string) => void }) {
-  const modes = [
-    { id: 'quick', label: 'Quick Practice', desc: 'Random questions from all papers', icon: Zap, color: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' },
-    { id: 'topic', label: 'Topic Practice', desc: 'Focus on a specific topic', icon: BookOpen, color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
-    { id: 'weak', label: 'Weak Area Practice', desc: 'Practice your weakest topics', icon: Brain, color: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
-    { id: 'mistakes', label: 'Previous Mistakes', desc: 'Review questions you got wrong', icon: AlertTriangle, color: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
-    { id: 'timed', label: 'Timed Practice', desc: 'Practice with a time limit', icon: Clock, color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400' },
-    { id: 'random', label: 'Random Mix', desc: 'Mixed difficulty random selection', icon: RotateCcw, color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-  ];
+function PracticeTab({
+  papers,
+  mistakes,
+  allQuestions,
+  onStartCustomPractice,
+  effectiveUserId,
+}: {
+  papers: Paper[];
+  mistakes: Mistake[];
+  allQuestions: QuestionJSON[];
+  onStartCustomPractice: (paper: Paper) => void;
+  effectiveUserId: string;
+}) {
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+
+  const subjects = useMemo(() => {
+    return Array.from(new Set(allQuestions.map(q => q.subject).filter(Boolean)));
+  }, [allQuestions]);
+
+  const topicsForSubject = useMemo(() => {
+    const list = allQuestions.filter(q => !selectedSubject || q.subject === selectedSubject);
+    return Array.from(new Set(list.map(q => q.topic).filter(Boolean)));
+  }, [allQuestions, selectedSubject]);
+
+  const topicMatchedQuestions = useMemo(() => {
+    return allQuestions.filter(q => {
+      const subMatch = !selectedSubject || q.subject === selectedSubject;
+      const topMatch = !selectedTopic || q.topic === selectedTopic;
+      return subMatch && topMatch;
+    });
+  }, [allQuestions, selectedSubject, selectedTopic]);
+
+  const launchCustomDrill = (title: string, desc: string, questions: QuestionJSON[], durationMins: number) => {
+    if (questions.length === 0) {
+      alert('No questions available for this practice mode. Import more papers to unlock drills.');
+      return;
+    }
+    const customPaper: Paper = {
+      id: `practice_${Date.now()}`,
+      user_id: effectiveUserId,
+      exam: 'SSC CGL',
+      title,
+      description: desc,
+      difficulty: 'medium',
+      duration_minutes: durationMins,
+      total_marks: questions.length * 2,
+      negative_marking: 0.5,
+      question_count: questions.length,
+      subjects: Array.from(new Set(questions.map(q => q.subject))),
+      raw_json: {
+        exam: 'SSC CGL',
+        paperTitle: title,
+        durationMinutes: durationMins,
+        totalMarks: questions.length * 2,
+        negativeMarking: 0.5,
+        subjects: Array.from(new Set(questions.map(q => q.subject))),
+        questions,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      visibility: 'private',
+    };
+    onStartCustomPractice(customPaper);
+  };
+
+  const startQuickSprint = () => {
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 10);
+    launchCustomDrill('Quick Sprint (10 Questions)', 'Rapid-fire 10 questions to test current readiness', shuffled, 10);
+  };
+
+  const startSpeedDrill = () => {
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 10);
+    launchCustomDrill('Speed Challenge (5 Minutes)', '10 questions under high-pressure 5-minute countdown', shuffled, 5);
+  };
+
+  const startWeakAreaDrill = () => {
+    if (mistakes.length === 0) {
+      startQuickSprint();
+      return;
+    }
+    const weakTopicsSet = new Set(mistakes.map(m => m.topic.toLowerCase()));
+    let matched = allQuestions.filter(q => weakTopicsSet.has(q.topic.toLowerCase()));
+    if (matched.length === 0) matched = allQuestions.slice(0, 10);
+    launchCustomDrill('Weak Areas Remediation', 'Targeted drill focusing strictly on topics with past mistakes', matched, Math.max(5, Math.ceil(matched.length * 1.5)));
+  };
+
+  const startMistakesDrill = () => {
+    if (mistakes.length === 0) {
+      alert('You have 0 mistakes recorded! Take an exam to log questions for review.');
+      return;
+    }
+    const mistakeQuestions: QuestionJSON[] = mistakes.map((m, idx) => ({
+      id: m.question_id || idx + 1,
+      subject: m.subject,
+      topic: m.topic,
+      question: m.question_text,
+      options: m.options,
+      correctAnswer: m.options[m.correct_answer] || '',
+      answerIndex: m.correct_answer,
+      marks: 2,
+      negativeMarks: 0.5,
+      solution: m.solution,
+      shortcut: m.shortcut,
+      hint: m.hint,
+      learningSuggestion: m.learning_suggestion,
+    }));
+    launchCustomDrill('Mistake Notebook Retest', 'Retest questions that you previously answered incorrectly', mistakeQuestions, Math.max(5, Math.ceil(mistakeQuestions.length * 1.5)));
+  };
+
+  const startMixedComprehensive = () => {
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 15);
+    launchCustomDrill('Comprehensive Mix (15 Qs)', 'Multi-subject randomized practice session', shuffled, 15);
+  };
+
+  const startTopicDrill = () => {
+    if (topicMatchedQuestions.length === 0) return;
+    const topicLabel = selectedTopic || selectedSubject || 'All Topics';
+    launchCustomDrill(
+      `${topicLabel} Practice Drill`,
+      `Focused drill on ${topicLabel} with ${topicMatchedQuestions.length} questions`,
+      topicMatchedQuestions,
+      Math.max(5, Math.ceil(topicMatchedQuestions.length * 1.5))
+    );
+  };
+
+  if (allQuestions.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Target size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-1">No Questions Available</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Please import a question set or paper first to unlock practice modes.</p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Practice Modes</h2>
-      {papers.length === 0 ? (
-        <div className="text-center py-12">
-          <Target size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Import papers first to start practicing.</p>
+    <div className="space-y-8 animate-fadeIn">
+      {/* Interactive Topic Selector */}
+      <div className="glass-card rounded-2xl p-6 border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-r from-indigo-50/50 via-white to-sky-50/50 dark:from-slate-900/60 dark:to-indigo-950/20 shadow-soft">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <span className="badge badge-accent mb-1">Custom Practice Builder</span>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <BookOpen size={18} className="text-indigo-600" />
+              Targeted Topic Drill
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Filter by subject and specific topic to practice weak syllabus areas.
+            </p>
+          </div>
+          <button
+            onClick={startTopicDrill}
+            disabled={topicMatchedQuestions.length === 0}
+            className="btn btn-primary text-xs py-2.5 px-5 shadow-soft shrink-0 self-start md:self-auto"
+          >
+            <Play size={14} className="fill-white" /> Start Topic Drill ({topicMatchedQuestions.length} Qs)
+          </button>
         </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {modes.map(mode => (
-            <button key={mode.id} onClick={() => {
-              // Start with first paper in practice mode
-              if (papers.length > 0) onStartExam(papers[0].id);
-            }} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-left hover:shadow-md transition-shadow">
-              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${mode.color}`}>
-                <mode.icon size={20} />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">{mode.label}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{mode.desc}</p>
-            </button>
-          ))}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">Subject</label>
+            <select
+              value={selectedSubject}
+              onChange={e => { setSelectedSubject(e.target.value); setSelectedTopic(''); }}
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+            >
+              <option value="">All Subjects ({allQuestions.length} Questions)</option>
+              {subjects.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">Specific Topic</label>
+            <select
+              value={selectedTopic}
+              onChange={e => setSelectedTopic(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+            >
+              <option value="">All Topics</option>
+              {topicsForSubject.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      )}
-      {mistakes.length > 0 && (
-        <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl">
-          <p className="text-sm text-red-700 dark:text-red-400">
-            <AlertTriangle size={14} className="inline mr-1" />
-            You have <strong>{mistakes.length}</strong> questions in your mistake notebook. Practice them to improve!
-          </p>
+      </div>
+
+      {/* Quick Launch Practice Modes */}
+      <div>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <Zap size={18} className="text-amber-500" />
+          Smart Practice Modes
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <button
+            onClick={startQuickSprint}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-amber-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <Zap size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              Quick 10-Q Sprint
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              10 random questions across all subjects. Perfect for a 10-minute coffee break drill.
+            </p>
+          </button>
+
+          <button
+            onClick={startSpeedDrill}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-purple-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <Clock size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              5-Minute Speed Drill
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              10 questions in 5 minutes. Trains high-speed calculation and fast elimination.
+            </p>
+          </button>
+
+          <button
+            onClick={startWeakAreaDrill}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-rose-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <Brain size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              Weak Areas Drill
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Dynamically targets topics where you have logged the most mistakes.
+            </p>
+          </button>
+
+          <button
+            onClick={startMistakesDrill}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-orange-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <AlertTriangle size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              Mistake Notebook Test
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {mistakes.length > 0
+                ? `Test yourself on ${mistakes.length} recorded mistake question${mistakes.length > 1 ? 's' : ''}.`
+                : 'Retest questions you previously got wrong.'}
+            </p>
+          </button>
+
+          <button
+            onClick={startMixedComprehensive}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-emerald-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <RotateCcw size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              Comprehensive Mixed (15 Qs)
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Balanced mix covering Quant, Reasoning, English, and General Awareness.
+            </p>
+          </button>
+
+          <button
+            onClick={startTopicDrill}
+            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-blue-400"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+              <Target size={20} />
+            </div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+              Subject Deep Dive
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Select any subject and master questions topic-by-topic with instant solutions.
+            </p>
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -514,42 +844,110 @@ function PracticeTab({ papers, mistakes, onStartExam }: { papers: Paper[]; mista
 // ============================================================
 // Mistakes Tab
 // ============================================================
-function MistakesTab({ mistakes, onResolve }: { mistakes: Mistake[]; onResolve: (id: string) => void }) {
+function MistakesTab({
+  mistakes,
+  onResolve,
+  onStartCustomPractice,
+  effectiveUserId,
+}: {
+  mistakes: Mistake[];
+  onResolve: (id: string) => void;
+  onStartCustomPractice: (paper: Paper) => void;
+  effectiveUserId: string;
+}) {
+  const handlePracticeMistakes = () => {
+    if (mistakes.length === 0) return;
+    const questions: QuestionJSON[] = mistakes.map((m, idx) => ({
+      id: m.question_id || idx + 1,
+      subject: m.subject,
+      topic: m.topic,
+      question: m.question_text,
+      options: m.options,
+      correctAnswer: m.options[m.correct_answer] || '',
+      answerIndex: m.correct_answer,
+      marks: 2,
+      negativeMarks: 0.5,
+      solution: m.solution,
+      shortcut: m.shortcut,
+      hint: m.hint,
+      learningSuggestion: m.learning_suggestion,
+    }));
+
+    const customPaper: Paper = {
+      id: `mistakes_practice_${Date.now()}`,
+      user_id: effectiveUserId,
+      exam: 'SSC CGL',
+      title: 'Mistake Notebook Retest',
+      description: `Targeted revision test for ${mistakes.length} past incorrect questions.`,
+      difficulty: 'medium',
+      duration_minutes: Math.max(5, Math.ceil(questions.length * 1.5)),
+      total_marks: questions.length * 2,
+      negative_marking: 0.5,
+      question_count: questions.length,
+      subjects: Array.from(new Set(questions.map(q => q.subject))),
+      raw_json: {
+        exam: 'SSC CGL',
+        paperTitle: 'Mistake Notebook Retest',
+        durationMinutes: Math.max(5, Math.ceil(questions.length * 1.5)),
+        totalMarks: questions.length * 2,
+        negativeMarking: 0.5,
+        subjects: Array.from(new Set(questions.map(q => q.subject))),
+        questions,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      visibility: 'private',
+    };
+    onStartCustomPractice(customPaper);
+  };
+
   if (mistakes.length === 0) {
     return (
       <div className="text-center py-16">
-        <CheckCircle size={48} className="mx-auto text-green-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">Excellent!</h3>
-        <p className="text-gray-500 dark:text-gray-500">You don't have any recorded mistakes yet. Keep it up!</p>
+        <CheckCircle size={48} className="mx-auto text-emerald-500 mb-4" />
+        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Mistake Notebook Clean!</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">You have no pending mistakes. Keep practicing to maintain high accuracy!</p>
       </div>
     );
   }
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">My Mistakes ({mistakes.length})</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">My Mistake Notebook ({mistakes.length})</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Questions you missed during mock tests. Review solutions and retest anytime.</p>
+        </div>
+        <button
+          onClick={handlePracticeMistakes}
+          className="btn btn-primary text-xs py-2.5 px-4 shadow-soft self-start sm:self-auto"
+        >
+          <RotateCcw size={14} /> Practice All Mistakes ({mistakes.length})
+        </button>
+      </div>
+
       <div className="space-y-3">
         {mistakes.map(m => (
-          <div key={m.id} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-            <div className="flex items-start justify-between gap-3 mb-2">
+          <div key={m.id} className="p-4 sm:p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-soft">
+            <div className="flex items-start justify-between gap-3 mb-2.5">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{m.question_text}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1.5 leading-relaxed">{m.question_text}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">{m.subject}</span>
-                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">{m.topic}</span>
-                  <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-xs">{m.incorrect_count}× wrong</span>
+                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-xs font-medium">{m.subject}</span>
+                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-xs font-medium">{m.topic}</span>
+                  <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 rounded text-xs font-bold">{m.incorrect_count}× wrong</span>
                 </div>
               </div>
-              <button onClick={() => onResolve(m.id)} className="shrink-0 p-1.5 text-gray-400 hover:text-green-600 transition-colors" title="Mark as resolved">
+              <button onClick={() => onResolve(m.id)} className="shrink-0 p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Mark as resolved">
                 <CheckCircle size={18} />
               </button>
             </div>
-            <div className="text-xs space-y-1">
-              <p className="text-red-600 dark:text-red-400">Your answer: {m.selected_answer !== null ? m.options[m.selected_answer] : 'Not attempted'}</p>
-              <p className="text-green-600 dark:text-green-400">Correct: {m.options[m.correct_answer]}</p>
-              {m.solution && <p className="text-gray-500 dark:text-gray-400 mt-1">💡 {m.solution}</p>}
-              {m.shortcut && <p className="text-purple-600 dark:text-purple-400">⚡ {m.shortcut}</p>}
-              {m.learning_suggestion && <p className="text-orange-600 dark:text-orange-400">📌 {m.learning_suggestion}</p>}
+            <div className="text-xs space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+              <p className="text-rose-600 dark:text-rose-400 font-medium">Your answer: {m.selected_answer !== null ? m.options[m.selected_answer] : 'Not attempted'}</p>
+              <p className="text-emerald-600 dark:text-emerald-400 font-medium">Correct answer: {m.options[m.correct_answer]}</p>
+              {m.solution && <p className="text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">💡 <strong>Solution:</strong> {m.solution}</p>}
+              {m.shortcut && <p className="text-purple-600 dark:text-purple-400">⚡ <strong>Shortcut:</strong> {m.shortcut}</p>}
+              {m.learning_suggestion && <p className="text-amber-600 dark:text-amber-400">📌 <strong>Tip:</strong> {m.learning_suggestion}</p>}
             </div>
           </div>
         ))}
@@ -561,16 +959,74 @@ function MistakesTab({ mistakes, onResolve }: { mistakes: Mistake[]; onResolve: 
 // ============================================================
 // Bookmarks Tab
 // ============================================================
-function BookmarksTab({ bookmarks, onRemove }: { bookmarks: Bookmark[]; onRemove: (id: string) => void }) {
+function BookmarksTab({
+  bookmarks,
+  allQuestions,
+  onRemove,
+  onStartCustomPractice,
+  effectiveUserId,
+}: {
+  bookmarks: Bookmark[];
+  allQuestions: QuestionJSON[];
+  onRemove: (id: string) => void;
+  onStartCustomPractice: (paper: Paper) => void;
+  effectiveUserId: string;
+}) {
   const [filterCat, setFilterCat] = useState<BookmarkCategory | ''>('');
   const filtered = filterCat ? bookmarks.filter(b => b.category === filterCat) : bookmarks;
+
+  const handlePracticeBookmarks = () => {
+    if (bookmarks.length === 0) return;
+    const bIds = new Set(bookmarks.map(b => String(b.question_id)));
+    let questions = allQuestions.filter(q => bIds.has(String(q.id)));
+    if (questions.length === 0) {
+      questions = bookmarks.map((b, idx) => ({
+        id: b.question_id || idx + 1,
+        subject: 'Revision',
+        topic: b.category,
+        question: b.question_text,
+        options: ['A', 'B', 'C', 'D'],
+        correctAnswer: 'A',
+        answerIndex: 0,
+        marks: 2,
+        negativeMarks: 0.5,
+      }));
+    }
+
+    const customPaper: Paper = {
+      id: `bookmarks_practice_${Date.now()}`,
+      user_id: effectiveUserId,
+      exam: 'SSC CGL',
+      title: 'Bookmarked Questions Revision',
+      description: `Revision practice for ${bookmarks.length} saved questions`,
+      difficulty: 'medium',
+      duration_minutes: Math.max(5, Math.ceil(questions.length * 1.5)),
+      total_marks: questions.length * 2,
+      negative_marking: 0.5,
+      question_count: questions.length,
+      subjects: Array.from(new Set(questions.map(q => q.subject))),
+      raw_json: {
+        exam: 'SSC CGL',
+        paperTitle: 'Bookmarked Questions Revision',
+        durationMinutes: Math.max(5, Math.ceil(questions.length * 1.5)),
+        totalMarks: questions.length * 2,
+        negativeMarking: 0.5,
+        subjects: Array.from(new Set(questions.map(q => q.subject))),
+        questions,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      visibility: 'private',
+    };
+    onStartCustomPractice(customPaper);
+  };
 
   if (bookmarks.length === 0) {
     return (
       <div className="text-center py-16">
-        <BookmarkIcon size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No bookmarks yet</h3>
-        <p className="text-gray-500 dark:text-gray-500">Bookmark important questions while taking exams.</p>
+        <BookmarkIcon size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">No Bookmarks Saved</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Click the bookmark icon or press [B] during exams to save questions here.</p>
       </div>
     );
   }
@@ -579,21 +1035,39 @@ function BookmarksTab({ bookmarks, onRemove }: { bookmarks: Bookmark[]; onRemove
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Saved Questions ({bookmarks.length})</h2>
-        <select value={filterCat} onChange={e => setFilterCat(e.target.value as BookmarkCategory | '')} className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-          <option value="">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
-        </select>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Saved Questions ({bookmarks.length})</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Questions pinned for special review and revision.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filterCat}
+            onChange={e => setFilterCat(e.target.value as BookmarkCategory | '')}
+            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200"
+          >
+            <option value="">All Categories</option>
+            {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+          </select>
+          <button
+            onClick={handlePracticeBookmarks}
+            className="btn btn-primary text-xs py-2 px-3.5 shadow-soft"
+          >
+            <Play size={13} className="fill-white" /> Practice Bookmarks
+          </button>
+        </div>
       </div>
-      <div className="space-y-2">
+
+      <div className="space-y-2.5">
         {filtered.map(b => (
-          <div key={b.id} className="flex items-start justify-between gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div key={b.id} className="flex items-start justify-between gap-3 p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-soft">
             <div className="min-w-0">
-              <p className="text-sm text-gray-900 dark:text-white mb-1">{b.question_text}</p>
-              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded text-xs">{b.category.replace('_', ' ')}</span>
+              <p className="text-sm font-medium text-slate-900 dark:text-white mb-1.5">{b.question_text}</p>
+              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded text-xs font-semibold uppercase tracking-wider text-[10px]">
+                {b.category.replace('_', ' ')}
+              </span>
             </div>
-            <button onClick={() => onRemove(b.id)} className="shrink-0 p-1.5 text-gray-400 hover:text-red-600 transition-colors">
+            <button onClick={() => onRemove(b.id)} className="shrink-0 p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Remove bookmark">
               <X size={16} />
             </button>
           </div>

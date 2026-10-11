@@ -9,26 +9,25 @@ interface ReviewDashboardProps {
 }
 
 export default function ReviewDashboard({ userId, onStartReview }: ReviewDashboardProps) {
+  const effectiveUserId = userId || 'guest';
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [dueReviews, setDueReviews] = useState<DueReview[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (userId) {
-      loadData();
-    }
-  }, [userId]);
+    loadData();
+  }, [effectiveUserId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       // Initialize SRS for any existing mistakes
-      await initializeSRS(userId!);
+      await initializeSRS(effectiveUserId);
       
       // Load stats and due reviews
       const [statsData, reviewsData] = await Promise.all([
-        getReviewStats(userId!),
-        getDueReviews(userId!, 5),
+        getReviewStats(effectiveUserId),
+        getDueReviews(effectiveUserId, 5),
       ]);
       
       setStats(statsData);

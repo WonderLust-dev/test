@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Paper, QuestionJSON, ExamSession, AttemptQuestion } from '../types';
-import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake } from '../services/database';
+import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake, addBookmark, removeBookmark, getBookmarks } from '../services/database';
 import { gradeQuestions, formatTime } from '../utils/grader';
-import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft } from 'lucide-react';
 
 interface ExamInterfaceProps {
   paper: Paper;
@@ -13,14 +13,17 @@ interface ExamInterfaceProps {
 }
 
 export default function ExamInterface({ paper, userId, mode = 'exam', onComplete, onExit }: ExamInterfaceProps) {
+  const effectiveUserId = userId || 'guest';
   const questions = paper.raw_json.questions;
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number | null>>({});
   const [marked, setMarked] = useState<Record<number, boolean>>({});
+  const [bookmarkedMap, setBookmarkedMap] = useState<Record<string, string>>({});
   const [qTimes, setQTimes] = useState<Record<number, number>>({});
   const [timeLeft, setTimeLeft] = useState(paper.duration_minutes * 60);
   const [startTime] = useState(Date.now());
   const [showSubmit, setShowSubmit] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showLearning, setShowLearning] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,15 +118,71 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
+  // Load existing bookmarks for this paper
+  useEffect(() => {
+    async function loadBookmarks() {
+      try {
+        const list = await getBookmarks(effectiveUserId);
+        const map: Record<string, string> = {};
+        list.filter(b => b.paper_id === paper.id).forEach(b => {
+          map[String(b.question_id)] = b.id;
+        });
+        setBookmarkedMap(map);
+      } catch (e) {
+        console.error('Failed to load bookmarks:', e);
+      }
+    }
+    loadBookmarks();
+  }, [paper.id, effectiveUserId]);
+
   const selectAnswer = (optionIdx: number) => {
     setAnswers(prev => ({ ...prev, [currentQ]: optionIdx }));
+  };
+
+  const clearAnswer = () => {
+    setAnswers(prev => ({ ...prev, [currentQ]: null }));
+  };
+
+  const toggleReview = () => {
+    setMarked(prev => ({ ...prev, [currentQ]: !prev[currentQ] }));
+  };
+
+  const toggleBookmark = async () => {
+    const currentQObj = questions[currentQ];
+    if (!currentQObj) return;
+    const qId = String(currentQObj.id);
+    const existingBookmarkId = bookmarkedMap[qId];
+
+    if (existingBookmarkId) {
+      await removeBookmark(existingBookmarkId);
+      setBookmarkedMap(prev => {
+        const next = { ...prev };
+        delete next[qId];
+        return next;
+      });
+    } else {
+      const created = await addBookmark({
+        user_id: effectiveUserId,
+        paper_id: paper.id,
+        question_id: currentQObj.id,
+        question_text: currentQObj.question,
+        category: 'important',
+      });
+      setBookmarkedMap(prev => ({ ...prev, [qId]: created.id }));
+    }
   };
 
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === 'n') setCurrentQ(prev => Math.min(questions.length - 1, prev + 1));
-      if (e.key === 'ArrowLeft' || e.key === 'p') setCurrentQ(prev => Math.max(0, prev - 1));
+      // Don't trigger if typing in an input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
+
+      if (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N') setCurrentQ(prev => Math.min(questions.length - 1, prev + 1));
+      if (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P') setCurrentQ(prev => Math.max(0, prev - 1));
+      if (e.key === 'b' || e.key === 'B') toggleBookmark();
+      if (e.key === 'r' || e.key === 'R') toggleReview();
+      if (e.key === 'c' || e.key === 'C') clearAnswer();
       if (e.key >= '1' && e.key <= '4') {
         const idx = parseInt(e.key) - 1;
         if (idx < questions[currentQ].options.length) {
@@ -133,15 +192,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [currentQ, questions]);
-
-  const clearAnswer = () => {
-    setAnswers(prev => ({ ...prev, [currentQ]: null }));
-  };
-
-  const toggleReview = () => {
-    setMarked(prev => ({ ...prev, [currentQ]: !prev[currentQ] }));
-  };
+  }, [currentQ, questions, bookmarkedMap, paper.id, effectiveUserId]);
 
   const navigateTo = (idx: number) => {
     setCurrentQ(idx);
@@ -255,10 +306,18 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top Bar */}
-      <div className="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <div className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                className="p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 transition-colors"
+                title="Exit exam"
+              >
+                <ArrowLeft size={16} />
+                <span className="hidden sm:inline">Exit</span>
+              </button>
               <button onClick={() => setShowPalette(!showPalette)} className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
                 <Menu size={20} />
               </button>
@@ -270,7 +329,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-sm sm:text-base font-bold ${
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-sm sm:text-base font-bold shadow-soft ${
                 isTimerCritical ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse' :
                 isTimerWarning ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
                 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
@@ -278,9 +337,9 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 <Clock size={16} />
                 <span>{formatTime(timeLeft)}</span>
               </div>
-              <button onClick={() => setShowSubmit(true)} className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors text-sm">
+              <button onClick={() => setShowSubmit(true)} className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-soft transition-all text-sm">
                 <Send size={16} />
-                <span className="hidden sm:inline">Submit</span>
+                <span className="hidden sm:inline">Submit Test</span>
               </button>
             </div>
           </div>
@@ -292,7 +351,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
           {/* Left: Question Palette (Desktop) */}
           <div className={`fixed inset-0 z-40 lg:static lg:z-auto lg:block ${showPalette ? 'block' : 'hidden'}`}>
             {showPalette && <div className="fixed inset-0 bg-black/30 lg:hidden" onClick={() => setShowPalette(false)} />}
-            <div className={`relative z-50 w-72 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 lg:w-64 lg:shrink-0 lg:rounded-xl lg:border lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]`}>
+            <div className={`relative z-50 w-72 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 lg:w-64 lg:shrink-0 lg:rounded-xl lg:border lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] shadow-sm`}>
               <div className="flex items-center justify-between mb-4 lg:hidden">
                 <h3 className="font-bold text-gray-900 dark:text-white">Question Palette</h3>
                 <button onClick={() => setShowPalette(false)}><X size={20} /></button>
@@ -321,7 +380,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                       else if (status === 'unanswered') bg = 'bg-red-500 text-white';
                       return (
                         <button key={idx} onClick={() => navigateTo(idx)}
-                          className={`w-8 h-8 rounded text-xs font-medium flex items-center justify-center transition-all ${bg} ${isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-gray-800 scale-110' : 'hover:scale-105'}`}>
+                          className={`w-8 h-8 rounded text-xs font-medium flex items-center justify-center transition-all ${bg} ${isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-gray-800 scale-110 font-bold' : 'hover:scale-105'}`}>
                           {idx + 1}
                         </button>
                       );
@@ -335,22 +394,40 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
           {/* Center: Question Content */}
           <div className="flex-1 min-w-0">
             {/* Question Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-4 shadow-sm">
               {/* Question Header */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="flex items-center justify-center w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-bold shrink-0">
+                  <span className="flex items-center justify-center w-8 h-8 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-bold shrink-0">
                     {currentQ + 1}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">{q.subject}</span>
-                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">{q.topic}</span>
-                    {q.difficulty && <span className={`px-2 py-0.5 rounded text-xs font-medium ${q.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : q.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'}`}>{q.difficulty}</span>}
+                    <span className="px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-semibold">{q.subject}</span>
+                    <span className="px-2.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-xs">{q.topic}</span>
+                    {q.difficulty && <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : q.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'}`}>{q.difficulty}</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span>+{q.marks}</span>
-                  {q.negativeMarks !== undefined && <span className="text-red-500">-{q.negativeMarks}</span>}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={toggleBookmark}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      bookmarkedMap[String(q.id)]
+                        ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700'
+                        : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                    title="Bookmark Question [B]"
+                  >
+                    {bookmarkedMap[String(q.id)] ? (
+                      <BookmarkCheck size={14} className="text-amber-600 dark:text-amber-400 fill-amber-500" />
+                    ) : (
+                      <Bookmark size={14} />
+                    )}
+                    <span>{bookmarkedMap[String(q.id)] ? 'Saved' : 'Bookmark'}</span>
+                  </button>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 font-semibold px-2 py-1 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
+                    <span className="text-emerald-600 dark:text-emerald-400">+{q.marks}</span>
+                    {q.negativeMarks !== undefined && <span className="text-rose-500">-{q.negativeMarks}</span>}
+                  </div>
                 </div>
               </div>
 
@@ -471,9 +548,45 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 </button>
               </div>
             </div>
+
+            {/* Keyboard Shortcuts Helper */}
+            <div className="mt-4 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Shortcuts:</span>
+                <span><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-[10px] text-gray-800 dark:text-gray-200">1-4</kbd> Option</span>
+                <span><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-[10px] text-gray-800 dark:text-gray-200">N / P</kbd> Next/Prev</span>
+                <span><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-[10px] text-gray-800 dark:text-gray-200">B</kbd> Bookmark</span>
+                <span><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-[10px] text-gray-800 dark:text-gray-200">R</kbd> Flag</span>
+                <span><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded font-mono text-[10px] text-gray-800 dark:text-gray-200">C</kbd> Clear</span>
+              </div>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">● Auto-saving</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Exit Confirmation Modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertTriangle size={24} className="text-amber-500" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Exit Exam?</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              Are you sure you want to exit? Your progress is saved locally and can be resumed later from the dashboard.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowExitConfirm(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium">
+                Keep Practicing
+              </button>
+              <button onClick={onExit} className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-colors font-semibold">
+                Exit to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submit Confirmation Modal */}
       {showSubmit && (
