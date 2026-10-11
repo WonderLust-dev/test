@@ -7,15 +7,18 @@ import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTrian
 // ============================================================
 // Dashboard (Home)
 // ============================================================
+import ReviewDashboard from './ReviewDashboard';
+
 interface DashboardProps {
   userId?: string;
   onStartExam: (paperId: string) => void;
   onPractice: (paperId: string) => void;
   onImport: () => void;
+  onStartReview: () => void;
   refreshKey: number;
 }
 
-export default function Dashboard({ userId, onStartExam, onPractice, onImport, refreshKey }: DashboardProps) {
+export default function Dashboard({ userId, onStartExam, onPractice, onImport, onStartReview, refreshKey }: DashboardProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [mistakes, setMistakes] = useState<Mistake[]>([]);
@@ -133,6 +136,11 @@ export default function Dashboard({ userId, onStartExam, onPractice, onImport, r
         <StatCard icon={Award} label="Best Score" value={`${highestScore}%`} color="info" />
         <StatCard icon={AlertTriangle} label="Mistakes" value={mistakes.length} color="danger" />
       </div>
+
+      {/* Spaced Repetition Review Dashboard */}
+      {userId && (
+        <ReviewDashboard userId={userId} onStartReview={onStartReview} />
+      )}
 
       {/* Weak Areas */}
       {weakTopics.length > 0 && (

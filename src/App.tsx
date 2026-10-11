@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import JsonImporter from './components/JsonImporter';
 import ExamInterface from './components/ExamInterface';
 import ResultsPage from './components/ResultsPage';
+import ReviewSession from './components/ReviewSession';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
@@ -14,7 +15,7 @@ import { BookOpen, PlusCircle, ArrowLeft, Home } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { usePWA } from './hooks/usePWA';
 
-type View = 'dashboard' | 'import' | 'exam' | 'results';
+type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
 
 function AppContent() {
   const { user } = useAuth();
@@ -104,10 +105,19 @@ function AppContent() {
     }
   };
 
+  const handleStartReview = () => {
+    setView('review');
+  };
+
+  const handleReviewComplete = () => {
+    setView('dashboard');
+    setRefreshKey(k => k + 1);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation */}
-      {view !== 'exam' && (
+      {view !== 'exam' && view !== 'review' && (
         <nav className="glass sticky top-0 z-30 border-b border-white/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -150,6 +160,7 @@ function AppContent() {
             onStartExam={handleStartExam}
             onPractice={handleStartPractice}
             onImport={() => setView('import')}
+            onStartReview={handleStartReview}
             refreshKey={refreshKey}
           />
         )}
@@ -176,10 +187,17 @@ function AppContent() {
             onPractice={() => setView('dashboard')}
           />
         )}
+        {view === 'review' && (
+          <ReviewSession
+            userId={userId}
+            onComplete={handleReviewComplete}
+            onExit={handleBackToDashboard}
+          />
+        )}
       </main>
 
       {/* Footer */}
-      {view !== 'exam' && (
+      {view !== 'exam' && view !== 'review' && (
         <footer className="glass-panel mt-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">

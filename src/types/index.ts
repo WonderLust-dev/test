@@ -132,6 +132,47 @@ export interface Mistake {
   incorrect_count: number;
   last_attempted_at: string;
   resolved: boolean;
+  // Spaced Repetition fields
+  next_review_date?: string | null;
+  interval_days?: number;
+  ease_factor?: number;
+  review_count?: number;
+  last_review_date?: string | null;
+  status?: 'new' | 'learning' | 'review' | 'relearning';
+}
+
+export interface Review {
+  id: string;
+  user_id: string;
+  mistake_id: string;
+  reviewed_at: string;
+  quality: number; // 0-5 rating
+  interval_before?: number;
+  interval_after?: number;
+  ease_factor_before?: number;
+  ease_factor_after?: number;
+  response_time_seconds?: number;
+  is_correct: boolean;
+}
+
+export interface ReviewStats {
+  total_reviews: number;
+  today_reviews: number;
+  week_reviews: number;
+  avg_quality: number;
+  due_count: number;
+  streak_days: number;
+}
+
+export interface DueReview {
+  mistake_id: string;
+  question_text: string;
+  subject: string;
+  topic: string;
+  interval_days: number;
+  ease_factor: number;
+  review_count: number;
+  next_review_date: string;
 }
 
 // --- Exam Session State ---
