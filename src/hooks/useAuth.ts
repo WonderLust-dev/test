@@ -59,12 +59,13 @@ export function useAuth() {
       return { error: { message: 'Supabase not configured' }, data: null };
     }
     try {
+      const redirectUrl = `${window.location.origin}${import.meta.env.BASE_URL || '/'}`;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { 
           data: { display_name: displayName },
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: redirectUrl,
         },
       });
       
@@ -127,7 +128,8 @@ export function useAuth() {
       return { error: { message: 'Supabase not configured' } };
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const redirectUrl = `${window.location.origin}${import.meta.env.BASE_URL || '/'}`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
       return { error };
     } catch (e: any) {
       return { error: { message: e.message || 'Reset failed' } };
