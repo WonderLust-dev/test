@@ -10,6 +10,7 @@ interface AuthModalContextType {
   user: User | null;
   signOut: () => Promise<void>;
   isGuest: boolean;
+  loading: boolean;
 }
 
 const AuthModalContext = createContext<AuthModalContextType | null>(null);
@@ -27,7 +28,7 @@ interface AuthGateProps {
 }
 
 export default function AuthGate({ children }: AuthGateProps) {
-  const { user, isGuest, signIn, signUp, signOut } = useAuth();
+  const { user, isGuest, loading, signIn, signUp, signOut } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -88,7 +89,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   };
 
   return (
-    <AuthModalContext.Provider value={{ openLogin, openSignup, closeAuth, user, signOut, isGuest }}>
+    <AuthModalContext.Provider value={{ openLogin, openSignup, closeAuth, user, signOut, isGuest, loading }}>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
         {/* Main application content */}
         <div className="flex-1 flex flex-col">

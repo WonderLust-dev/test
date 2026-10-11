@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { isRemoteUser } from './database';
 import type { Mistake, Review, ReviewStats, DueReview } from '../types';
 
 /**
@@ -11,6 +12,34 @@ const LS_KEYS = {
   reviews: 'sscp_reviews',
   reviewStats: 'sscp_review_stats',
 };
+
+// In-flight deduplication cache
+const srsInFlight = new Map<string, Promise<any>>();
+const srsCache = new Map<string, { data: any; exp: number }>();
+
+function cachedSrs<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+  const cached = srsCache.get(key);
+  if (cached && cached.exp > Date.now()) {
+    return Promise.resolve(cached.data as T);
+  }
+  if (srsInFlight.has(key)) {
+    return srsInFlight.get(key)! as Promise<T>;
+  }
+  const promise = fetcher().then((data) => {
+    srsInFlight.delete(key);
+    srsCache.set(key, { data, exp: Date.now() + ttlMs });
+    return data;
+  }).catch((err) => {
+    srsInFlight.delete(key);
+    throw err;
+  });
+  srsInFlight.set(key, promise);
+  return promise;
+}
+
+export function invalidateSrsCache() {
+  srsCache.clear();
+}
 
 // Helper to safely use supabase with local fallback
 async function sb<T>(fn: () => Promise<T>): Promise<T | null> {
@@ -45,7 +74,28 @@ function lsSet(key: string, data: unknown): void {
  * Get all mistakes that are due for review
  */
 export async function getDueReviews(userId: string, limit: number = 20): Promise<DueReview[]> {
-  if (isSupabaseConfigured && supabase) {
+  if (!isRemoteUser(userId)) {
+    const mistakes = lsGet<Mistake>('sscp_mistakes');
+    const now = new Date();
+    return mistakes
+      .filter(m => 
+        !m.resolved && 
+        (!m.next_review_date || new Date(m.next_review_date) <= now)
+      )
+      .slice(0, limit)
+      .map(m => ({
+        mistake_id: m.id,
+        question_text: m.question_text,
+        subject: m.subject,
+        topic: m.topic,
+        interval_days: m.interval_days || 1,
+        ease_factor: m.ease_factor || 2.5,
+        review_count: m.review_count || 0,
+        next_review_date: m.next_review_date || m.last_attempted_at,
+      }));
+  }
+
+  return cachedSrs<DueReview[]>(`due_${userId}_${limit}`, 8000, async () => {
     const result = await sb(async () => {
       const { data, error } = await supabase!
         .rpc('get_due_reviews', { p_user_id: userId, p_limit: limit });
@@ -55,28 +105,26 @@ export async function getDueReviews(userId: string, limit: number = 20): Promise
     });
     
     if (result) return result;
-  }
-  
-  // Fallback to localStorage for guest mode
-  const mistakes = lsGet<Mistake>('sscp_mistakes');
-  const now = new Date();
-  
-  return mistakes
-    .filter(m => 
-      !m.resolved && 
-      (!m.next_review_date || new Date(m.next_review_date) <= now)
-    )
-    .slice(0, limit)
-    .map(m => ({
-      mistake_id: m.id,
-      question_text: m.question_text,
-      subject: m.subject,
-      topic: m.topic,
-      interval_days: m.interval_days || 1,
-      ease_factor: m.ease_factor || 2.5,
-      review_count: m.review_count || 0,
-      next_review_date: m.next_review_date || m.last_attempted_at,
-    }));
+
+    const mistakes = lsGet<Mistake>('sscp_mistakes');
+    const now = new Date();
+    return mistakes
+      .filter(m => 
+        !m.resolved && 
+        (!m.next_review_date || new Date(m.next_review_date) <= now)
+      )
+      .slice(0, limit)
+      .map(m => ({
+        mistake_id: m.id,
+        question_text: m.question_text,
+        subject: m.subject,
+        topic: m.topic,
+        interval_days: m.interval_days || 1,
+        ease_factor: m.ease_factor || 2.5,
+        review_count: m.review_count || 0,
+        next_review_date: m.next_review_date || m.last_attempted_at,
+      }));
+  });
 }
 
 /**
@@ -91,11 +139,12 @@ export async function submitReview(
   quality: number,
   responseTime: number = 0
 ): Promise<{ success: boolean; nextReview?: string; error?: string }> {
+  invalidateSrsCache();
   if (quality < 0 || quality > 5) {
     return { success: false, error: 'Quality must be between 0 and 5' };
   }
 
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(userId)) {
     const result = await sb(async () => {
       // Call the database function to calculate next review
       const { data: nextReview, error: calcError } = await supabase!
@@ -190,23 +239,7 @@ export async function submitReview(
   return { success: true, nextReview: nextReview.toISOString() };
 }
 
-/**
- * Get review statistics for a user
- */
-export async function getReviewStats(userId: string): Promise<ReviewStats> {
-  if (isSupabaseConfigured && supabase) {
-    const result = await sb(async () => {
-      const { data, error } = await supabase!
-        .rpc('get_review_stats', { p_user_id: userId });
-      
-      if (error) throw error;
-      return data as ReviewStats;
-    });
-    
-    if (result) return result;
-  }
-  
-  // Fallback to localStorage
+function getLocalStats(): ReviewStats {
   const reviews = lsGet<Review>(LS_KEYS.reviews);
   const mistakes = lsGet<Mistake>('sscp_mistakes');
   
@@ -223,7 +256,6 @@ export async function getReviewStats(userId: string): Promise<ReviewStats> {
     (!m.next_review_date || new Date(m.next_review_date) <= now)
   ).length;
   
-  // Calculate streak (simplified)
   let streak = 0;
   const reviewDates = new Set(reviews.map(r => new Date(r.reviewed_at).toDateString()));
   let checkDate = new Date(today);
@@ -243,6 +275,28 @@ export async function getReviewStats(userId: string): Promise<ReviewStats> {
     due_count: dueCount,
     streak_days: streak,
   };
+}
+
+/**
+ * Get review statistics for a user
+ */
+export async function getReviewStats(userId: string): Promise<ReviewStats> {
+  if (!isRemoteUser(userId)) {
+    return getLocalStats();
+  }
+
+  return cachedSrs<ReviewStats>(`stats_${userId}`, 8000, async () => {
+    const result = await sb(async () => {
+      const { data, error } = await supabase!
+        .rpc('get_review_stats', { p_user_id: userId });
+      
+      if (error) throw error;
+      return data as ReviewStats;
+    });
+    
+    if (result) return result;
+    return getLocalStats();
+  });
 }
 
 /**
@@ -275,23 +329,25 @@ export async function getMistakeReviews(mistakeId: string): Promise<Review[]> {
  * Get all reviews for a user
  */
 export async function getUserReviews(userId: string, limit: number = 50): Promise<Review[]> {
-  if (isSupabaseConfigured && supabase) {
-    const result = await sb(async () => {
-      const { data, error } = await supabase!
-        .from('reviews')
-        .select('*')
-        .eq('user_id', userId)
-        .order('reviewed_at', { ascending: false })
-        .limit(limit);
-      
-      if (error) throw error;
-      return data as Review[];
-    });
-    
-    if (result) return result;
+  if (!isRemoteUser(userId)) {
+    const reviews = lsGet<Review>(LS_KEYS.reviews);
+    return reviews.slice(0, limit);
   }
+
+  const result = await sb(async () => {
+    const { data, error } = await supabase!
+      .from('reviews')
+      .select('*')
+      .eq('user_id', userId)
+      .order('reviewed_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    return data as Review[];
+  });
   
-  // Fallback to localStorage
+  if (result) return result;
+
   const reviews = lsGet<Review>(LS_KEYS.reviews);
   return reviews.slice(0, limit);
 }
@@ -300,7 +356,7 @@ export async function getUserReviews(userId: string, limit: number = 50): Promis
  * Initialize SRS for existing mistakes (set initial review dates)
  */
 export async function initializeSRS(userId: string): Promise<{ success: boolean; count: number }> {
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(userId)) {
     const result = await sb(async () => {
       // Get all unresolved mistakes without next_review_date
       const { data: mistakes, error } = await supabase!
@@ -367,7 +423,7 @@ export async function getMistakesByStatus(
   userId: string,
   status: 'new' | 'learning' | 'review' | 'relearning'
 ): Promise<Mistake[]> {
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(userId)) {
     const result = await sb(async () => {
       const { data, error } = await supabase!
         .from('mistakes')

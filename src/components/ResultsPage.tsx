@@ -6,12 +6,13 @@ import { Trophy, Target, Clock, CheckCircle, XCircle, MinusCircle, BarChart3, Tr
 
 interface ResultsPageProps {
   attemptId: string;
+  userId?: string;
   onRetake: () => void;
   onBack: () => void;
   onPractice: (subject: string, topic: string) => void;
 }
 
-export default function ResultsPage({ attemptId, onRetake, onBack, onPractice }: ResultsPageProps) {
+export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPractice }: ResultsPageProps) {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [attemptQs, setAttemptQs] = useState<AttemptQuestion[]>([]);
   const [paper, setPaper] = useState<Paper | null>(null);
@@ -20,7 +21,7 @@ export default function ResultsPage({ attemptId, onRetake, onBack, onPractice }:
 
   useEffect(() => {
     async function load() {
-      const attempts = await getAttempts();
+      const attempts = await getAttempts(userId);
       const a = attempts.find(at => at.id === attemptId);
       if (a) {
         setAttempt(a);

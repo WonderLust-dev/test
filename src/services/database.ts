@@ -30,6 +30,45 @@ function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+// Only query remote Supabase if client is initialized AND user is a real authenticated UUID (never for guest or empty)
+export function isRemoteUser(userId?: string): boolean {
+  return Boolean(isSupabaseConfigured && supabase && userId && userId !== 'guest' && userId.length > 10);
+}
+
+// In-flight deduplication and short TTL cache to prevent duplicate bursts on page load
+const inFlight = new Map<string, Promise<any>>();
+const cache = new Map<string, { data: any; exp: number }>();
+
+function cachedFetch<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+  const cached = cache.get(key);
+  if (cached && cached.exp > Date.now()) {
+    return Promise.resolve(cached.data as T);
+  }
+  if (inFlight.has(key)) {
+    return inFlight.get(key)! as Promise<T>;
+  }
+  const promise = fetcher().then((data) => {
+    inFlight.delete(key);
+    cache.set(key, { data, exp: Date.now() + ttlMs });
+    return data;
+  }).catch((err) => {
+    inFlight.delete(key);
+    throw err;
+  });
+  inFlight.set(key, promise);
+  return promise;
+}
+
+export function invalidateCache(prefix?: string) {
+  if (!prefix) {
+    cache.clear();
+  } else {
+    for (const k of cache.keys()) {
+      if (k.startsWith(prefix)) cache.delete(k);
+    }
+  }
+}
+
 // Helper to safely use supabase
 async function sb<T>(fn: () => Promise<T>): Promise<T | null> {
   if (!isSupabaseConfigured || !supabase) return null;
@@ -61,7 +100,10 @@ async function sbWithResult<T>(fn: () => Promise<{ data: T | null; error: any }>
 // Papers Service
 // ============================================================
 export async function getPapers(userId?: string): Promise<Paper[]> {
-  if (isSupabaseConfigured && supabase && userId) {
+  if (!isRemoteUser(userId)) {
+    return lsGet<Paper>(LS_KEYS.papers);
+  }
+  return cachedFetch<Paper[]>(`papers_${userId}`, 8000, async () => {
     const result = await sb(async () => {
       // Fetch user's own papers AND all public papers
       const { data, error } = await supabase!
@@ -73,23 +115,26 @@ export async function getPapers(userId?: string): Promise<Paper[]> {
       return (data || []) as Paper[];
     });
     if (result) return result;
-  }
-  return lsGet<Paper>(LS_KEYS.papers);
+    return lsGet<Paper>(LS_KEYS.papers);
+  });
 }
 
 export async function getPaperById(paperId: string): Promise<Paper | null> {
-  if (isSupabaseConfigured && supabase) {
-    const result = await sb(async () => {
-      const { data, error } = await supabase!.from('papers').select('*').eq('id', paperId).single();
-      if (error) throw error;
-      return data as Paper;
-    });
-    if (result) return result;
-  }
-  return lsGet<Paper>(LS_KEYS.papers).find(p => p.id === paperId) || null;
+  return cachedFetch<Paper | null>(`paper_${paperId}`, 15000, async () => {
+    if (isSupabaseConfigured && supabase) {
+      const result = await sb(async () => {
+        const { data, error } = await supabase!.from('papers').select('*').eq('id', paperId).single();
+        if (error) throw error;
+        return data as Paper;
+      });
+      if (result) return result;
+    }
+    return lsGet<Paper>(LS_KEYS.papers).find(p => p.id === paperId) || null;
+  });
 }
 
 export async function savePaper(paper: Omit<Paper, 'id' | 'created_at' | 'updated_at'>): Promise<Paper> {
+  invalidateCache('papers');
   const now = new Date().toISOString();
   const newPaper: Paper = {
     ...paper,
@@ -98,7 +143,7 @@ export async function savePaper(paper: Omit<Paper, 'id' | 'created_at' | 'update
     updated_at: now,
   };
 
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(paper.user_id)) {
     const result = await sb(async () => {
       const { data, error } = await supabase!.from('papers').insert(newPaper).select().single();
       if (error) throw error;
@@ -190,33 +235,40 @@ export async function checkDuplicatePaper(title: string, userId?: string): Promi
 // Attempts Service
 // ============================================================
 export async function getAttempts(userId?: string): Promise<Attempt[]> {
-  if (isSupabaseConfigured && supabase && userId) {
+  if (!isRemoteUser(userId)) {
+    return lsGet<Attempt>(LS_KEYS.attempts);
+  }
+  return cachedFetch<Attempt[]>(`attempts_${userId}`, 8000, async () => {
     const result = await sb(async () => {
-      const { data, error } = await supabase!.from('attempts').select('*').eq('user_id', userId).order('started_at', { ascending: false });
+      const { data, error } = await supabase!.from('attempts').select('*').eq('user_id', userId!).order('started_at', { ascending: false });
       if (error) throw error;
       return (data || []) as Attempt[];
     });
     if (result) return result;
-  }
-  return lsGet<Attempt>(LS_KEYS.attempts);
+    return lsGet<Attempt>(LS_KEYS.attempts);
+  });
 }
 
 export async function getAttemptsByPaper(paperId: string, userId?: string): Promise<Attempt[]> {
-  if (isSupabaseConfigured && supabase && userId) {
+  if (!isRemoteUser(userId)) {
+    return lsGet<Attempt>(LS_KEYS.attempts).filter(a => a.paper_id === paperId);
+  }
+  return cachedFetch<Attempt[]>(`attempts_${paperId}_${userId}`, 8000, async () => {
     const result = await sb(async () => {
-      const { data } = await supabase!.from('attempts').select('*').eq('paper_id', paperId).eq('user_id', userId).order('started_at', { ascending: false });
+      const { data } = await supabase!.from('attempts').select('*').eq('paper_id', paperId).eq('user_id', userId!).order('started_at', { ascending: false });
       return (data || []) as Attempt[];
     });
     if (result) return result;
-  }
-  return lsGet<Attempt>(LS_KEYS.attempts).filter(a => a.paper_id === paperId);
+    return lsGet<Attempt>(LS_KEYS.attempts).filter(a => a.paper_id === paperId);
+  });
 }
 
 export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<AttemptQuestion, 'id' | 'attempt_id'>[]): Promise<Attempt> {
+  invalidateCache('attempts');
   const newAttempt: Attempt = { ...attempt, id: generateId() };
   const newQuestions = questions.map(q => ({ ...q, id: generateId(), attempt_id: newAttempt.id }));
 
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(attempt.user_id)) {
     const result = await sbWithResult<Attempt>(async () => {
       const { data, error } = await supabase!.from('attempts').insert(newAttempt).select().single();
       if (error) return { data: null, error };
@@ -231,8 +283,6 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
     if (result.success && result.data) {
       return result.data;
     }
-    // If cloud save failed, we still save locally but the caller should know
-    // For now, fall through to localStorage
   }
 
   // Fallback to localStorage
@@ -260,19 +310,23 @@ export async function getAttemptQuestions(attemptId: string): Promise<AttemptQue
 // Bookmarks Service
 // ============================================================
 export async function getBookmarks(userId?: string): Promise<Bookmark[]> {
-  if (isSupabaseConfigured && supabase && userId) {
+  if (!isRemoteUser(userId)) {
+    return lsGet<Bookmark>(LS_KEYS.bookmarks);
+  }
+  return cachedFetch<Bookmark[]>(`bookmarks_${userId}`, 8000, async () => {
     const result = await sb(async () => {
-      const { data } = await supabase!.from('bookmarks').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data } = await supabase!.from('bookmarks').select('*').eq('user_id', userId!).order('created_at', { ascending: false });
       return (data || []) as Bookmark[];
     });
     if (result) return result;
-  }
-  return lsGet<Bookmark>(LS_KEYS.bookmarks);
+    return lsGet<Bookmark>(LS_KEYS.bookmarks);
+  });
 }
 
 export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'created_at'>): Promise<Bookmark> {
+  invalidateCache('bookmarks');
   const newBookmark: Bookmark = { ...bookmark, id: generateId(), created_at: new Date().toISOString() };
-  if (isSupabaseConfigured && supabase) {
+  if (isRemoteUser(bookmark.user_id)) {
     const result = await sb(async () => {
       const { data } = await supabase!.from('bookmarks').insert(newBookmark).select().single();
       return data as Bookmark;
@@ -286,25 +340,26 @@ export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'created_at'>)
 }
 
 export async function removeBookmark(bookmarkId: string): Promise<void> {
+  invalidateCache('bookmarks');
   if (isSupabaseConfigured && supabase) {
     await sb(async () => {
       const { error } = await supabase!.from('bookmarks').delete().eq('id', bookmarkId);
       if (error) throw error;
     });
-    return;
   }
   const bookmarks = lsGet<Bookmark>(LS_KEYS.bookmarks).filter(b => b.id !== bookmarkId);
   lsSet(LS_KEYS.bookmarks, bookmarks);
 }
 
 export async function isBookmarked(paperId: string, questionId: number | string, userId?: string): Promise<boolean> {
-  if (isSupabaseConfigured && supabase && userId) {
-    const result = await sb(async () => {
-      const { data } = await supabase!.from('bookmarks').select('id').eq('paper_id', paperId).eq('question_id', String(questionId)).eq('user_id', userId).limit(1);
-      return (data?.length || 0) > 0;
-    });
-    if (result !== null) return result;
+  if (!isRemoteUser(userId)) {
+    return lsGet<Bookmark>(LS_KEYS.bookmarks).some(b => b.paper_id === paperId && String(b.question_id) === String(questionId));
   }
+  const result = await sb(async () => {
+    const { data } = await supabase!.from('bookmarks').select('id').eq('paper_id', paperId).eq('question_id', String(questionId)).eq('user_id', userId!).limit(1);
+    return (data?.length || 0) > 0;
+  });
+  if (result !== null) return result;
   return lsGet<Bookmark>(LS_KEYS.bookmarks).some(b => b.paper_id === paperId && String(b.question_id) === String(questionId));
 }
 
@@ -312,23 +367,27 @@ export async function isBookmarked(paperId: string, questionId: number | string,
 // Mistakes Service
 // ============================================================
 export async function getMistakes(userId?: string): Promise<Mistake[]> {
-  if (isSupabaseConfigured && supabase && userId) {
+  if (!isRemoteUser(userId)) {
+    return lsGet<Mistake>(LS_KEYS.mistakes).filter(m => !m.resolved);
+  }
+  return cachedFetch<Mistake[]>(`mistakes_${userId}`, 8000, async () => {
     const result = await sb(async () => {
-      const { data } = await supabase!.from('mistakes').select('*').eq('user_id', userId).eq('resolved', false).order('last_attempted_at', { ascending: false });
+      const { data } = await supabase!.from('mistakes').select('*').eq('user_id', userId!).eq('resolved', false).order('last_attempted_at', { ascending: false });
       return (data || []) as Mistake[];
     });
     if (result) return result;
-  }
-  return lsGet<Mistake>(LS_KEYS.mistakes).filter(m => !m.resolved);
+    return lsGet<Mistake>(LS_KEYS.mistakes).filter(m => !m.resolved);
+  });
 }
 
 export async function addOrUpdateMistake(mistake: Omit<Mistake, 'id' | 'incorrect_count' | 'last_attempted_at'>, userId?: string): Promise<void> {
-  if (isSupabaseConfigured && supabase && userId) {
+  invalidateCache('mistakes');
+  if (isRemoteUser(userId)) {
     await sb(async () => {
       const { data: existing } = await supabase!
         .from('mistakes')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId!)
         .eq('paper_id', mistake.paper_id)
         .eq('question_id', String(mistake.question_id))
         .eq('resolved', false)
@@ -373,12 +432,12 @@ export async function addOrUpdateMistake(mistake: Omit<Mistake, 'id' | 'incorrec
 }
 
 export async function resolveMistake(mistakeId: string): Promise<void> {
+  invalidateCache('mistakes');
   if (isSupabaseConfigured && supabase) {
     await sb(async () => {
       const { error } = await supabase!.from('mistakes').update({ resolved: true }).eq('id', mistakeId);
       if (error) throw error;
     });
-    return;
   }
   const mistakes = lsGet<Mistake>(LS_KEYS.mistakes);
   const idx = mistakes.findIndex(m => m.id === mistakeId);

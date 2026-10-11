@@ -17,7 +17,7 @@ import { usePWA } from './hooks/usePWA';
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
 
 function AppContent() {
-  const { user, openLogin, openSignup, signOut, isGuest } = useAuthModal();
+  const { user, openLogin, openSignup, signOut, isGuest, loading } = useAuthModal();
   const effectiveUserId = user?.id || 'guest';
   const { isInstallable, isOffline, install, dismissInstall, updateAvailable, update } = usePWA();
 
@@ -29,10 +29,10 @@ function AppContent() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [demoLoaded, setDemoLoaded] = useState(false);
 
-  // Load demo paper on first visit if library is empty
+  // Load demo paper on first visit if library is empty (only after auth has resolved)
   useEffect(() => {
     async function loadDemo() {
-      if (demoLoaded) return;
+      if (loading || demoLoaded) return;
       try {
         const papers = await getPapers(effectiveUserId);
         if (papers.length === 0) {
@@ -59,7 +59,7 @@ function AppContent() {
       setDemoLoaded(true);
     }
     loadDemo();
-  }, [demoLoaded, effectiveUserId]);
+  }, [loading, demoLoaded, effectiveUserId]);
 
   const handleStartExam = async (paperId: string) => {
     try {
@@ -181,6 +181,22 @@ function AppContent() {
     setView('dashboard');
     setRefreshKey(k => k + 1);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center p-6 font-sans">
+        <div className="bento-card p-8 flex flex-col items-center gap-4 text-center max-w-sm w-full shadow-soft animate-fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-gray-900 text-white flex items-center justify-center animate-pulse">
+            <BookOpen size={22} className="text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">SSC CGL Prep</h2>
+            <p className="text-xs text-gray-500 mt-1">Preparing your workspace...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] flex flex-col md:flex-row font-sans text-gray-900">
@@ -352,6 +368,7 @@ function AppContent() {
           {view === 'results' && (
             <ResultsPage
               attemptId={lastAttemptId}
+              userId={effectiveUserId}
               onRetake={handleRetake}
               onBack={handleBackToDashboard}
               onPractice={handlePracticeTopic}
