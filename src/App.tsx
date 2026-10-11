@@ -11,6 +11,7 @@ import ReviewSession from './components/ReviewSession';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
+import ThemeSwitcher from './components/ThemeSwitcher';
 import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
@@ -279,8 +280,10 @@ function AppContent() {
             </nav>
           </div>
 
-          {/* Bottom of Sidebar: Profile / Status */}
+          {/* Bottom of Sidebar: Theme Switcher & Profile / Status */}
           <div className="pt-4 border-t border-gray-200/80 space-y-3">
+            <ThemeSwitcher variant="full" />
+
             {user ? (
               <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white border border-gray-100 shadow-2xs">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -337,7 +340,10 @@ function AppContent() {
               </h1>
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Theme Switcher Compact Pill for Header */}
+              <ThemeSwitcher variant="compact" />
+
               {view === 'import' ? (
                 <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-2 px-4 rounded-full flex items-center gap-1.5">
                   <ArrowLeft size={14} /> Back

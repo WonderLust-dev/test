@@ -3,6 +3,7 @@ import { Paper, QuestionJSON, ExamSession, AttemptQuestion } from '../types';
 import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake, addBookmark, removeBookmark, getBookmarks } from '../services/database';
 import { gradeQuestions, formatTime } from '../utils/grader';
 import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft } from 'lucide-react';
+import ThemeSwitcher from './ThemeSwitcher';
 
 interface ExamInterfaceProps {
   paper: Paper;
@@ -333,7 +334,10 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {/* Theme Switcher Compact Pill */}
+              <ThemeSwitcher variant="compact" />
+
               {/* Timer Pill */}
               <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono text-sm sm:text-base font-bold shadow-xs transition-all ${
                 isTimerCritical

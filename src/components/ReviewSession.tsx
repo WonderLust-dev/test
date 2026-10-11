@@ -3,6 +3,7 @@ import { DueReview, Mistake } from '../types';
 import { getDueReviews, submitReview } from '../services/srs';
 import { getMistakes } from '../services/database';
 import { Clock, CheckCircle, XCircle, Brain, TrendingUp, Award, ArrowRight, RotateCcw, ArrowLeft, Lightbulb, Zap } from 'lucide-react';
+import ThemeSwitcher from './ThemeSwitcher';
 
 interface ReviewSessionProps {
   userId?: string;
@@ -188,12 +189,15 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
                 Question {currentIndex + 1} of {dueReviews.length}
               </p>
             </div>
-            <button
-              onClick={onExit}
-              className="btn btn-ghost"
-            >
-              Exit
-            </button>
+            <div className="flex items-center gap-3">
+              <ThemeSwitcher variant="compact" />
+              <button
+                onClick={onExit}
+                className="btn btn-ghost"
+              >
+                Exit
+              </button>
+            </div>
           </div>
 
           {/* Progress Bar */}
