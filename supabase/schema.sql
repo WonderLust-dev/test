@@ -171,44 +171,71 @@ ALTER TABLE mistakes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- Papers: Users can see their own papers + all public papers
--- Own papers (private or public)
+DROP POLICY IF EXISTS "Users can view own papers" ON papers;
 CREATE POLICY "Users can view own papers" ON papers FOR SELECT USING (user_id = auth.uid()::text);
--- Public papers visible to everyone (including anonymous users)
+
+DROP POLICY IF EXISTS "Anyone can view public papers" ON papers;
 CREATE POLICY "Anyone can view public papers" ON papers FOR SELECT USING (visibility = 'public');
--- Users can insert their own papers
+
+DROP POLICY IF EXISTS "Users can insert own papers" ON papers;
 CREATE POLICY "Users can insert own papers" ON papers FOR INSERT WITH CHECK (user_id = auth.uid()::text);
--- Users can only update their own papers
+
+DROP POLICY IF EXISTS "Users can update own papers" ON papers;
 CREATE POLICY "Users can update own papers" ON papers FOR UPDATE USING (user_id = auth.uid()::text);
--- Users can only delete their own papers
+
+DROP POLICY IF EXISTS "Users can delete own papers" ON papers;
 CREATE POLICY "Users can delete own papers" ON papers FOR DELETE USING (user_id = auth.uid()::text);
 
 -- Attempts: Users can only see their own attempts
+DROP POLICY IF EXISTS "Users can view own attempts" ON attempts;
 CREATE POLICY "Users can view own attempts" ON attempts FOR SELECT USING (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can insert own attempts" ON attempts;
 CREATE POLICY "Users can insert own attempts" ON attempts FOR INSERT WITH CHECK (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can update own attempts" ON attempts;
 CREATE POLICY "Users can update own attempts" ON attempts FOR UPDATE USING (user_id = auth.uid()::text);
 
 -- Attempt Questions: Access through attempts
+DROP POLICY IF EXISTS "Users can view own attempt questions" ON attempt_questions;
 CREATE POLICY "Users can view own attempt questions" ON attempt_questions FOR SELECT USING (
   attempt_id IN (SELECT id FROM attempts WHERE user_id = auth.uid()::text)
 );
+
+DROP POLICY IF EXISTS "Users can insert own attempt questions" ON attempt_questions;
 CREATE POLICY "Users can insert own attempt questions" ON attempt_questions FOR INSERT WITH CHECK (
   attempt_id IN (SELECT id FROM attempts WHERE user_id = auth.uid()::text)
 );
 
 -- Bookmarks: Users can only manage their own bookmarks
+DROP POLICY IF EXISTS "Users can view own bookmarks" ON bookmarks;
 CREATE POLICY "Users can view own bookmarks" ON bookmarks FOR SELECT USING (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can insert own bookmarks" ON bookmarks;
 CREATE POLICY "Users can insert own bookmarks" ON bookmarks FOR INSERT WITH CHECK (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can delete own bookmarks" ON bookmarks;
 CREATE POLICY "Users can delete own bookmarks" ON bookmarks FOR DELETE USING (user_id = auth.uid()::text);
 
 -- Mistakes: Users can only manage their own mistakes
+DROP POLICY IF EXISTS "Users can view own mistakes" ON mistakes;
 CREATE POLICY "Users can view own mistakes" ON mistakes FOR SELECT USING (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can insert own mistakes" ON mistakes;
 CREATE POLICY "Users can insert own mistakes" ON mistakes FOR INSERT WITH CHECK (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can update own mistakes" ON mistakes;
 CREATE POLICY "Users can update own mistakes" ON mistakes FOR UPDATE USING (user_id = auth.uid()::text);
 
--- Profiles: Users can only manage their own profile
-CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (id = auth.uid()::text);
-CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (id = auth.uid()::text);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (id = auth.uid()::text);
+-- Profiles: Users can only manage their own profile (UUID to UUID match)
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (id = auth.uid());
 
 -- ============================================================
 -- AUTO-CREATE PROFILE ON SIGNUP
@@ -218,7 +245,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO profiles (id, display_name, avatar_url)
   VALUES (
-    NEW.id::text,
+    NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'display_name', ''),
     NEW.raw_user_meta_data->>'avatar_url'
   );
@@ -234,7 +261,10 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- REVIEWS TABLE RLS POLICIES
 -- ============================================================
+DROP POLICY IF EXISTS "Users can view own reviews" ON reviews;
 CREATE POLICY "Users can view own reviews" ON reviews FOR SELECT USING (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can insert own reviews" ON reviews;
 CREATE POLICY "Users can insert own reviews" ON reviews FOR INSERT WITH CHECK (user_id = auth.uid()::text);
 
 -- ============================================================

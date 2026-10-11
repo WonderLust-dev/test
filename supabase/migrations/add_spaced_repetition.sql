@@ -39,7 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_reviews_reviewed_at ON reviews(reviewed_at DESC);
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for reviews
+DROP POLICY IF EXISTS "Users can view own reviews" ON reviews;
 CREATE POLICY "Users can view own reviews" ON reviews FOR SELECT USING (user_id = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can insert own reviews" ON reviews;
 CREATE POLICY "Users can insert own reviews" ON reviews FOR INSERT WITH CHECK (user_id = auth.uid()::text);
 
 -- Function to calculate next review date using SM-2 algorithm
