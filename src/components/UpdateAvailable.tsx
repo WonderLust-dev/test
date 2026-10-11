@@ -15,10 +15,10 @@ export default function UpdateAvailable({ onUpdate }: UpdateAvailableProps) {
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">
+            <h3 className="font-bold text-slate-900 text-sm mb-1">
               Update Available
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+            <p className="text-xs text-slate-600 mb-3">
               A new version of SSC CGL Prep is available. Update now for the latest features and improvements.
             </p>
             <div className="flex gap-2">

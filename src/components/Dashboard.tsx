@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
 import { getPapers, getAttempts, getMistakes, getBookmarks, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
-import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check } from 'lucide-react';
 
 // ============================================================
 // Dashboard (Home)
@@ -617,6 +617,8 @@ interface LibraryTabProps {
 
 function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, allSubjects, allExams, onStartExam, onPractice, onImport, onRefresh, userId }: LibraryTabProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'public'>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const getBestScore = (paperId: string) => {
     const paperAttempts = attempts.filter(a => a.paper_id === paperId);
@@ -652,156 +654,322 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
     }
   };
 
+  const handleShare = async (paper: Paper) => {
+    if (paper.visibility !== 'public') {
+      const makePub = confirm(
+        `"${paper.title}" is currently private.\n\nMake it Public so your colleagues can open and take it?`
+      );
+      if (makePub) {
+        const res = await updatePaperVisibility(paper.id, 'public', userId);
+        if (!res.success) {
+          alert(res.error || 'Failed to make test public');
+          return;
+        }
+        await onRefresh();
+      } else {
+        return;
+      }
+    }
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}?exam=${encodeURIComponent(paper.id)}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedId(paper.id);
+      setTimeout(() => setCopiedId(null), 3500);
+    } catch {
+      prompt('Copy this link to share with colleagues:', shareUrl);
+    }
+  };
+
+  const displayedPapers = useMemo(() => {
+    let list = papers;
+    if (viewFilter === 'mine') {
+      list = list.filter(p => p.user_id === userId || p.user_id === 'guest');
+    } else if (viewFilter === 'public') {
+      list = list.filter(p => p.visibility === 'public');
+    }
+    return list;
+  }, [papers, viewFilter, userId]);
+
+  const myCount = useMemo(() => papers.filter(p => p.user_id === userId || p.user_id === 'guest').length, [papers, userId]);
+  const publicCount = useMemo(() => papers.filter(p => p.visibility === 'public').length, [papers]);
+
   if (papers.length === 0 && !search) {
     return (
-      <div className="text-center py-16">
-        <BookOpen size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No papers yet</h3>
-        <p className="text-gray-500 dark:text-gray-500 mb-4">Import your first AI-generated question set to get started.</p>
-        <button onClick={onImport} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors mx-auto">
-          <PlusCircle size={18} /> Import Paper
+      <div className="text-center py-20 bento-card p-10">
+        <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-bold text-gray-900 mb-2">No question papers yet</h3>
+        <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+          Import your first AI-generated question set or load our demo exam to get started.
+        </p>
+        <button onClick={onImport} className="btn btn-primary text-xs py-3 px-6 rounded-full inline-flex items-center gap-2 shadow-xs">
+          <PlusCircle size={16} /> Import Paper
         </button>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-5 animate-fadeIn">
       {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search papers, topics, or questions..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+            className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200/90 rounded-full text-xs sm:text-sm text-gray-900 placeholder-gray-400 shadow-2xs focus:ring-2 focus:ring-gray-900 focus:outline-none"
+          />
         </div>
-        <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-          <Filter size={16} /> Filters
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="btn btn-outline text-xs py-2 px-4 rounded-full flex items-center gap-1.5"
+          >
+            <Filter size={14} /> Filters
+          </button>
+          <button
+            onClick={onImport}
+            className="btn btn-primary text-xs py-2 px-4.5 rounded-full flex items-center gap-1.5 shadow-xs"
+          >
+            <PlusCircle size={14} /> Import Paper
+          </button>
+        </div>
+      </div>
+
+      {/* Quick View Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setViewFilter('all')}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            viewFilter === 'all'
+              ? 'bg-gray-900 text-white shadow-2xs'
+              : 'bg-white border border-gray-200 text-gray-600 hover:text-black'
+          }`}
+        >
+          All Tests ({papers.length})
         </button>
-        <button onClick={onImport} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-          <PlusCircle size={16} /> Import Paper
+        <button
+          onClick={() => setViewFilter('mine')}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            viewFilter === 'mine'
+              ? 'bg-gray-900 text-white shadow-2xs'
+              : 'bg-white border border-gray-200 text-gray-600 hover:text-black'
+          }`}
+        >
+          My Tests ({myCount})
+        </button>
+        <button
+          onClick={() => setViewFilter('public')}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            viewFilter === 'public'
+              ? 'bg-emerald-600 text-white shadow-2xs'
+              : 'bg-white border border-gray-200 text-gray-600 hover:text-black'
+          }`}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Globe size={12} /> Public & Shared ({publicCount})
+          </span>
         </button>
       </div>
 
-      {/* Filter Options */}
+      {/* Advanced Filter Options */}
       {showFilters && (
-        <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-          <select value={filters.exam || ''} onChange={e => setFilters({ ...filters, exam: e.target.value || undefined })}
-            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+        <div className="flex flex-wrap gap-2.5 p-4 bg-white border border-gray-200/80 rounded-2xl shadow-2xs">
+          <select
+            value={filters.exam || ''}
+            onChange={e => setFilters({ ...filters, exam: e.target.value || undefined })}
+            className="px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 outline-none"
+          >
             <option value="">All Exams</option>
             {allExams.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          <select value={filters.subject || ''} onChange={e => setFilters({ ...filters, subject: e.target.value || undefined })}
-            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+          <select
+            value={filters.subject || ''}
+            onChange={e => setFilters({ ...filters, subject: e.target.value || undefined })}
+            className="px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 outline-none"
+          >
             <option value="">All Subjects</option>
             {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={filters.difficulty || ''} onChange={e => setFilters({ ...filters, difficulty: (e.target.value || undefined) as any })}
-            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+          <select
+            value={filters.difficulty || ''}
+            onChange={e => setFilters({ ...filters, difficulty: (e.target.value || undefined) as any })}
+            className="px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 outline-none"
+          >
             <option value="">All Difficulty</option>
             <option value="easy">Easy</option>
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </select>
-          <select value={filters.status || ''} onChange={e => setFilters({ ...filters, status: (e.target.value || undefined) as any })}
-            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+          <select
+            value={filters.status || ''}
+            onChange={e => setFilters({ ...filters, status: (e.target.value || undefined) as any })}
+            className="px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 outline-none"
+          >
             <option value="">All Status</option>
             <option value="attempted">Attempted</option>
             <option value="not_attempted">Not Attempted</option>
           </select>
           {(filters.exam || filters.subject || filters.difficulty || filters.status) && (
-            <button onClick={() => setFilters({})} className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:underline">Clear Filters</button>
+            <button
+              onClick={() => setFilters({})}
+              className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:underline"
+            >
+              Clear Filters
+            </button>
           )}
         </div>
       )}
 
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{papers.length} paper{papers.length !== 1 ? 's' : ''} found</p>
-
-      {/* Paper Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {papers.map(paper => {
+      {/* Paper Cards Grid */}
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {displayedPapers.map(paper => {
           const bestScore = getBestScore(paper.id);
           const attemptCount = getAttemptCount(paper.id);
 
           return (
-            <div key={paper.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow group">
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2 flex-1 mr-2">{paper.title}</h3>
-                  <div className="flex gap-1 shrink-0">
-                    {paper.is_demo && <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-xs font-medium">Demo</span>}
-                    {paper.visibility === 'public' && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
+            <div
+              key={paper.id}
+              className="bento-card p-5 sm:p-6 flex flex-col justify-between hover:shadow-soft transition-all duration-200 group bg-white border border-gray-200/80 rounded-3xl"
+            >
+              <div>
+                {/* Header Row: Title & Badges */}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h3 className="font-extrabold text-gray-900 text-sm sm:text-base leading-snug line-clamp-2 flex-1">
+                    {paper.title}
+                  </h3>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {paper.is_demo && (
+                      <span className="badge badge-warning">Demo</span>
+                    )}
+                    {paper.visibility === 'public' ? (
+                      <span className="badge badge-accent flex items-center gap-1">
                         <Globe size={10} /> Public
+                      </span>
+                    ) : (
+                      <span className="badge badge-muted flex items-center gap-1">
+                        <Lock size={10} /> Private
                       </span>
                     )}
                   </div>
                 </div>
-                {paper.description && <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{paper.description}</p>}
 
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded text-xs">{paper.exam}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getDifficultyColor(paper.difficulty)}`}>{paper.difficulty}</span>
+                {paper.description && (
+                  <p className="text-xs text-gray-500 mb-3.5 line-clamp-2 leading-relaxed">
+                    {paper.description}
+                  </p>
+                )}
+
+                {/* Exam & Difficulty Row */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-3.5">
+                  <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-[11px] font-semibold">
+                    {paper.exam}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${getDifficultyColor(paper.difficulty)}`}>
+                    {paper.difficulty}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                  <div className="p-1.5 bg-gray-50 dark:bg-gray-900/50 rounded">
-                    <div className="text-sm font-bold text-gray-900 dark:text-white">{paper.question_count}</div>
-                    <div className="text-xs text-gray-500">Qs</div>
+                {/* Bento Subcard Stats Box (Image 2 style) */}
+                <div className="grid grid-cols-3 gap-2 my-3">
+                  <div className="p-2.5 bg-gray-50/80 border border-gray-100 rounded-2xl text-center">
+                    <div className="text-sm font-extrabold text-gray-900">{paper.question_count}</div>
+                    <div className="text-[10px] font-semibold text-gray-400 mt-0.5">Questions</div>
                   </div>
-                  <div className="p-1.5 bg-gray-50 dark:bg-gray-900/50 rounded">
-                    <div className="text-sm font-bold text-gray-900 dark:text-white">{paper.total_marks}</div>
-                    <div className="text-xs text-gray-500">Marks</div>
+                  <div className="p-2.5 bg-gray-50/80 border border-gray-100 rounded-2xl text-center">
+                    <div className="text-sm font-extrabold text-gray-900">{paper.total_marks}</div>
+                    <div className="text-[10px] font-semibold text-gray-400 mt-0.5">Marks</div>
                   </div>
-                  <div className="p-1.5 bg-gray-50 dark:bg-gray-900/50 rounded">
-                    <div className="text-sm font-bold text-gray-900 dark:text-white">{paper.duration_minutes}m</div>
-                    <div className="text-xs text-gray-500">Time</div>
+                  <div className="p-2.5 bg-gray-50/80 border border-gray-100 rounded-2xl text-center">
+                    <div className="text-sm font-extrabold text-gray-900">{paper.duration_minutes}m</div>
+                    <div className="text-[10px] font-semibold text-gray-400 mt-0.5">Duration</div>
                   </div>
                 </div>
 
+                {/* Attempt History Pill */}
                 {attemptCount > 0 && (
-                  <div className="flex items-center justify-between text-xs mb-3 p-2 bg-gray-50 dark:bg-gray-900/50 rounded">
-                    <span className="text-gray-500">{attemptCount} attempt{attemptCount > 1 ? 's' : ''}</span>
+                  <div className="flex items-center justify-between text-xs mb-3 px-3 py-2 bg-emerald-50/60 border border-emerald-100/80 rounded-2xl">
+                    <span className="text-gray-500 text-[11px] font-medium">{attemptCount} attempt{attemptCount > 1 ? 's' : ''}</span>
                     {bestScore !== null && (
-                      <span className={`font-bold ${getAccuracyColor(bestScore)}`}>Best: {bestScore}%</span>
+                      <span className={`font-bold text-[11px] ${getAccuracyColor(bestScore)}`}>Best: {bestScore}%</span>
                     )}
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-1 mb-3">
+                {/* Subject Tags */}
+                <div className="flex flex-wrap gap-1 mb-4">
                   {paper.subjects.slice(0, 3).map(s => (
-                    <span key={s} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs truncate max-w-[100px]">{s}</span>
+                    <span key={s} className="px-2 py-0.5 bg-gray-50 border border-gray-100 text-gray-600 rounded-full text-[10px] font-medium truncate max-w-[120px]">
+                      {s}
+                    </span>
                   ))}
+                  {paper.subjects.length > 3 && (
+                    <span className="px-1.5 py-0.5 text-gray-400 text-[10px] font-medium">
+                      +{paper.subjects.length - 3}
+                    </span>
+                  )}
                 </div>
+
+                {/* Share Link Copied Toast Banner */}
+                {copiedId === paper.id && (
+                  <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-1.5 animate-fadeIn">
+                    <Check size={13} className="text-emerald-600" />
+                    <span>Share link copied! Send to colleagues to take test.</span>
+                  </div>
+                )}
               </div>
 
-              {/* Actions */}
-              <div className="border-t border-gray-100 dark:border-gray-700 p-3 flex flex-wrap gap-1.5">
-                <button onClick={() => onStartExam(paper.id)} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors">
-                  <Play size={12} /> Exam
+              {/* Actions Bottom Bar */}
+              <div className="pt-3.5 border-t border-gray-100 flex items-center gap-1.5">
+                <button
+                  onClick={() => onStartExam(paper.id)}
+                  className="flex-1 btn btn-primary text-xs py-2 px-3 rounded-full flex items-center justify-center gap-1.5 shadow-2xs"
+                >
+                  <Play size={12} className="fill-white" /> Exam
                 </button>
-                <button onClick={() => onPractice(paper.id)} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
+                <button
+                  onClick={() => onPractice(paper.id)}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-3 rounded-full flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+                >
                   <Target size={12} /> Practice
                 </button>
-                <button onClick={() => handleExport(paper)} className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Export JSON">
-                  <Download size={12} />
-                </button>
-                <button onClick={() => handleCopyJSON(paper)} className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Copy JSON">
-                  <Copy size={12} />
-                </button>
-                <button 
-                  onClick={() => handleToggleVisibility(paper)} 
-                  className={`p-2 rounded-lg transition-colors ${
-                    paper.visibility === 'public' 
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40' 
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`} 
-                  title={paper.visibility === 'public' ? 'Make Private' : 'Make Public'}
+                <button
+                  onClick={() => handleShare(paper)}
+                  className={`p-2 rounded-full border transition-all shadow-2xs ${
+                    copiedId === paper.id
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                      : 'bg-white border-gray-200 text-gray-600 hover:text-black hover:bg-gray-50'
+                  }`}
+                  title="Share test with colleagues (copies direct exam link)"
                 >
-                  {paper.visibility === 'public' ? <Globe size={12} /> : <Lock size={12} />}
+                  {copiedId === paper.id ? <Check size={13} /> : <Share2 size={13} />}
                 </button>
-                <button onClick={() => handleDelete(paper.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors" title="Delete">
-                  <Trash2 size={12} />
+                <button
+                  onClick={() => handleToggleVisibility(paper)}
+                  className={`p-2 rounded-full border transition-all shadow-2xs ${
+                    paper.visibility === 'public'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                      : 'bg-white border-gray-200 text-gray-500 hover:text-black hover:bg-gray-50'
+                  }`}
+                  title={paper.visibility === 'public' ? 'Make Private' : 'Publish test so colleagues can access it'}
+                >
+                  {paper.visibility === 'public' ? <Globe size={13} /> : <Lock size={13} />}
+                </button>
+                <button
+                  onClick={() => handleExport(paper)}
+                  className="p-2 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-black hover:bg-gray-50 transition-colors shadow-2xs"
+                  title="Export JSON"
+                >
+                  <Download size={13} />
+                </button>
+                <button
+                  onClick={() => handleDelete(paper.id)}
+                  className="p-2 rounded-full border border-rose-200 bg-white text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors shadow-2xs"
+                  title="Delete Paper"
+                >
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>
@@ -943,45 +1111,45 @@ function PracticeTab({
 
   if (allQuestions.length === 0) {
     return (
-      <div className="text-center py-16">
-        <Target size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-1">No Questions Available</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Please import a question set or paper first to unlock practice modes.</p>
+      <div className="text-center py-20 bento-card p-10">
+        <Target size={48} className="mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-bold text-gray-900 mb-1">No Questions Available</h3>
+        <p className="text-sm text-gray-500 mb-4">Please import a question set or paper first to unlock practice modes.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn">
       {/* Interactive Topic Selector */}
-      <div className="glass-card rounded-2xl p-6 border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-r from-indigo-50/50 via-white to-sky-50/50 dark:from-slate-900/60 dark:to-indigo-950/20 shadow-soft">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+      <div className="bento-card p-6 sm:p-7 bg-white border border-gray-200/80 rounded-3xl shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
           <div>
-            <span className="badge badge-accent mb-1">Custom Practice Builder</span>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen size={18} className="text-indigo-600" />
+            <span className="badge badge-accent mb-2">Custom Practice Builder</span>
+            <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+              <BookOpen size={18} className="text-gray-900" />
               Targeted Topic Drill
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-1">
               Filter by subject and specific topic to practice weak syllabus areas.
             </p>
           </div>
           <button
             onClick={startTopicDrill}
             disabled={topicMatchedQuestions.length === 0}
-            className="btn btn-primary text-xs py-2.5 px-5 shadow-soft shrink-0 self-start md:self-auto"
+            className="btn btn-primary text-xs py-2.5 px-5 shadow-xs shrink-0 self-start md:self-auto rounded-full"
           >
-            <Play size={14} className="fill-white" /> Start Topic Drill ({topicMatchedQuestions.length} Qs)
+            <Play size={13} className="fill-white" /> Start Topic Drill ({topicMatchedQuestions.length} Qs)
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">Subject</label>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 block">Subject</label>
             <select
               value={selectedSubject}
               onChange={e => { setSelectedSubject(e.target.value); setSelectedTopic(''); }}
-              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-gray-900 shadow-2xs"
             >
               <option value="">All Subjects ({allQuestions.length} Questions)</option>
               {subjects.map(s => (
@@ -990,11 +1158,11 @@ function PracticeTab({
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">Specific Topic</label>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 block">Specific Topic</label>
             <select
               value={selectedTopic}
               onChange={e => setSelectedTopic(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-gray-900 shadow-2xs"
             >
               <option value="">All Topics</option>
               {topicsForSubject.map(t => (
@@ -1007,67 +1175,67 @@ function PracticeTab({
 
       {/* Quick Launch Practice Modes */}
       <div>
-        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+        <h3 className="text-base font-extrabold text-gray-900 mb-4 flex items-center gap-2">
           <Zap size={18} className="text-amber-500" />
           Smart Practice Modes
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             onClick={startQuickSprint}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-amber-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <Zap size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               Quick 10-Q Sprint
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               10 random questions across all subjects. Perfect for a 10-minute coffee break drill.
             </p>
           </button>
 
           <button
             onClick={startSpeedDrill}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-purple-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <Clock size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               5-Minute Speed Drill
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               10 questions in 5 minutes. Trains high-speed calculation and fast elimination.
             </p>
           </button>
 
           <button
             onClick={startWeakAreaDrill}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-rose-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <Brain size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               Weak Areas Drill
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               Dynamically targets topics where you have logged the most mistakes.
             </p>
           </button>
 
           <button
             onClick={startMistakesDrill}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-orange-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <AlertTriangle size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               Mistake Notebook Test
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               {mistakes.length > 0
                 ? `Test yourself on ${mistakes.length} recorded mistake question${mistakes.length > 1 ? 's' : ''}.`
                 : 'Retest questions you previously got wrong.'}
@@ -1076,30 +1244,30 @@ function PracticeTab({
 
           <button
             onClick={startMixedComprehensive}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-emerald-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <RotateCcw size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               Comprehensive Mixed (15 Qs)
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               Balanced mix covering Quant, Reasoning, English, and General Awareness.
             </p>
           </button>
 
           <button
             onClick={startTopicDrill}
-            className="p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left hover:shadow-medium transition-all group hover:border-blue-400"
+            className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl text-left hover:shadow-soft transition-all group"
           >
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 shadow-soft group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition-transform">
               <Target size={20} />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 group-hover:text-indigo-600 transition-colors">
+            <h4 className="font-extrabold text-gray-900 text-sm mb-1 group-hover:text-black transition-colors">
               Subject Deep Dive
             </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               Select any subject and master questions topic-by-topic with instant solutions.
             </p>
           </button>
@@ -1171,24 +1339,24 @@ function MistakesTab({
 
   if (mistakes.length === 0) {
     return (
-      <div className="text-center py-16">
+      <div className="text-center py-20 bento-card p-10">
         <CheckCircle size={48} className="mx-auto text-emerald-500 mb-4" />
-        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Mistake Notebook Clean!</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">You have no pending mistakes. Keep practicing to maintain high accuracy!</p>
+        <h3 className="text-lg font-extrabold text-gray-900 mb-1">Mistake Notebook Clean!</h3>
+        <p className="text-sm text-gray-500">You have no pending mistakes. Keep practicing to maintain high accuracy!</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="space-y-5 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">My Mistake Notebook ({mistakes.length})</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Questions you missed during mock tests. Review solutions and retest anytime.</p>
+          <h2 className="text-lg font-extrabold text-gray-900">My Mistake Notebook ({mistakes.length})</h2>
+          <p className="text-xs text-gray-500">Questions you missed during mock tests. Review solutions and retest anytime.</p>
         </div>
         <button
           onClick={handlePracticeMistakes}
-          className="btn btn-primary text-xs py-2.5 px-4 shadow-soft self-start sm:self-auto"
+          className="btn btn-primary text-xs py-2.5 px-4.5 rounded-full shadow-xs self-start sm:self-auto flex items-center gap-1.5"
         >
           <RotateCcw size={14} /> Practice All Mistakes ({mistakes.length})
         </button>
@@ -1196,26 +1364,30 @@ function MistakesTab({
 
       <div className="space-y-3">
         {mistakes.map(m => (
-          <div key={m.id} className="p-4 sm:p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-soft">
-            <div className="flex items-start justify-between gap-3 mb-2.5">
+          <div key={m.id} className="bento-card p-5 bg-white border border-gray-200/80 rounded-3xl shadow-xs">
+            <div className="flex items-start justify-between gap-3 mb-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1.5 leading-relaxed">{m.question_text}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-xs font-medium">{m.subject}</span>
-                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-xs font-medium">{m.topic}</span>
-                  <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 rounded text-xs font-bold">{m.incorrect_count}× wrong</span>
+                <p className="text-sm font-bold text-gray-900 mb-2 leading-relaxed">{m.question_text}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-[11px] font-semibold">{m.subject}</span>
+                  <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-[11px] font-semibold">{m.topic}</span>
+                  <span className="px-2.5 py-0.5 bg-rose-50 border border-rose-200/80 text-rose-700 rounded-full text-[11px] font-bold">{m.incorrect_count}× wrong</span>
                 </div>
               </div>
-              <button onClick={() => onResolve(m.id)} className="shrink-0 p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Mark as resolved">
+              <button
+                onClick={() => onResolve(m.id)}
+                className="shrink-0 p-2 text-gray-400 hover:text-emerald-600 rounded-full hover:bg-gray-100 transition-colors"
+                title="Mark as resolved"
+              >
                 <CheckCircle size={18} />
               </button>
             </div>
-            <div className="text-xs space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-              <p className="text-rose-600 dark:text-rose-400 font-medium">Your answer: {m.selected_answer !== null ? m.options[m.selected_answer] : 'Not attempted'}</p>
-              <p className="text-emerald-600 dark:text-emerald-400 font-medium">Correct answer: {m.options[m.correct_answer]}</p>
-              {m.solution && <p className="text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">💡 <strong>Solution:</strong> {m.solution}</p>}
-              {m.shortcut && <p className="text-purple-600 dark:text-purple-400">⚡ <strong>Shortcut:</strong> {m.shortcut}</p>}
-              {m.learning_suggestion && <p className="text-amber-600 dark:text-amber-400">📌 <strong>Tip:</strong> {m.learning_suggestion}</p>}
+            <div className="text-xs space-y-1.5 pt-3 border-t border-gray-100">
+              <p className="text-rose-600 font-semibold">Your answer: {m.selected_answer !== null ? m.options[m.selected_answer] : 'Not attempted'}</p>
+              <p className="text-emerald-600 font-semibold">Correct answer: {m.options[m.correct_answer]}</p>
+              {m.solution && <p className="text-gray-700 mt-1 whitespace-pre-wrap">💡 <strong>Solution:</strong> {m.solution}</p>}
+              {m.shortcut && <p className="text-purple-600">⚡ <strong>Shortcut:</strong> {m.shortcut}</p>}
+              {m.learning_suggestion && <p className="text-amber-600">📌 <strong>Tip:</strong> {m.learning_suggestion}</p>}
             </div>
           </div>
         ))}
@@ -1291,10 +1463,10 @@ function BookmarksTab({
 
   if (bookmarks.length === 0) {
     return (
-      <div className="text-center py-16">
-        <BookmarkIcon size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">No Bookmarks Saved</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Click the bookmark icon or press [B] during exams to save questions here.</p>
+      <div className="text-center py-20 bento-card p-10">
+        <BookmarkIcon size={48} className="mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-extrabold text-gray-900 mb-1">No Bookmarks Saved</h3>
+        <p className="text-sm text-gray-500">Click the bookmark icon or press [B] during exams to save questions here.</p>
       </div>
     );
   }
@@ -1302,40 +1474,44 @@ function BookmarksTab({
   const categories: BookmarkCategory[] = ['important', 'difficult', 'revise_later', 'shortcut', 'formula', 'doubt'];
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="space-y-5 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Saved Questions ({bookmarks.length})</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Questions pinned for special review and revision.</p>
+          <h2 className="text-lg font-extrabold text-gray-900">Saved Questions ({bookmarks.length})</h2>
+          <p className="text-xs text-gray-500">Questions pinned for special review and revision.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={filterCat}
             onChange={e => setFilterCat(e.target.value as BookmarkCategory | '')}
-            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200"
+            className="px-3.5 py-2 bg-white border border-gray-200 rounded-full text-xs font-semibold text-gray-700 outline-none shadow-2xs"
           >
             <option value="">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
           </select>
           <button
             onClick={handlePracticeBookmarks}
-            className="btn btn-primary text-xs py-2 px-3.5 shadow-soft"
+            className="btn btn-primary text-xs py-2 px-4 rounded-full shadow-xs flex items-center gap-1.5"
           >
-            <Play size={13} className="fill-white" /> Practice Bookmarks
+            <Play size={12} className="fill-white" /> Practice Bookmarks
           </button>
         </div>
       </div>
 
       <div className="space-y-2.5">
         {filtered.map(b => (
-          <div key={b.id} className="flex items-start justify-between gap-3 p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-soft">
+          <div key={b.id} className="bento-card p-4 sm:p-5 bg-white border border-gray-200/80 rounded-2xl shadow-xs flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-white mb-1.5">{b.question_text}</p>
-              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded text-xs font-semibold uppercase tracking-wider text-[10px]">
+              <p className="text-sm font-semibold text-gray-900 mb-2">{b.question_text}</p>
+              <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
                 {b.category.replace('_', ' ')}
               </span>
             </div>
-            <button onClick={() => onRemove(b.id)} className="shrink-0 p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Remove bookmark">
+            <button
+              onClick={() => onRemove(b.id)}
+              className="shrink-0 p-1.5 text-gray-400 hover:text-rose-600 rounded-full hover:bg-gray-100 transition-colors"
+              title="Remove bookmark"
+            >
               <X size={16} />
             </button>
           </div>
@@ -1351,107 +1527,99 @@ function BookmarksTab({
 function AnalyticsTab({ attempts, papers }: { attempts: Attempt[]; papers: Paper[] }) {
   if (attempts.length === 0) {
     return (
-      <div className="text-center py-16">
-        <BarChart3 size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No analytics yet</h3>
-        <p className="text-gray-500 dark:text-gray-500">Start your first paper to begin tracking your progress.</p>
+      <div className="text-center py-20 bento-card p-10">
+        <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-extrabold text-gray-900 mb-2">No analytics yet</h3>
+        <p className="text-sm text-gray-500">Take your first mock exam to begin tracking your score progress and topic mastery.</p>
       </div>
     );
   }
 
   const totalQs = attempts.reduce((s, a) => s + a.attempted_count, 0);
   const avgAccuracy = Math.round(attempts.reduce((s, a) => s + a.accuracy, 0) / attempts.length);
-  const avgTime = attempts.length > 0 ? Math.round(attempts.reduce((s, a) => s + a.time_spent_seconds, 0) / attempts.length) : 0;
   const avgTimePerQ = totalQs > 0 ? Math.round(attempts.reduce((s, a) => s + a.time_spent_seconds, 0) / totalQs) : 0;
   const bestScore = Math.max(...attempts.map(a => Math.round((a.score / a.total_marks) * 100)));
   const avgScore = Math.round(attempts.reduce((s, a) => s + (a.score / a.total_marks) * 100, 0) / attempts.length);
 
-  // Subject analysis
-  const subjectStats = new Map<string, { correct: number; total: number; time: number }>();
-  attempts.forEach(a => {
-    const paper = papers.find(p => p.id === a.paper_id);
-    if (!paper) return;
-    paper.raw_json.subjects?.forEach(sub => {
-      const subQs = paper.raw_json.questions.filter(q => q.subject === sub);
-      if (!subjectStats.has(sub)) subjectStats.set(sub, { correct: 0, total: 0, time: 0 });
-    });
-  });
-
   return (
-    <div>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Performance Analytics</h2>
+    <div className="space-y-6 animate-fadeIn">
+      <h2 className="text-lg font-extrabold text-gray-900">Performance Analytics</h2>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{attempts.length}</div>
-          <div className="text-xs text-gray-500">Total Exams</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-gray-900">{attempts.length}</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Total Exams</div>
         </div>
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{totalQs}</div>
-          <div className="text-xs text-gray-500">Questions Solved</div>
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-gray-900">{totalQs}</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Questions Solved</div>
         </div>
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-green-600 dark:text-green-400">{avgAccuracy}%</div>
-          <div className="text-xs text-gray-500">Avg Accuracy</div>
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-emerald-600">{avgAccuracy}%</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Avg Accuracy</div>
         </div>
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-purple-600 dark:text-purple-400">{bestScore}%</div>
-          <div className="text-xs text-gray-500">Highest Score</div>
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-indigo-600">{bestScore}%</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Highest Score</div>
         </div>
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{formatTime(avgTimePerQ)}</div>
-          <div className="text-xs text-gray-500">Avg Time/Q</div>
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-amber-600">{formatTime(avgTimePerQ)}</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Avg Time/Q</div>
         </div>
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
-          <div className="text-xl font-bold text-orange-600 dark:text-orange-400">{avgScore}%</div>
-          <div className="text-xs text-gray-500">Avg Score</div>
+        <div className="bento-card p-4 bg-white border border-gray-200/80 rounded-2xl text-center shadow-xs">
+          <div className="text-2xl font-extrabold text-gray-900">{avgScore}%</div>
+          <div className="text-[11px] font-semibold text-gray-400 mt-1">Avg Score</div>
         </div>
       </div>
 
-      {/* Score Progress Chart (Simple bar chart) */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Score Progress</h3>
-        <div className="flex items-end gap-1 h-32">
-          {attempts.slice(-20).reverse().map((a, idx) => {
+      {/* Score Progress Chart */}
+      <div className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl shadow-xs">
+        <h3 className="font-extrabold text-gray-900 mb-4 text-sm">Score Progress</h3>
+        <div className="flex items-end gap-1.5 h-36">
+          {attempts.slice(-20).reverse().map((a) => {
             const pct = Math.round((a.score / a.total_marks) * 100);
             return (
-              <div key={a.id} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full rounded-t transition-all hover:opacity-80" style={{
-                  height: `${Math.max(4, pct)}%`,
-                  backgroundColor: pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#ef4444',
-                }} title={`${a.paper_title}: ${pct}%`} />
+              <div key={a.id} className="flex-1 flex flex-col items-center gap-1 group relative">
+                <div
+                  className="w-full rounded-t-lg transition-all hover:opacity-80"
+                  style={{
+                    height: `${Math.max(6, pct)}%`,
+                    backgroundColor: pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444',
+                  }}
+                  title={`${a.paper_title}: ${pct}%`}
+                />
               </div>
             );
           })}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Last {Math.min(20, attempts.length)} attempts</p>
+        <p className="text-[11px] text-gray-400 mt-3 text-center font-medium">Last {Math.min(20, attempts.length)} attempts</p>
       </div>
 
       {/* Recent Attempts Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Recent Attempts</h3>
+      <div className="bento-card p-6 bg-white border border-gray-200/80 rounded-3xl shadow-xs">
+        <h3 className="font-extrabold text-gray-900 mb-4 text-sm">Recent Attempts</h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
-                <th className="pb-2 pr-4">Paper</th>
-                <th className="pb-2 pr-4">Score</th>
-                <th className="pb-2 pr-4">Accuracy</th>
-                <th className="pb-2 pr-4">Time</th>
-                <th className="pb-2">Date</th>
+              <tr className="text-left font-bold text-gray-400 border-b border-gray-100">
+                <th className="pb-3 pr-4">Paper</th>
+                <th className="pb-3 pr-4">Score</th>
+                <th className="pb-3 pr-4">Accuracy</th>
+                <th className="pb-3 pr-4">Time</th>
+                <th className="pb-3">Date</th>
               </tr>
             </thead>
             <tbody>
               {attempts.slice(0, 10).map(a => {
                 const pct = Math.round((a.score / a.total_marks) * 100);
                 return (
-                  <tr key={a.id} className="border-b border-gray-50 dark:border-gray-700/50">
-                    <td className="py-2 pr-4 text-gray-900 dark:text-white font-medium truncate max-w-[200px]">{a.paper_title}</td>
-                    <td className={`py-2 pr-4 font-bold ${getAccuracyColor(pct)}`}>{a.score}/{a.total_marks}</td>
-                    <td className={`py-2 pr-4 ${getAccuracyColor(a.accuracy)}`}>{a.accuracy}%</td>
-                    <td className="py-2 pr-4 text-gray-500">{formatTime(a.time_spent_seconds)}</td>
-                    <td className="py-2 text-gray-500 text-xs">{new Date(a.started_at).toLocaleDateString()}</td>
+                  <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 pr-4 text-gray-900 font-bold truncate max-w-[220px]">{a.paper_title}</td>
+                    <td className={`py-3 pr-4 font-extrabold ${getAccuracyColor(pct)}`}>{a.score}/{a.total_marks}</td>
+                    <td className={`py-3 pr-4 font-bold ${getAccuracyColor(a.accuracy)}`}>{a.accuracy}%</td>
+                    <td className="py-3 pr-4 text-gray-500 font-medium">{formatTime(a.time_spent_seconds)}</td>
+                    <td className="py-3 text-gray-400 font-medium">{new Date(a.started_at).toLocaleDateString()}</td>
                   </tr>
                 );
               })}

@@ -124,7 +124,7 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading your review session...</p>
+          <p className="text-sm font-medium text-slate-600">Loading your review session...</p>
         </div>
       </div>
     );
@@ -133,14 +133,14 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
   if (dueReviews.length === 0) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4">
-        <div className="glass-card rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center border border-white/40 shadow-strong">
-          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-soft">
-            <CheckCircle size={40} className="text-emerald-600 dark:text-emerald-400" />
+        <div className="bento-card rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center border border-gray-200/80 shadow-soft">
+          <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-soft">
+            <CheckCircle size={40} className="text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">
             All Caught Up!
           </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
             {availableMistakes.length > 0
               ? `You have no reviews strictly due today, but you have ${availableMistakes.length} question${availableMistakes.length > 1 ? 's' : ''} in your mistake notebook.`
               : 'You have no pending mistakes scheduled for review right now. Excellent progress!'}
@@ -164,7 +164,7 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-slate-600 dark:text-slate-400">Preparing next question...</p>
+          <p className="text-slate-600">Preparing next question...</p>
         </div>
       </div>
     );
@@ -173,7 +173,6 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
   const progress = ((currentIndex + 1) / dueReviews.length) * 100;
   const isCorrect = selectedAnswer === mistake.correct_answer;
 
-
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-4">
@@ -181,11 +180,11 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Brain size={28} className="text-indigo-600" />
                 Review Session
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Question {currentIndex + 1} of {dueReviews.length}
               </p>
             </div>
@@ -198,8 +197,8 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
           </div>
 
           {/* Progress Bar */}
-          <div className="glass-card rounded-full p-1">
-            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="bento-card rounded-full p-1">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-300"
                 style={{ width: `${progress}%` }}
@@ -210,28 +209,28 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
         {/* Session Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+          <div className="bento-card rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-indigo-600">
               {sessionStats.correct + sessionStats.incorrect}
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Reviewed</div>
+            <div className="text-xs text-gray-600">Reviewed</div>
           </div>
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <div className="bento-card rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">
               {sessionStats.correct}
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Correct</div>
+            <div className="text-xs text-gray-600">Correct</div>
           </div>
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+          <div className="bento-card rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-red-600">
               {sessionStats.incorrect}
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Incorrect</div>
+            <div className="text-xs text-gray-600">Incorrect</div>
           </div>
         </div>
 
         {/* Question Card */}
-        <div className="glass-card rounded-2xl p-6 mb-6">
+        <div className="bento-card rounded-2xl p-6 mb-6">
           {/* Question Info */}
           <div className="flex items-center gap-2 mb-4">
             <span className="badge badge-accent">{mistake.subject}</span>
@@ -249,7 +248,7 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
           </div>
 
           {/* Question Text */}
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
             {mistake.question_text}
           </h2>
 
@@ -259,20 +258,20 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
               const isSelected = selectedAnswer === index;
               const isCorrectAnswer = index === mistake.correct_answer;
               
-              let borderColor = 'border-gray-200 dark:border-gray-700';
-              let bgColor = 'bg-white dark:bg-gray-800';
+              let borderColor = 'border-gray-200';
+              let bgColor = 'bg-white';
               
               if (showAnswer) {
                 if (isCorrectAnswer) {
                   borderColor = 'border-green-500';
-                  bgColor = 'bg-green-50 dark:bg-green-900/20';
+                  bgColor = 'bg-green-50';
                 } else if (isSelected && !isCorrectAnswer) {
                   borderColor = 'border-red-500';
-                  bgColor = 'bg-red-50 dark:bg-red-900/20';
+                  bgColor = 'bg-red-50';
                 }
               } else if (isSelected) {
                 borderColor = 'border-indigo-500';
-                bgColor = 'bg-indigo-50 dark:bg-indigo-900/20';
+                bgColor = 'bg-indigo-50';
               }
 
               return (
@@ -284,16 +283,16 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
-                      isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'
                     }`}>
                       {String.fromCharCode(65 + index)}
                     </div>
-                    <span className="flex-1 text-gray-900 dark:text-white">{option}</span>
+                    <span className="flex-1 text-gray-900">{option}</span>
                     {showAnswer && isCorrectAnswer && (
-                      <CheckCircle size={24} className="text-green-600 dark:text-green-400" />
+                      <CheckCircle size={24} className="text-green-600" />
                     )}
                     {showAnswer && isSelected && !isCorrectAnswer && (
-                      <XCircle size={24} className="text-red-600 dark:text-red-400" />
+                      <XCircle size={24} className="text-red-600" />
                     )}
                   </div>
                 </button>
@@ -317,23 +316,23 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
               {/* Result */}
               <div className={`p-4 rounded-xl ${
                 isCorrect 
-                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                  ? 'bg-green-50 border border-green-200' 
+                  : 'bg-red-50 border border-red-200'
               }`}>
                 <div className="flex items-center gap-2 mb-2">
                   {isCorrect ? (
-                    <CheckCircle size={20} className="text-green-600 dark:text-green-400" />
+                    <CheckCircle size={20} className="text-green-600" />
                   ) : (
-                    <XCircle size={20} className="text-red-600 dark:text-red-400" />
+                    <XCircle size={20} className="text-red-600" />
                   )}
                   <span className={`font-semibold ${
-                    isCorrect ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'
+                    isCorrect ? 'text-green-800' : 'text-red-800'
                   }`}>
                     {isCorrect ? 'Correct!' : 'Incorrect'}
                   </span>
                 </div>
                 <p className={`text-sm ${
-                  isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+                  isCorrect ? 'text-green-700' : 'text-red-700'
                 }`}>
                   {isCorrect 
                     ? 'Great job! Rate how well you remembered this.' 
@@ -344,12 +343,12 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
               {/* Explanation */}
               {mistake.solution && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                     <TrendingUp size={18} />
                     Solution
                   </h3>
-                  <p className="text-sm text-blue-800 dark:text-blue-400 whitespace-pre-wrap">
+                  <p className="text-sm text-blue-800 whitespace-pre-wrap">
                     {mistake.solution}
                   </p>
                 </div>
@@ -357,12 +356,12 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
               {/* Shortcut */}
               {mistake.shortcut && (
-                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-                  <h3 className="font-semibold text-purple-900 dark:text-purple-300 mb-2 flex items-center gap-2">
+                <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
+                  <h3 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
                     <Award size={18} />
                     Shortcut Method
                   </h3>
-                  <p className="text-sm text-purple-800 dark:text-purple-400">
+                  <p className="text-sm text-purple-800">
                     {mistake.shortcut}
                   </p>
                 </div>
@@ -370,11 +369,11 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
 
               {/* Rating */}
               {showRating && (
-                <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-center">
+                <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-2 text-center">
                     How well did you remember this?
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
+                  <p className="text-sm text-gray-600 text-center mb-4">
                     Rate your recall quality (0 = complete failure, 5 = perfect recall)
                   </p>
                   <div className="grid grid-cols-6 gap-2">
@@ -384,17 +383,17 @@ export default function ReviewSession({ userId, onComplete, onExit }: ReviewSess
                         onClick={() => handleRateQuality(quality)}
                         className={`p-3 rounded-lg font-semibold transition-all hover:scale-105 ${
                           quality <= 2 
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
                             : quality === 3
-                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
-                            : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
                         }`}
                       >
                         {quality}
                       </button>
                     ))}
                   </div>
-                  <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between mt-2 text-xs text-gray-500">
                     <span>Complete failure</span>
                     <span>Perfect recall</span>
                   </div>

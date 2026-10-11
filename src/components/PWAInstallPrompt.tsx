@@ -16,10 +16,10 @@ export default function PWAInstallPrompt({ onInstall, onDismiss }: PWAInstallPro
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">
+            <h3 className="font-bold text-slate-900 text-sm mb-1">
               Install SSC CGL Prep
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+            <p className="text-xs text-slate-600 mb-3">
               Install the app for a better experience. Access your exams offline and get study reminders.
             </p>
             <div className="flex gap-2">
@@ -39,7 +39,7 @@ export default function PWAInstallPrompt({ onInstall, onDismiss }: PWAInstallPro
           </div>
           <button
             onClick={onDismiss}
-            className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors"
             aria-label="Dismiss"
           >
             <X size={16} />

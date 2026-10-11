@@ -37,7 +37,7 @@ export default function ResultsPage({ attemptId, userId, onRetake, onBack, onPra
   if (!attempt || !paper) {
     return (
       <div className="max-w-4xl mx-auto text-center py-16">
-        <p className="text-gray-500 dark:text-gray-400">Loading results...</p>
+        <p className="text-gray-500">Loading results...</p>
       </div>
     );
   }

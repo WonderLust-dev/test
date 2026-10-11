@@ -45,6 +45,7 @@
 }
 
 :root {
+  color-scheme: light;
   --font-heading: 'Plus Jakarta Sans', 'Inter', sans-serif;
   --font-body: 'Plus Jakarta Sans', 'Inter', sans-serif;
 

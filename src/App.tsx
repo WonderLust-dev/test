@@ -61,6 +61,26 @@ function AppContent() {
     loadDemo();
   }, [loading, demoLoaded, effectiveUserId]);
 
+  // Deep-link support for 1-click shared exam links: ?exam=<paperId> or ?paper=<paperId>
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedPaperId = params.get('exam') || params.get('paper');
+    if (sharedPaperId) {
+      getPaperById(sharedPaperId).then(paper => {
+        if (paper) {
+          setActivePaper(paper);
+          setExamMode('exam');
+          setView('exam');
+        } else {
+          console.warn('[DeepLink] Shared test not found:', sharedPaperId);
+        }
+      }).catch(err => {
+        console.error('[DeepLink] Failed to load shared test:', err);
+      });
+    }
+  }, [loading]);
+
   const handleStartExam = async (paperId: string) => {
     try {
       const paper = await getPaperById(paperId);
@@ -154,6 +174,14 @@ function AppContent() {
     setView('dashboard');
     setActivePaper(null);
     setRefreshKey(k => k + 1);
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('exam') || url.searchParams.has('paper')) {
+        url.searchParams.delete('exam');
+        url.searchParams.delete('paper');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch {}
   };
 
   const handleRetake = async () => {

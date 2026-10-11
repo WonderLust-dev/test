@@ -147,16 +147,23 @@ export async function getPapers(userId?: string): Promise<Paper[]> {
 }
 
 export async function getPaperById(paperId: string): Promise<Paper | null> {
+  const localPapers = lsGet<Paper>(LS_KEYS.papers);
+  const local = localPapers.find(p => p.id === paperId);
+  if (local) return local;
+
   return cachedFetch<Paper | null>(`paper_${paperId}`, 15000, async () => {
     if (isSupabaseConfigured && supabase) {
       const result = await sb(async () => {
-        const { data, error } = await supabase!.from('papers').select('*').eq('id', paperId).single();
-        if (error) throw error;
-        return data as Paper;
+        const { data, error } = await supabase!.from('papers').select('*').eq('id', paperId).maybeSingle();
+        if (error) {
+          console.warn('[Supabase] Failed to fetch paper by id:', error);
+          return null;
+        }
+        return data as Paper | null;
       });
       if (result) return result;
     }
-    return lsGet<Paper>(LS_KEYS.papers).find(p => p.id === paperId) || null;
+    return null;
   });
 }
 
@@ -246,11 +253,17 @@ export async function updatePaperVisibility(
         if (insertError) {
           return { success: false, error: insertError.message };
         }
+
+        // Also update local storage paper to match
+        localPaper.user_id = userId!;
+        localPaper.visibility = visibility;
+        localPaper.updated_at = new Date().toISOString();
+        lsSet(LS_KEYS.papers, localPapers);
       }
     } else if (visibility === 'public') {
       return {
         success: false,
-        error: 'Please sign in to publish this test to the public community.',
+        error: 'Please sign in to publish this test to the public community so colleagues can access it.',
       };
     }
   }
