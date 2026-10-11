@@ -88,19 +88,27 @@ export function useAuth() {
       
       return { data, error };
     } catch (e: any) {
-      return { error: { message: e.message || 'Sign up failed' }, data: null };
+      const msg = e?.message || '';
+      const friendlyMsg = msg.includes('fetch') || msg.includes('Headers') || msg.includes('network')
+        ? 'Cloud authentication server is unreachable. You can continue in Guest Mode with full local access.'
+        : msg || 'Sign up failed. Please try again.';
+      return { error: { message: friendlyMsg }, data: null };
     }
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured || !supabase) {
-      return { error: { message: 'Supabase not configured' }, data: null };
+      return { error: { message: 'Cloud authentication is not configured. Continue in Guest Mode.' }, data: null };
     }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       return { data, error };
     } catch (e: any) {
-      return { error: { message: e.message || 'Sign in failed' }, data: null };
+      const msg = e?.message || '';
+      const friendlyMsg = msg.includes('fetch') || msg.includes('Headers') || msg.includes('network')
+        ? 'Cloud authentication server is unreachable. You can continue in Guest Mode with full local access.'
+        : msg || 'Sign in failed. Please try again.';
+      return { error: { message: friendlyMsg }, data: null };
     }
   }, []);
 

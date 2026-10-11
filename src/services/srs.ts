@@ -12,13 +12,13 @@ const LS_KEYS = {
   reviewStats: 'sscp_review_stats',
 };
 
-// Helper to safely use supabase
+// Helper to safely use supabase with local fallback
 async function sb<T>(fn: () => Promise<T>): Promise<T | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
     return await fn();
   } catch (e) {
-    console.error('Supabase error:', e);
+    console.warn('[SRS] Cloud sync unavailable, falling back to local storage:', (e as any)?.message || e);
     return null;
   }
 }

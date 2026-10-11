@@ -7,12 +7,11 @@ const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
 // Files to cache immediately on install (app shell)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/404.html',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  './',
+  './index.html',
+  './manifest.json',
+  './404.html',
+  './icons/icon.svg',
 ];
 
 // Maximum number of dynamic cache entries
