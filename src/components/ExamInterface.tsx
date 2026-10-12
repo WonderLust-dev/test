@@ -319,30 +319,30 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] font-sans text-gray-900 antialiased selection:bg-indigo-100">
+    <div className="min-h-screen bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased selection:bg-indigo-500/20">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200/80 shadow-xs">
+      <header className="sticky top-0 z-30 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)] shadow-xs">
         <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-2.5 sm:py-3">
           <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 onClick={() => setShowExitConfirm(true)}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold shadow-xs transition-all shrink-0"
+                className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] hover:bg-[var(--bg-subcard-hover)] text-[var(--text-main)] text-xs font-bold shadow-xs transition-all shrink-0"
                 title="Exit exam"
               >
-                <ArrowLeft size={14} />
+                <ArrowLeft size={15} />
                 <span className="hidden sm:inline">Exit Exam</span>
               </button>
               <button
                 onClick={() => setShowPalette(!showPalette)}
-                className="lg:hidden p-1.5 sm:p-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs shrink-0"
+                className="lg:hidden p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] shadow-xs shrink-0"
                 title="Toggle question palette"
               >
-                <Menu size={16} />
+                <Menu size={15} />
               </button>
               <div className="min-w-0">
-                <h1 className="text-xs sm:text-base font-extrabold text-gray-900 truncate tracking-tight max-w-[90px] xs:max-w-[140px] sm:max-w-xs">{paper.title}</h1>
-                <p className="text-[11px] font-medium text-gray-500 hidden sm:block truncate">
+                <h1 className="text-xs sm:text-base font-extrabold text-[var(--text-main)] truncate tracking-tight max-w-[90px] xs:max-w-[140px] sm:max-w-xs">{paper.title}</h1>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] hidden sm:block truncate">
                   Question {currentQ + 1} of {questions.length} • {q.subject} {q.topic ? `• ${q.topic}` : ''}
                 </p>
               </div>
@@ -361,14 +361,14 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold border transition-all ${
                   instantFeedback
                     ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-1 ring-emerald-400/40'
-                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    : 'bg-[var(--bg-subcard)] text-[var(--text-main)] border-[var(--border-color)] hover:bg-[var(--bg-subcard-hover)]'
                 }`}
                 title={instantFeedback ? 'Instant answer checking is ON' : 'Turn ON instant answer check'}
                 aria-pressed={instantFeedback}
               >
                 <Zap size={13} className={instantFeedback ? 'text-amber-300 fill-amber-300' : 'text-amber-500'} />
                 <span className="hidden xs:inline">Check:</span>
-                <span className={instantFeedback ? 'text-amber-200 font-extrabold' : 'text-gray-500'}>
+                <span className={instantFeedback ? 'text-amber-200 font-extrabold' : 'text-[var(--text-muted)]'}>
                   {instantFeedback ? 'ON' : 'OFF'}
                 </span>
               </button>
@@ -377,21 +377,21 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               <ThemeSwitcher variant="compact" />
 
               {/* Timer Pill */}
-              <div className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-mono text-xs sm:text-base font-bold shadow-xs transition-all ${
+              <div className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl font-mono text-xs sm:text-base font-bold shadow-xs transition-all border ${
                 isTimerCritical
-                  ? 'bg-rose-50 border border-rose-200 text-rose-600 animate-pulse'
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 animate-pulse'
                   : isTimerWarning
-                  ? 'bg-amber-50 border border-amber-200 text-amber-700'
-                  : 'bg-gray-100 border border-gray-200 text-gray-900'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-500'
+                  : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-main)]'
               }`}>
-                <Clock size={14} className={isTimerCritical ? 'text-rose-600' : isTimerWarning ? 'text-amber-600' : 'text-gray-600'} />
+                <Clock size={14} className={isTimerCritical ? 'text-rose-500' : isTimerWarning ? 'text-amber-500' : 'text-[var(--text-muted)]'} />
                 <span>{formatTime(timeLeft)}</span>
               </div>
 
               {/* Submit Test Button */}
               <button
                 onClick={() => setShowSubmit(true)}
-                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95"
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95 shrink-0"
               >
                 <Send size={13} />
                 <span className="hidden xs:inline">Submit</span>
@@ -402,7 +402,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-[calc(env(safe-area-inset-bottom,0px)+4rem)] sm:pb-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Left Column: Question Palette (Desktop Sticky & Mobile Drawer) */}
           <div className="shrink-0 lg:w-72 w-full">
@@ -483,25 +483,25 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             {showPalette && (
               <div className="fixed inset-0 z-50 flex lg:hidden">
                 <div
-                  className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+                  className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
                   onClick={() => setShowPalette(false)}
                 />
-                <div className="relative w-80 max-w-[85vw] h-full bg-[#F4F5F7] p-5 flex flex-col shadow-2xl z-50">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200">
+                <div className="relative w-80 max-w-[85vw] h-full bg-[var(--bg-surface)] text-[var(--text-main)] p-5 flex flex-col shadow-2xl z-50 border-r border-[var(--border-color)]">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--border-color)]">
                     <div>
-                      <h3 className="text-base font-extrabold text-gray-900">Question Palette</h3>
-                      <p className="text-xs font-semibold text-gray-400">Total {questions.length} questions</p>
+                      <h3 className="text-base font-extrabold text-[var(--text-main)]">Question Palette</h3>
+                      <p className="text-xs font-semibold text-[var(--text-subtle)]">Total {questions.length} questions</p>
                     </div>
                     <button
                       onClick={() => setShowPalette(false)}
-                      className="p-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs"
+                      className="p-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] shadow-xs"
                     >
                       <X size={18} />
                     </button>
                   </div>
 
                   {/* Mobile Legend */}
-                  <div className="grid grid-cols-2 gap-2 pb-3 mb-3 border-b border-gray-200 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pb-3 mb-3 border-b border-[var(--border-color)] text-xs">
                     <div className="flex items-center gap-2">
                       <span className="w-3.5 h-3.5 rounded-lg bg-emerald-500 shrink-0" />
                       <span className="text-gray-700 font-medium text-[11px]">Ans ({counts.answered})</span>
@@ -567,84 +567,92 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
           {/* Right Column: Question Content */}
           <div className="flex-1 min-w-0 w-full">
             {/* Question Card */}
-            <div className="bento-card p-5 sm:p-7 mb-5 shadow-soft border border-gray-200/80">
+            <div className="bento-card p-4 sm:p-7 mb-5 shadow-soft border border-[var(--border-color)]">
               {/* Question Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex items-center justify-center w-9 h-9 bg-gray-900 text-white rounded-2xl text-sm font-black shadow-xs shrink-0">
-                    {currentQ + 1}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full text-xs font-bold">
-                      {q.subject}
+              <div className="flex flex-col gap-3 mb-5 pb-4 border-b border-[var(--border-color)]">
+                {/* Top Row: Q Counter + Bookmark + Marks */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black shadow-xs shrink-0">
+                      {currentQ + 1}
                     </span>
-                    {q.topic && (
-                      <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
-                        {q.topic}
-                      </span>
-                    )}
-                    {q.difficulty && (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize ${
-                        q.difficulty === 'easy'
-                          ? 'bg-emerald-50 border border-emerald-100 text-emerald-700'
-                          : q.difficulty === 'hard'
-                          ? 'bg-rose-50 border border-rose-100 text-rose-700'
-                          : 'bg-amber-50 border border-amber-100 text-amber-700'
-                      }`}>
-                        {q.difficulty}
-                      </span>
-                    )}
+                    <span className="text-xs font-bold text-[var(--text-muted)]">
+                      Question {currentQ + 1} of {questions.length}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={toggleBookmark}
+                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        bookmarkedMap[String(q.id)]
+                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 shadow-xs'
+                          : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                      }`}
+                      title="Bookmark Question [B]"
+                    >
+                      {bookmarkedMap[String(q.id)] ? (
+                        <BookmarkCheck size={14} className="text-amber-500 fill-amber-500" />
+                      ) : (
+                        <Bookmark size={14} />
+                      )}
+                      <span className="hidden xs:inline">{bookmarkedMap[String(q.id)] ? 'Saved' : 'Bookmark'}</span>
+                    </button>
+                    <div className="flex items-center gap-1.5 text-xs font-bold px-2 sm:px-2.5 py-1.5 bg-[var(--bg-subcard)] rounded-xl text-[var(--text-main)] border border-[var(--border-color)]">
+                      <span className="text-emerald-500">+{q.marks}</span>
+                      {q.negativeMarks !== undefined && (
+                        <span className="text-rose-500">-{q.negativeMarks}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={toggleBookmark}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                      bookmarkedMap[String(q.id)]
-                        ? 'bg-amber-50 border-amber-200 text-amber-800 shadow-xs'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
-                    title="Bookmark Question [B]"
-                  >
-                    {bookmarkedMap[String(q.id)] ? (
-                      <BookmarkCheck size={14} className="text-amber-600 fill-amber-500" />
-                    ) : (
-                      <Bookmark size={14} />
-                    )}
-                    <span>{bookmarkedMap[String(q.id)] ? 'Saved' : 'Bookmark'}</span>
-                  </button>
-                  <div className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 bg-gray-100 rounded-xl text-gray-700 border border-gray-200/60">
-                    <span className="text-emerald-600">+{q.marks}</span>
-                    {q.negativeMarks !== undefined && (
-                      <span className="text-rose-500">-{q.negativeMarks}</span>
-                    )}
-                  </div>
+                {/* Second Row: Subject, Topic, Difficulty Pills */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-[11px] font-bold">
+                    {q.subject}
+                  </span>
+                  {q.topic && (
+                    <span className="px-2.5 py-1 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] rounded-full text-[11px] font-medium">
+                      {q.topic}
+                    </span>
+                  )}
+                  {q.difficulty && (
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold capitalize border ${
+                      q.difficulty === 'easy'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : q.difficulty === 'hard'
+                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                    }`}>
+                      {q.difficulty}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Passage (if any) */}
               {q.passage && (
-                <div className="mb-5 p-4 bg-gray-50 rounded-2xl border-l-4 border-indigo-600 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                <div className="mb-5 p-4 bg-[var(--bg-subcard)] rounded-2xl border-l-4 border-indigo-500 text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
                   {q.passage}
                 </div>
               )}
 
               {/* Question Text */}
-              <p className="text-base sm:text-lg font-bold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap">
+              <p className="text-base sm:text-lg font-bold text-[var(--text-main)] mb-6 leading-relaxed whitespace-pre-wrap">
                 {q.question}
               </p>
 
               {/* Image */}
               {q.image && (
-                <div className="mb-6 rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+                <div className="mb-6 rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-xs">
                   <img src={q.image} alt="Question Diagram" className="max-w-full h-auto" />
                 </div>
               )}
 
               {/* Formula */}
               {q.formula && (
-                <div className="mb-5 p-3.5 bg-amber-50 rounded-2xl text-sm font-mono text-amber-900 border border-amber-200/60">
+                <div className="mb-5 p-3.5 bg-amber-500/10 rounded-2xl text-sm font-mono text-amber-400 border border-amber-500/20">
                   📐 {q.formula}
                 </div>
               )}
@@ -657,23 +665,23 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                   const isRevealed = instantFeedback || !!revealedQuestions[currentQ];
                   const isCorrect = idx === q.answerIndex;
 
-                  let optionStyle = 'border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/70 text-gray-800';
-                  let badgeStyle = 'bg-gray-100 text-gray-700 group-hover:bg-gray-200 font-bold';
+                  let optionStyle = 'border border-[var(--border-color)] bg-[var(--bg-subcard)] hover:border-indigo-500/50 hover:bg-[var(--bg-subcard-hover)] text-[var(--text-main)]';
+                  let badgeStyle = 'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] font-bold';
 
                   if (hasAnswered && isRevealed) {
                     if (isCorrect) {
-                      optionStyle = 'border-2 border-emerald-500 bg-emerald-50/90 text-emerald-950 font-bold shadow-xs ring-1 ring-emerald-500/20';
-                      badgeStyle = 'bg-emerald-600 text-white font-black shadow-2xs';
+                      optionStyle = 'border-2 border-emerald-500 bg-emerald-500/15 text-emerald-400 font-bold shadow-xs ring-1 ring-emerald-500/20';
+                      badgeStyle = 'bg-emerald-600 text-white font-black shadow-xs';
                     } else if (isSelected && !isCorrect) {
-                      optionStyle = 'border-2 border-rose-500 bg-rose-50/90 text-rose-950 font-bold shadow-xs ring-1 ring-rose-500/20';
-                      badgeStyle = 'bg-rose-600 text-white font-black shadow-2xs';
+                      optionStyle = 'border-2 border-rose-500 bg-rose-500/15 text-rose-400 font-bold shadow-xs ring-1 ring-rose-500/20';
+                      badgeStyle = 'bg-rose-600 text-white font-black shadow-xs';
                     } else {
-                      optionStyle = 'border border-gray-200/60 bg-gray-50/40 text-gray-400 opacity-60';
-                      badgeStyle = 'bg-gray-100 text-gray-400';
+                      optionStyle = 'border border-[var(--border-color)]/60 bg-[var(--bg-subcard)]/40 text-[var(--text-subtle)] opacity-50';
+                      badgeStyle = 'bg-[var(--bg-surface)] text-[var(--text-subtle)] border border-[var(--border-color)]/60';
                     }
                   } else if (isSelected) {
-                    optionStyle = 'border-2 border-indigo-600 bg-indigo-50/60 ring-1 ring-indigo-600/20 text-indigo-950 font-bold';
-                    badgeStyle = 'bg-indigo-600 text-white font-black';
+                    optionStyle = 'border-2 border-indigo-500 bg-indigo-500/15 ring-1 ring-indigo-500/30 text-[var(--text-main)] font-bold';
+                    badgeStyle = 'bg-indigo-600 text-white font-black shadow-xs';
                   }
 
                   return (
@@ -694,19 +702,19 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                         {opt}
                       </span>
                       {hasAnswered && isRevealed && isCorrect && (
-                        <span className="flex items-center gap-1 text-xs font-extrabold text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2.5 py-1 rounded-full shrink-0">
-                          <CheckCircle size={14} className="text-emerald-600" />
-                          <span>Correct Answer</span>
+                        <span className="flex items-center gap-1 text-xs font-extrabold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-full shrink-0">
+                          <CheckCircle size={14} className="text-emerald-400" />
+                          <span>Correct</span>
                         </span>
                       )}
                       {hasAnswered && isRevealed && isSelected && !isCorrect && (
-                        <span className="flex items-center gap-1 text-xs font-extrabold text-rose-700 bg-rose-100/90 border border-rose-300 px-2.5 py-1 rounded-full shrink-0">
-                          <XCircle size={14} className="text-rose-600" />
+                        <span className="flex items-center gap-1 text-xs font-extrabold text-rose-400 bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 rounded-full shrink-0">
+                          <XCircle size={14} className="text-rose-400" />
                           <span>Your Choice</span>
                         </span>
                       )}
                       {isSelected && !(hasAnswered && isRevealed) && (
-                        <CheckCircle size={20} className="text-indigo-600 shrink-0 ml-auto" />
+                        <CheckCircle size={20} className="text-indigo-400 shrink-0 ml-auto" />
                       )}
                     </button>
                   );
@@ -813,14 +821,14 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 <button
                   onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
                   disabled={currentQ === 0}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
                 >
                   <ChevronLeft size={16} /> Previous
                 </button>
                 <button
                   onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
                   disabled={currentQ === questions.length - 1}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 sm:px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs active:scale-95"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 sm:px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md active:scale-95"
                 >
                   Next <ChevronRight size={16} />
                 </button>
@@ -831,8 +839,8 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                   onClick={toggleReview}
                   className={`w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
                     marked[currentQ]
-                      ? 'bg-purple-100 border border-purple-200 text-purple-700'
-                      : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-purple-500/15 border border-purple-500/40 text-purple-400 font-bold'
+                      : 'bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)]'
                   }`}
                 >
                   {marked[currentQ] ? <FlagOff size={15} /> : <Flag size={15} />}
@@ -840,7 +848,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 </button>
                 <button
                   onClick={clearAnswer}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
                 >
                   <Eraser size={15} /> Clear
                 </button>
@@ -848,16 +856,16 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             {/* Keyboard Shortcuts Helper Bar */}
-            <div className="mt-5 p-3 bento-card border border-gray-200/60 hidden sm:flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 shadow-xs">
+            <div className="mt-5 p-3 bento-card border border-[var(--border-color)] hidden sm:flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-subtle)] shadow-xs">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <span className="font-bold text-gray-700">Shortcuts:</span>
-                <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">1-4</kbd> Select</span>
-                <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">N / P</kbd> Next/Prev</span>
-                <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">B</kbd> Bookmark</span>
-                <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">R</kbd> Review</span>
-                <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">C</kbd> Clear</span>
+                <span className="font-bold text-[var(--text-main)]">Shortcuts:</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">1-4</kbd> Select</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">N / P</kbd> Next/Prev</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">B</kbd> Bookmark</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">R</kbd> Review</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">C</kbd> Clear</span>
               </div>
-              <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+              <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Auto-saving
               </span>
             </div>

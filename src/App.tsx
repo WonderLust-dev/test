@@ -332,9 +332,9 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] md:pb-8">
         {/* Top Header Bar */}
         {view !== 'exam' && view !== 'review' && (
-          <header className="sticky top-0 z-20 bg-[#F4F5F7]/90 backdrop-blur-md px-3 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2.5 sm:gap-4 border-b border-gray-200/50">
+          <header className="sticky top-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2.5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">
+              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--text-main)] truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none">
                 {view === 'dashboard'
                   ? (dashboardTab === 'overview' ? 'Dashboard' : dashboardTab.charAt(0).toUpperCase() + dashboardTab.slice(1))
                   : view === 'import' ? 'Import Paper' : 'Exam Results'}
@@ -352,7 +352,7 @@ function AppContent() {
               ) : (
                 <button
                   onClick={() => setView('import')}
-                  className="btn btn-primary text-xs py-1.5 sm:py-2 px-2.5 sm:px-4.5 rounded-full shadow-xs flex items-center gap-1.5 shrink-0"
+                  className="btn btn-outline text-xs p-2 sm:px-3.5 sm:py-2 rounded-full shadow-2xs flex items-center gap-1.5 shrink-0"
                   title="Import Paper"
                 >
                   <PlusCircle size={15} />
@@ -364,19 +364,19 @@ function AppContent() {
               {user ? (
                 <button
                   onClick={() => setShowAccountModal(true)}
-                  className="relative group p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 shrink-0"
+                  className="relative group p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0"
                   title={`${user.user_metadata?.display_name || user.email} (Manage Account)`}
                   aria-label="Manage Account"
                 >
-                  <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs border-2 border-white group-hover:scale-105 transition-transform">
+                  <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] flex items-center justify-center font-bold text-xs shadow-xs border-2 border-[var(--border-color)] group-hover:scale-105 transition-transform">
                     {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
                   </div>
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[var(--bg-surface)]"></span>
                 </button>
               ) : (
                 <button
                   onClick={openLogin}
-                  className="btn btn-primary text-xs py-1.5 px-3 sm:px-4 rounded-full shadow-xs flex items-center gap-1.5 bg-gray-900 text-white hover:bg-black transition-all shrink-0"
+                  className="btn btn-primary text-xs py-1.5 px-3 sm:px-4 rounded-full shadow-xs flex items-center gap-1.5 shrink-0"
                   title="Sign In to sync tests"
                 >
                   <LogIn size={13} />
@@ -438,7 +438,7 @@ function AppContent() {
 
       {/* Mobile Bottom Navigation Bar (< 768px) with Safe Area Support */}
       {view !== 'exam' && view !== 'review' && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-1 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-lg">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-surface)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-1 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-lg">
           {[
             { id: 'overview' as const, label: 'Home', icon: LayoutDashboard },
             { id: 'library' as const, label: 'Library', icon: BookOpen },
@@ -452,13 +452,13 @@ function AppContent() {
                 key={item.id}
                 onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
                 className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
-                  isActive ? 'text-gray-900 font-bold' : 'text-gray-400 font-medium'
+                  isActive ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-subtle)] font-medium'
                 }`}
               >
-                <item.icon size={18} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                <item.icon size={18} className={isActive ? 'text-[var(--text-main)]' : 'text-[var(--text-subtle)]'} />
                 <span className="text-[10px] leading-none">{item.label}</span>
                 {isActive && (
-                  <span className="w-1 h-1 rounded-full bg-gray-900"></span>
+                  <span className="w-1 h-1 rounded-full bg-[var(--text-main)]"></span>
                 )}
               </button>
             );
@@ -474,15 +474,15 @@ function AppContent() {
               }
             }}
             className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
-              showAccountModal ? 'text-gray-900 font-bold' : 'text-gray-400 font-medium'
+              showAccountModal ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-subtle)] font-medium'
             }`}
           >
             {user ? (
-              <div className="w-4.5 h-4.5 rounded-full bg-gray-900 text-white font-black text-[9px] flex items-center justify-center">
+              <div className="w-4.5 h-4.5 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] font-black text-[9px] flex items-center justify-center">
                 {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
               </div>
             ) : (
-              <LogIn size={18} className="text-gray-600" />
+              <LogIn size={18} className="text-[var(--text-subtle)]" />
             )}
             <span className="text-[10px] leading-none">{user ? 'Account' : 'Sign In'}</span>
           </button>

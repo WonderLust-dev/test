@@ -316,7 +316,11 @@
 [data-theme="dark"],
 [data-theme="high-contrast"] {
   /* Surfaces */
-  .bg-white {
+  .bg-white,
+  .bg-white\/95,
+  .bg-white\/90,
+  .bg-white\/80,
+  .bg-white\/70 {
     background-color: var(--bg-surface) !important;
   }
   .bg-\[\#F4F5F7\],
@@ -325,6 +329,8 @@
   }
   .bg-gray-50,
   .bg-gray-50\/80,
+  .bg-gray-50\/70,
+  .bg-gray-50\/40,
   .bg-gray-100 {
     background-color: var(--bg-subcard) !important;
   }
@@ -356,7 +362,9 @@
   /* Borders */
   .border-gray-200,
   .border-gray-100,
+  .border-gray-200\/90,
   .border-gray-200\/80,
+  .border-gray-200\/60,
   .border-gray-200\/50,
   .border-gray-300 {
     border-color: var(--border-color) !important;
