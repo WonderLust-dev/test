@@ -79,11 +79,13 @@ export default function Dashboard({
     if (filters.subject) result = result.filter(p => p.subjects.includes(filters.subject!));
     if (filters.difficulty) result = result.filter(p => p.difficulty === filters.difficulty);
     if (filters.status === 'attempted') {
-      const attemptedIds = new Set(attempts.map(a => a.paper_id));
-      result = result.filter(p => attemptedIds.has(p.id));
+      const attemptedIds = new Set(attempts.map(a => String(a.paper_id).trim()));
+      const attemptedTitles = new Set(attempts.map(a => a.paper_title?.trim().toLowerCase()).filter(Boolean));
+      result = result.filter(p => attemptedIds.has(String(p.id).trim()) || (p.title && attemptedTitles.has(p.title.trim().toLowerCase())));
     } else if (filters.status === 'not_attempted') {
-      const attemptedIds = new Set(attempts.map(a => a.paper_id));
-      result = result.filter(p => !attemptedIds.has(p.id));
+      const attemptedIds = new Set(attempts.map(a => String(a.paper_id).trim()));
+      const attemptedTitles = new Set(attempts.map(a => a.paper_title?.trim().toLowerCase()).filter(Boolean));
+      result = result.filter(p => !attemptedIds.has(String(p.id).trim()) && (!p.title || !attemptedTitles.has(p.title.trim().toLowerCase())));
     }
     return result;
   }, [papers, search, filters, attempts]);
@@ -217,6 +219,7 @@ export default function Dashboard({
       {activeTab === 'library' && (
         <LibraryTab
           papers={filteredPapers}
+          totalPapersCount={papers.length}
           attempts={attempts}
           search={search}
           setSearch={setSearch}
@@ -601,6 +604,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
 // ============================================================
 interface LibraryTabProps {
   papers: Paper[];
+  totalPapersCount?: number;
   attempts: Attempt[];
   search: string;
   setSearch: (s: string) => void;
@@ -615,18 +619,18 @@ interface LibraryTabProps {
   userId?: string;
 }
 
-function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, allSubjects, allExams, onStartExam, onPractice, onImport, onRefresh, userId }: LibraryTabProps) {
+function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch, filters, setFilters, allSubjects, allExams, onStartExam, onPractice, onImport, onRefresh, userId }: LibraryTabProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'public'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const getBestScore = (paperId: string) => {
-    const paperAttempts = attempts.filter(a => a.paper_id === paperId);
+    const paperAttempts = attempts.filter(a => String(a.paper_id) === String(paperId));
     if (paperAttempts.length === 0) return null;
     return Math.max(...paperAttempts.map(a => Math.round((a.score / a.total_marks) * 100)));
   };
 
-  const getAttemptCount = (paperId: string) => attempts.filter(a => a.paper_id === paperId).length;
+  const getAttemptCount = (paperId: string) => attempts.filter(a => String(a.paper_id) === String(paperId)).length;
 
   const handleDelete = async (paperId: string) => {
     if (confirm('Delete this paper? This cannot be undone.')) {
@@ -694,7 +698,12 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
   const myCount = useMemo(() => papers.filter(p => p.user_id === userId || p.user_id === 'guest').length, [papers, userId]);
   const publicCount = useMemo(() => papers.filter(p => p.visibility === 'public').length, [papers]);
 
-  if (papers.length === 0 && !search) {
+  const hasActiveFilters = Boolean(
+    filters.exam || filters.subject || filters.difficulty || filters.status || search
+  );
+
+  // Only show the initial onboarding empty screen when the library has zero papers overall
+  if (totalPapersCount === 0 && !hasActiveFilters && papers.length === 0) {
     return (
       <div className="text-center py-20 bento-card p-10">
         <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
@@ -725,9 +734,17 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="btn btn-outline text-xs py-2 px-4 rounded-full flex items-center gap-1.5"
+            className={`btn text-xs py-2 px-4 rounded-full flex items-center gap-1.5 transition-all ${
+              hasActiveFilters || showFilters
+                ? 'bg-gray-900 text-white shadow-2xs'
+                : 'btn-outline'
+            }`}
           >
-            <Filter size={14} /> Filters
+            <Filter size={14} />
+            <span>Filters</span>
+            {hasActiveFilters && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+            )}
           </button>
           <button
             onClick={onImport}
@@ -737,6 +754,79 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
           </button>
         </div>
       </div>
+
+      {/* Active Filter Pills */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <span className="text-xs font-semibold text-gray-400 mr-0.5">Active Filters:</span>
+          {filters.status && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Status: {filters.status === 'attempted' ? 'Attempted' : 'Not Attempted'}
+              <button
+                onClick={() => setFilters({ ...filters, status: undefined })}
+                className="hover:text-indigo-950 p-0.5 rounded-full"
+                title="Remove status filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          {filters.exam && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Exam: {filters.exam}
+              <button
+                onClick={() => setFilters({ ...filters, exam: undefined })}
+                className="hover:text-indigo-950 p-0.5 rounded-full"
+                title="Remove exam filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          {filters.subject && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Subject: {filters.subject}
+              <button
+                onClick={() => setFilters({ ...filters, subject: undefined })}
+                className="hover:text-indigo-950 p-0.5 rounded-full"
+                title="Remove subject filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          {filters.difficulty && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Difficulty: {filters.difficulty}
+              <button
+                onClick={() => setFilters({ ...filters, difficulty: undefined })}
+                className="hover:text-indigo-950 p-0.5 rounded-full"
+                title="Remove difficulty filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          {search && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
+              Search: "{search}"
+              <button
+                onClick={() => setSearch('')}
+                className="hover:text-black p-0.5 rounded-full"
+                title="Clear search"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          <button
+            onClick={() => { setFilters({}); setSearch(''); }}
+            className="text-xs font-bold text-rose-600 hover:underline ml-1"
+          >
+            Clear All
+          </button>
+        </div>
+      )}
 
       {/* Quick View Filter Tabs */}
       <div className="flex flex-wrap items-center gap-2">
@@ -825,7 +915,40 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
 
       {/* Paper Cards Grid */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {displayedPapers.map(paper => {
+        {displayedPapers.length === 0 ? (
+          <div className="bento-card p-10 sm:p-14 text-center bg-white border border-gray-200/80 rounded-3xl col-span-full shadow-xs">
+            <Filter size={40} className="mx-auto text-gray-300 mb-3" />
+            <h3 className="font-extrabold text-gray-900 text-base sm:text-lg mb-1.5">
+              {filters.status === 'attempted'
+                ? 'No Attempted Tests Found'
+                : filters.status === 'not_attempted'
+                ? 'All Available Tests Have Been Attempted'
+                : 'No Tests Found Matching Filters'}
+            </h3>
+            <p className="text-xs text-gray-500 max-w-md mx-auto mb-5 leading-relaxed">
+              {filters.status === 'attempted'
+                ? "You haven't completed an exam attempt for any tests under this view yet. Take any exam from your library to view your results and analytics here."
+                : 'Try adjusting your search query or clearing your filter selections to view available question papers.'}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              <button
+                onClick={() => { setFilters({}); setSearch(''); setViewFilter('all'); }}
+                className="btn btn-primary text-xs py-2.5 px-6 rounded-full font-bold shadow-xs"
+              >
+                Clear All Filters
+              </button>
+              {filters.status === 'attempted' && (
+                <button
+                  onClick={() => { setFilters({}); setViewFilter('all'); }}
+                  className="btn btn-outline text-xs py-2.5 px-5 rounded-full font-bold"
+                >
+                  Browse All Tests ({totalPapersCount || papers.length})
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          displayedPapers.map(paper => {
           const bestScore = getBestScore(paper.id);
           const attemptCount = getAttemptCount(paper.id);
 
@@ -974,7 +1097,8 @@ function LibraryTab({ papers, attempts, search, setSearch, filters, setFilters, 
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </div>
     </div>
   );

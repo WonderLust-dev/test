@@ -81,6 +81,10 @@ export default function QuestionPalette({
     return 'not_visited';
   };
 
+  const attemptedCount = useMemo(() => {
+    return Object.values(answers).filter(v => v !== null && v !== undefined).length;
+  }, [answers]);
+
   // Filter questions based on subject & status filter
   const filteredIndices = useMemo(() => {
     return questions
@@ -94,11 +98,18 @@ export default function QuestionPalette({
 
         // Status filter
         if (statusFilter !== 'all') {
-          const status = getQStatus(idx);
-          if (statusFilter === 'answered' && status !== 'answered' && status !== 'correct' && status !== 'incorrect') return false;
-          if (statusFilter === 'marked' && status !== 'marked') return false;
-          if (statusFilter === 'unanswered' && status !== 'unanswered') return false;
-          if (statusFilter === 'not_visited' && status !== 'not_visited') return false;
+          const isAttempted = answers[idx] !== undefined && answers[idx] !== null;
+          if (statusFilter === 'answered') {
+            if (!isAttempted) return false;
+          } else if (statusFilter === 'marked') {
+            if (!marked[idx]) return false;
+          } else if (statusFilter === 'unanswered') {
+            const status = getQStatus(idx);
+            if (status !== 'unanswered') return false;
+          } else if (statusFilter === 'not_visited') {
+            const status = getQStatus(idx);
+            if (status !== 'not_visited') return false;
+          }
         }
 
         return true;
@@ -211,8 +222,8 @@ export default function QuestionPalette({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span>Ans</span>
-            <span className="text-[10px] font-mono">({counts.answered})</span>
+            <span>Attempted</span>
+            <span className="text-[10px] font-mono">({attemptedCount})</span>
           </button>
 
           <button
@@ -328,8 +339,22 @@ export default function QuestionPalette({
       {/* Questions Grid */}
       <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-[180px] max-h-[50vh] lg:max-h-[calc(100vh-22rem)]">
         {displayIndices.length === 0 ? (
-          <div className="py-8 text-center text-xs text-[var(--text-muted)]">
-            No questions match the current filter.
+          <div className="py-8 px-3 text-center text-xs text-[var(--text-muted)] space-y-2">
+            <p className="font-semibold">
+              {statusFilter === 'answered'
+                ? 'No questions attempted yet in this section.'
+                : statusFilter === 'marked'
+                ? 'No questions marked for review.'
+                : 'No questions match the current filter.'}
+            </p>
+            {statusFilter !== 'all' && (
+              <button
+                onClick={() => setStatusFilter('all')}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-500 hover:text-indigo-400 border border-[var(--border-color)] bg-[var(--bg-subcard)] transition-colors"
+              >
+                Show All Questions ({questions.length})
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-5 gap-2 sm:gap-2.5">

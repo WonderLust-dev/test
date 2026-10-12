@@ -334,8 +334,9 @@ export async function checkDuplicatePaper(title: string, userId?: string): Promi
 // Attempts Service
 // ============================================================
 export async function getAttempts(userId?: string): Promise<Attempt[]> {
+  const localAttempts = lsGet<Attempt>(LS_KEYS.attempts);
   if (!isRemoteUser(userId)) {
-    return lsGet<Attempt>(LS_KEYS.attempts);
+    return localAttempts;
   }
   return cachedFetch<Attempt[]>(`attempts_${userId}`, 8000, async () => {
     const result = await sb(async () => {
@@ -343,22 +344,30 @@ export async function getAttempts(userId?: string): Promise<Attempt[]> {
       if (error) throw error;
       return (data || []) as Attempt[];
     });
-    if (result) return result;
-    return lsGet<Attempt>(LS_KEYS.attempts);
+    if (result) {
+      // Merge remote attempts with local attempts, avoiding duplicate IDs
+      const remoteIds = new Set(result.map(a => a.id));
+      return [...result, ...localAttempts.filter(a => !remoteIds.has(a.id))];
+    }
+    return localAttempts;
   });
 }
 
 export async function getAttemptsByPaper(paperId: string, userId?: string): Promise<Attempt[]> {
+  const localByPaper = lsGet<Attempt>(LS_KEYS.attempts).filter(a => String(a.paper_id) === String(paperId));
   if (!isRemoteUser(userId)) {
-    return lsGet<Attempt>(LS_KEYS.attempts).filter(a => a.paper_id === paperId);
+    return localByPaper;
   }
   return cachedFetch<Attempt[]>(`attempts_${paperId}_${userId}`, 8000, async () => {
     const result = await sb(async () => {
       const { data } = await supabase!.from('attempts').select('*').eq('paper_id', paperId).eq('user_id', userId!).order('started_at', { ascending: false });
       return (data || []) as Attempt[];
     });
-    if (result) return result;
-    return lsGet<Attempt>(LS_KEYS.attempts).filter(a => a.paper_id === paperId);
+    if (result) {
+      const remoteIds = new Set(result.map(a => a.id));
+      return [...result, ...localByPaper.filter(a => !remoteIds.has(a.id))];
+    }
+    return localByPaper;
   });
 }
 
@@ -366,6 +375,14 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
   invalidateCache('attempts');
   const newAttempt: Attempt = { ...attempt, id: generateId() };
   const newQuestions = questions.map(q => ({ ...q, id: generateId(), attempt_id: newAttempt.id }));
+
+  // Always persist locally first so attempts are immediately available and resilient
+  const attempts = lsGet<Attempt>(LS_KEYS.attempts);
+  attempts.unshift(newAttempt);
+  lsSet(LS_KEYS.attempts, attempts);
+  const allQs = lsGet<AttemptQuestion>(LS_KEYS.attemptQuestions);
+  allQs.push(...newQuestions);
+  lsSet(LS_KEYS.attemptQuestions, allQs);
 
   if (isRemoteUser(attempt.user_id)) {
     const result = await sbWithResult<Attempt>(async () => {
@@ -384,13 +401,6 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
     }
   }
 
-  // Fallback to localStorage
-  const attempts = lsGet<Attempt>(LS_KEYS.attempts);
-  attempts.unshift(newAttempt);
-  lsSet(LS_KEYS.attempts, attempts);
-  const allQs = lsGet<AttemptQuestion>(LS_KEYS.attemptQuestions);
-  allQs.push(...newQuestions);
-  lsSet(LS_KEYS.attemptQuestions, allQs);
   return newAttempt;
 }
 
