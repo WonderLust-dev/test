@@ -12,7 +12,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search } from 'lucide-react';
+import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
@@ -29,6 +29,7 @@ function AppContent() {
   const [lastAttemptId, setLastAttemptId] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [demoLoaded, setDemoLoaded] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Load demo paper on first visit if library is empty (only after auth has resolved)
   useEffect(() => {
@@ -328,49 +329,66 @@ function AppContent() {
       )}
 
       {/* Main Workspace Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-8">
-        {/* Top Header Bar (Matching Image 2) */}
+      <div className="flex-1 flex flex-col min-w-0 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] md:pb-8">
+        {/* Top Header Bar */}
         {view !== 'exam' && view !== 'review' && (
-          <header className="sticky top-0 z-20 bg-[#F4F5F7]/90 backdrop-blur-md px-4 sm:px-8 py-4 flex items-center justify-between gap-4 border-b border-gray-200/50">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+          <header className="sticky top-0 z-20 bg-[#F4F5F7]/90 backdrop-blur-md px-3 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2.5 sm:gap-4 border-b border-gray-200/50">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">
                 {view === 'dashboard'
                   ? (dashboardTab === 'overview' ? 'Dashboard' : dashboardTab.charAt(0).toUpperCase() + dashboardTab.slice(1))
                   : view === 'import' ? 'Import Paper' : 'Exam Results'}
               </h1>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Theme Switcher Compact Pill for Header */}
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+              {/* Theme Switcher Compact Pill */}
               <ThemeSwitcher variant="compact" />
 
               {view === 'import' ? (
-                <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-2 px-4 rounded-full flex items-center gap-1.5">
-                  <ArrowLeft size={14} /> Back
+                <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-1.5 sm:py-2 px-3 sm:px-4 rounded-full flex items-center gap-1.5">
+                  <ArrowLeft size={14} /> <span className="hidden xs:inline">Back</span>
                 </button>
               ) : (
                 <button
                   onClick={() => setView('import')}
-                  className="btn btn-primary text-xs py-2 px-4.5 rounded-full shadow-xs flex items-center gap-1.5"
+                  className="btn btn-primary text-xs py-1.5 sm:py-2 px-2.5 sm:px-4.5 rounded-full shadow-xs flex items-center gap-1.5 shrink-0"
+                  title="Import Paper"
                 >
-                  <PlusCircle size={14} />
-                  <span>Import Paper</span>
+                  <PlusCircle size={15} />
+                  <span className="hidden sm:inline">Import Paper</span>
                 </button>
               )}
 
-              {/* User Avatar Pill */}
-              <div className="relative">
-                <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs border-2 border-white">
-                  {user ? (user.user_metadata?.display_name || 'A')[0].toUpperCase() : 'G'}
-                </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
-              </div>
+              {/* Login / Profile Button — Always Visible & Accessible on Mobile & Desktop */}
+              {user ? (
+                <button
+                  onClick={() => setShowAccountModal(true)}
+                  className="relative group p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 shrink-0"
+                  title={`${user.user_metadata?.display_name || user.email} (Manage Account)`}
+                  aria-label="Manage Account"
+                >
+                  <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs border-2 border-white group-hover:scale-105 transition-transform">
+                    {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
+                </button>
+              ) : (
+                <button
+                  onClick={openLogin}
+                  className="btn btn-primary text-xs py-1.5 px-3 sm:px-4 rounded-full shadow-xs flex items-center gap-1.5 bg-gray-900 text-white hover:bg-black transition-all shrink-0"
+                  title="Sign In to sync tests"
+                >
+                  <LogIn size={13} />
+                  <span>Sign In</span>
+                </button>
+              )}
             </div>
           </header>
         )}
 
         {/* Content Viewport */}
-        <main className={`flex-1 ${view === 'exam' || view === 'review' ? 'p-0' : 'px-4 sm:px-8 py-6'}`}>
+        <main className={`flex-1 ${view === 'exam' || view === 'review' ? 'p-0' : 'px-3 sm:px-8 py-4 sm:py-6'}`}>
           {view === 'dashboard' && (
             <Dashboard
               userId={effectiveUserId}
@@ -418,9 +436,9 @@ function AppContent() {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (< 768px) */}
+      {/* Mobile Bottom Navigation Bar (< 768px) with Safe Area Support */}
       {view !== 'exam' && view !== 'review' && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-2 py-2 flex items-center justify-around shadow-lg">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-1 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-lg">
           {[
             { id: 'overview' as const, label: 'Home', icon: LayoutDashboard },
             { id: 'library' as const, label: 'Library', icon: BookOpen },
@@ -433,11 +451,11 @@ function AppContent() {
               <button
                 key={item.id}
                 onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
-                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
                   isActive ? 'text-gray-900 font-bold' : 'text-gray-400 font-medium'
                 }`}
               >
-                <item.icon size={19} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                <item.icon size={18} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
                 <span className="text-[10px] leading-none">{item.label}</span>
                 {isActive && (
                   <span className="w-1 h-1 rounded-full bg-gray-900"></span>
@@ -445,7 +463,109 @@ function AppContent() {
               </button>
             );
           })}
+
+          {/* Account / Sign In Tab on Mobile */}
+          <button
+            onClick={() => {
+              if (user) {
+                setShowAccountModal(true);
+              } else {
+                openLogin();
+              }
+            }}
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
+              showAccountModal ? 'text-gray-900 font-bold' : 'text-gray-400 font-medium'
+            }`}
+          >
+            {user ? (
+              <div className="w-4.5 h-4.5 rounded-full bg-gray-900 text-white font-black text-[9px] flex items-center justify-center">
+                {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
+              </div>
+            ) : (
+              <LogIn size={18} className="text-gray-600" />
+            )}
+            <span className="text-[10px] leading-none">{user ? 'Account' : 'Sign In'}</span>
+          </button>
         </nav>
+      )}
+
+      {/* Mobile & Desktop Account Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white text-gray-900 rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-gray-200/80 relative">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  {user ? (user.user_metadata?.display_name || 'A')[0].toUpperCase() : 'G'}
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-gray-900">
+                    {user ? (user.user_metadata?.display_name || 'SSC Aspirant') : 'Guest User'}
+                  </h3>
+                  <div className="text-[11px] font-semibold text-gray-400 truncate max-w-[180px]">
+                    {user ? user.email : 'Local Storage Mode'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAccountModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            {user ? (
+              <div className="space-y-4">
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-xs font-bold text-emerald-800">Cloud Sync Active</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-emerald-600">Cross-device</span>
+                </div>
+
+                {/* Theme Selector inside Modal */}
+                <ThemeSwitcher variant="full" />
+
+                <button
+                  onClick={async () => {
+                    await signOut();
+                    setShowAccountModal(false);
+                  }}
+                  className="w-full btn btn-outline text-xs py-2.5 rounded-full flex items-center justify-center gap-2 text-rose-600 hover:bg-rose-50 hover:border-rose-200 font-bold"
+                >
+                  <LogOut size={15} /> Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span className="text-xs font-bold text-amber-800">Local Storage Active</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    You're currently taking tests locally. Sign in or create a free account to sync tests and bookmarks between your phone and laptop!
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowAccountModal(false);
+                    openLogin();
+                  }}
+                  className="w-full btn btn-primary text-xs py-2.5 rounded-full flex items-center justify-center gap-2 font-bold shadow-xs"
+                >
+                  <LogIn size={15} /> Sign In / Create Account
+                </button>
+
+                <ThemeSwitcher variant="full" />
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* PWA Components */}

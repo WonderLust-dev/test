@@ -322,33 +322,33 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
     <div className="min-h-screen bg-[#F4F5F7] font-sans text-gray-900 antialiased selection:bg-indigo-100">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200/80 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 onClick={() => setShowExitConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold shadow-xs transition-all shrink-0"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold shadow-xs transition-all shrink-0"
                 title="Exit exam"
               >
-                <ArrowLeft size={15} />
+                <ArrowLeft size={14} />
                 <span className="hidden sm:inline">Exit Exam</span>
               </button>
               <button
                 onClick={() => setShowPalette(!showPalette)}
-                className="lg:hidden p-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs"
+                className="lg:hidden p-1.5 sm:p-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs shrink-0"
                 title="Toggle question palette"
               >
-                <Menu size={18} />
+                <Menu size={16} />
               </button>
               <div className="min-w-0">
-                <h1 className="text-sm sm:text-base font-extrabold text-gray-900 truncate tracking-tight">{paper.title}</h1>
-                <p className="text-xs font-medium text-gray-500 hidden sm:block truncate">
+                <h1 className="text-xs sm:text-base font-extrabold text-gray-900 truncate tracking-tight max-w-[90px] xs:max-w-[140px] sm:max-w-xs">{paper.title}</h1>
+                <p className="text-[11px] font-medium text-gray-500 hidden sm:block truncate">
                   Question {currentQ + 1} of {questions.length} • {q.subject} {q.topic ? `• ${q.topic}` : ''}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               {/* Instant Check Toggle Button */}
               <button
                 onClick={() => {
@@ -358,16 +358,16 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                     setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
                   }
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold border transition-all ${
                   instantFeedback
                     ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-1 ring-emerald-400/40'
                     : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                 }`}
-                title={instantFeedback ? 'Instant answer checking is ON (answers are shown immediately)' : 'Turn ON instant answer check to verify correctness immediately'}
+                title={instantFeedback ? 'Instant answer checking is ON' : 'Turn ON instant answer check'}
                 aria-pressed={instantFeedback}
               >
-                <Zap size={14} className={instantFeedback ? 'text-amber-300 fill-amber-300' : 'text-amber-500'} />
-                <span className="hidden sm:inline">Instant Check:</span>
+                <Zap size={13} className={instantFeedback ? 'text-amber-300 fill-amber-300' : 'text-amber-500'} />
+                <span className="hidden xs:inline">Check:</span>
                 <span className={instantFeedback ? 'text-amber-200 font-extrabold' : 'text-gray-500'}>
                   {instantFeedback ? 'ON' : 'OFF'}
                 </span>
@@ -377,25 +377,24 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               <ThemeSwitcher variant="compact" />
 
               {/* Timer Pill */}
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-sm sm:text-base font-bold shadow-xs transition-all ${
+              <div className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-mono text-xs sm:text-base font-bold shadow-xs transition-all ${
                 isTimerCritical
                   ? 'bg-rose-50 border border-rose-200 text-rose-600 animate-pulse'
                   : isTimerWarning
                   ? 'bg-amber-50 border border-amber-200 text-amber-700'
                   : 'bg-gray-100 border border-gray-200 text-gray-900'
               }`}>
-                <Clock size={16} className={isTimerCritical ? 'text-rose-600' : isTimerWarning ? 'text-amber-600' : 'text-gray-600'} />
+                <Clock size={14} className={isTimerCritical ? 'text-rose-600' : isTimerWarning ? 'text-amber-600' : 'text-gray-600'} />
                 <span>{formatTime(timeLeft)}</span>
               </div>
 
               {/* Submit Test Button */}
               <button
                 onClick={() => setShowSubmit(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95"
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all text-xs sm:text-sm active:scale-95"
               >
-                <Send size={15} />
-                <span className="hidden sm:inline">Submit Test</span>
-                <span className="sm:hidden">Submit</span>
+                <Send size={13} />
+                <span className="hidden xs:inline">Submit</span>
               </button>
             </div>
           </div>
@@ -809,39 +808,39 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             )}
 
             {/* Navigation Bottom Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center sm:justify-between gap-2.5 sm:gap-3">
+              <div className="contents sm:flex sm:items-center sm:gap-2">
                 <button
                   onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
                   disabled={currentQ === 0}
-                  className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
                 >
                   <ChevronLeft size={16} /> Previous
                 </button>
                 <button
                   onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
                   disabled={currentQ === questions.length - 1}
-                  className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs active:scale-95"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 sm:px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs active:scale-95"
                 >
                   Next <ChevronRight size={16} />
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="contents sm:flex sm:items-center sm:gap-2">
                 <button
                   onClick={toggleReview}
-                  className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
+                  className={`w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
                     marked[currentQ]
                       ? 'bg-purple-100 border border-purple-200 text-purple-700'
                       : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {marked[currentQ] ? <FlagOff size={15} /> : <Flag size={15} />}
-                  <span>{marked[currentQ] ? 'Unmark Review' : 'Mark for Review'}</span>
+                  <span className="truncate">{marked[currentQ] ? 'Unmark Review' : 'Mark Review'}</span>
                 </button>
                 <button
                   onClick={clearAnswer}
-                  className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
+                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
                 >
                   <Eraser size={15} /> Clear
                 </button>
@@ -849,7 +848,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             {/* Keyboard Shortcuts Helper Bar */}
-            <div className="mt-5 p-3 bento-card border border-gray-200/60 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 shadow-xs">
+            <div className="mt-5 p-3 bento-card border border-gray-200/60 hidden sm:flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 shadow-xs">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span className="font-bold text-gray-700">Shortcuts:</span>
                 <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-[10px] text-gray-800 font-bold border border-gray-200">1-4</kbd> Select</span>
