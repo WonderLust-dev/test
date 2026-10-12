@@ -239,6 +239,23 @@ export interface ValidationResult {
   duration: number;
 }
 
+export interface BatchItemValidation {
+  index: number;
+  title: string;
+  paper: PaperJSON | null;
+  validation: ValidationResult;
+  selected: boolean;
+}
+
+export interface BatchValidationResult {
+  isBatch: boolean;
+  totalPapers: number;
+  validCount: number;
+  items: BatchItemValidation[];
+  singleResult?: ValidationResult;
+  singlePaper?: PaperJSON | null;
+}
+
 // --- Filter Types ---
 export interface PaperFilters {
   exam?: string;

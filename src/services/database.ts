@@ -192,6 +192,34 @@ export async function savePaper(paper: Omit<Paper, 'id' | 'created_at' | 'update
   return newPaper;
 }
 
+export async function savePapersBatch(papersToSave: Array<Omit<Paper, 'id' | 'created_at' | 'updated_at'>>): Promise<Paper[]> {
+  invalidateCache('papers');
+  const now = new Date().toISOString();
+  const newPapers: Paper[] = papersToSave.map((p, idx) => ({
+    ...p,
+    id: `${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 7)}`,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  if (newPapers.length === 0) return [];
+
+  const userId = papersToSave[0]?.user_id;
+  if (isRemoteUser(userId)) {
+    const result = await sb(async () => {
+      const { data, error } = await supabase!.from('papers').insert(newPapers).select();
+      if (error) throw error;
+      return (data || []) as Paper[];
+    });
+    if (result && result.length > 0) return result;
+  }
+
+  const existingPapers = lsGet<Paper>(LS_KEYS.papers);
+  const updated = [...newPapers, ...existingPapers];
+  lsSet(LS_KEYS.papers, updated);
+  return newPapers;
+}
+
 export async function updatePaper(paperId: string, updates: Partial<Paper>): Promise<void> {
   invalidateCache('papers');
   if (isSupabaseConfigured && supabase) {

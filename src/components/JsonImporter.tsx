@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
-import { validatePaperJSON, parsePaperJSON } from '../utils/validator';
-import { savePaper, checkDuplicatePaper } from '../services/database';
+import { validateInputJSON } from '../utils/validator';
+import { savePaper, savePapersBatch, checkDuplicatePaper } from '../services/database';
 import { getDemoPaperJSON } from '../utils/demoData';
-import { PaperJSON, ValidationResult } from '../types';
-import { Upload, FileJson, CheckCircle, AlertTriangle, XCircle, ClipboardPaste, Eye, Download, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { PaperJSON, ValidationResult, BatchValidationResult } from '../types';
+import { Upload, FileJson, CheckCircle, AlertTriangle, XCircle, ClipboardPaste, Eye, Download, ChevronDown, ChevronUp, Sparkles, Layers, CheckSquare, Square } from 'lucide-react';
 
 interface JsonImporterProps {
   userId?: string;
@@ -14,6 +14,10 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
   const [jsonInput, setJsonInput] = useState('');
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [parsedPaper, setParsedPaper] = useState<PaperJSON | null>(null);
+  const [batchValidation, setBatchValidation] = useState<BatchValidationResult | null>(null);
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
+  const [previewItemIndex, setPreviewItemIndex] = useState<number | null>(null);
+  const [batchSuccessMessage, setBatchSuccessMessage] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
@@ -23,15 +27,28 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleValidate = () => {
-    const result = validatePaperJSON(jsonInput);
-    setValidation(result);
-    if (result.valid) {
-      const paper = parsePaperJSON(jsonInput);
-      setParsedPaper(paper);
-      setShowPreview(true);
-    } else {
+    setBatchSuccessMessage(null);
+    setImportError('');
+    setDuplicateWarning('');
+    
+    const result = validateInputJSON(jsonInput);
+    if (result.isBatch) {
+      setBatchValidation(result);
+      setSelectedIndices(result.items.filter(it => it.validation.valid).map(it => it.index));
+      setValidation(null);
       setParsedPaper(null);
       setShowPreview(false);
+    } else {
+      setBatchValidation(null);
+      setSelectedIndices([]);
+      setValidation(result.singleResult || null);
+      if (result.singleResult?.valid && result.singlePaper) {
+        setParsedPaper(result.singlePaper);
+        setShowPreview(true);
+      } else {
+        setParsedPaper(null);
+        setShowPreview(false);
+      }
     }
   };
 
@@ -44,6 +61,8 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
       setJsonInput(content);
       setValidation(null);
       setParsedPaper(null);
+      setBatchValidation(null);
+      setBatchSuccessMessage(null);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -53,7 +72,71 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
     setJsonInput(getDemoPaperJSON());
     setValidation(null);
     setParsedPaper(null);
+    setBatchValidation(null);
+    setBatchSuccessMessage(null);
     setShowPreview(false);
+  };
+
+  const handleToggleSelect = (index: number) => {
+    setSelectedIndices(prev => 
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    );
+  };
+
+  const handleSelectAll = (select: boolean) => {
+    if (!batchValidation) return;
+    if (select) {
+      setSelectedIndices(batchValidation.items.filter(it => it.validation.valid).map(it => it.index));
+    } else {
+      setSelectedIndices([]);
+    }
+  };
+
+  const handleBatchImport = async () => {
+    if (!batchValidation) return;
+    const selectedItems = batchValidation.items.filter(
+      it => selectedIndices.includes(it.index) && it.validation.valid && it.paper
+    );
+    if (selectedItems.length === 0) return;
+
+    setImporting(true);
+    setImportError('');
+    setBatchSuccessMessage(null);
+
+    try {
+      const papersToSave = selectedItems.map(it => {
+        const p = it.paper!;
+        return {
+          user_id: userId || 'guest',
+          exam: p.exam || 'SSC CGL',
+          title: p.paperTitle,
+          description: p.description || '',
+          difficulty: p.difficulty || 'medium',
+          duration_minutes: p.durationMinutes,
+          total_marks: p.totalMarks || it.validation.totalMarks,
+          negative_marking: p.negativeMarking || 0,
+          question_count: p.questions.length,
+          subjects: p.subjects || it.validation.subjects,
+          raw_json: p,
+          is_demo: false,
+          visibility: 'private' as const,
+        };
+      });
+
+      await savePapersBatch(papersToSave);
+      setBatchSuccessMessage(`Successfully imported ${papersToSave.length} question paper${papersToSave.length > 1 ? 's' : ''} to your library!`);
+      setTimeout(() => {
+        setJsonInput('');
+        setBatchValidation(null);
+        setSelectedIndices([]);
+        onImported();
+      }, 1500);
+    } catch (err) {
+      setImportError('Failed to import batch papers. Please try again.');
+      console.error(err);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleImport = async () => {
@@ -186,8 +269,220 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
         </div>
       </div>
 
-      {/* Validation Results */}
-      {validation && (
+      {/* Success Notification */}
+      {batchSuccessMessage && (
+        <div className="bento-card p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl shadow-xs flex items-center gap-3">
+          <CheckCircle size={24} className="text-emerald-500 shrink-0" />
+          <div>
+            <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">{batchSuccessMessage}</h3>
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">Redirecting to your exam library...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Validation Results */}
+      {batchValidation && (
+        <div className="space-y-4">
+          <div className="bento-card p-5 sm:p-6 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-2xl bg-indigo-500/10 text-indigo-500">
+                  <Layers size={22} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-[var(--text-main)]">
+                    Batch Import Detected ({batchValidation.totalPapers} Paper Sets)
+                  </h3>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Multiple JSON papers found. Choose which papers to import into your library.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleSelectAll(selectedIndices.length !== batchValidation.validCount)}
+                  className="px-3 py-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] text-xs font-bold hover:bg-[var(--bg-subcard-hover)] transition-colors flex items-center gap-1.5"
+                >
+                  {selectedIndices.length === batchValidation.validCount ? (
+                    <>
+                      <Square size={13} /> Deselect All
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare size={13} /> Select All Valid ({batchValidation.validCount})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Batch Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div className="p-3 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-2xl text-center shadow-2xs">
+                <div className="text-xl font-extrabold text-[var(--text-main)]">{batchValidation.totalPapers}</div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)]">Total Papers</div>
+              </div>
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center shadow-2xs">
+                <div className="text-xl font-extrabold text-emerald-500">{batchValidation.validCount}</div>
+                <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Valid & Ready</div>
+              </div>
+              <div className="p-3 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-2xl text-center shadow-2xs">
+                <div className="text-xl font-extrabold text-[var(--text-main)]">
+                  {batchValidation.items.reduce((acc, it) => acc + it.validation.questionCount, 0)}
+                </div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)]">Total Questions</div>
+              </div>
+              <div className="p-3 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-2xl text-center shadow-2xs">
+                <div className="text-xl font-extrabold text-[var(--text-main)]">
+                  {batchValidation.items.reduce((acc, it) => acc + it.validation.totalMarks, 0)}
+                </div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)]">Total Marks</div>
+              </div>
+            </div>
+
+            {/* Batch Action Banner */}
+            {selectedIndices.length > 0 && (
+              <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs">
+                  <span className="font-extrabold text-indigo-400">
+                    {selectedIndices.length} of {batchValidation.validCount} valid papers selected
+                  </span>
+                  <p className="text-[var(--text-muted)]">All selected papers will be created as individual test sets in your library.</p>
+                </div>
+                <button
+                  onClick={handleBatchImport}
+                  disabled={importing}
+                  className="btn btn-primary text-xs py-2.5 px-6 rounded-full font-bold shadow-soft flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
+                >
+                  <Download size={15} />
+                  {importing ? 'Importing Batch...' : `Import All ${selectedIndices.length} Papers`}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* List of Detected Papers */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider px-1">
+              Detected Papers ({batchValidation.items.length})
+            </h4>
+
+            {batchValidation.items.map((item) => {
+              const isSelected = selectedIndices.includes(item.index);
+              const isValid = item.validation.valid;
+              const isExpanded = previewItemIndex === item.index;
+
+              return (
+                <div
+                  key={item.index}
+                  className={`bento-card rounded-2xl border transition-all ${
+                    isValid
+                      ? isSelected
+                        ? 'border-indigo-500/40 bg-[var(--bg-surface)] shadow-xs'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface)] opacity-80'
+                      : 'border-rose-500/30 bg-rose-500/5'
+                  }`}
+                >
+                  <div className="p-4 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      disabled={!isValid}
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(item.index)}
+                      className="mt-1 rounded cursor-pointer accent-indigo-600 w-4 h-4"
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)]">
+                          #{item.index + 1}
+                        </span>
+                        <h4 className="font-extrabold text-sm text-[var(--text-main)] truncate max-w-sm sm:max-w-md">
+                          {item.title}
+                        </h4>
+                        {isValid ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25 flex items-center gap-1">
+                            <CheckCircle size={10} /> Valid
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-500 border border-rose-500/25 flex items-center gap-1">
+                            <XCircle size={10} /> {item.validation.errors.length} Errors
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <span>{item.validation.questionCount} Questions</span>
+                        <span>•</span>
+                        <span>{item.validation.duration} min</span>
+                        <span>•</span>
+                        <span>{item.validation.totalMarks} Marks</span>
+                        {item.validation.subjects.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate max-w-[200px]">{item.validation.subjects.join(', ')}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Item validation errors */}
+                      {!isValid && item.validation.errors.length > 0 && (
+                        <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 space-y-1">
+                          {item.validation.errors.slice(0, 3).map((err, ei) => (
+                            <div key={ei} className="flex items-start gap-1.5">
+                              <XCircle size={12} className="mt-0.5 shrink-0" />
+                              <span>{err.message}</span>
+                            </div>
+                          ))}
+                          {item.validation.errors.length > 3 && (
+                            <p className="text-[11px] font-semibold text-rose-300">
+                              + {item.validation.errors.length - 3} more errors
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Preview Toggle Button */}
+                    {isValid && item.paper && (
+                      <button
+                        onClick={() => setPreviewItemIndex(isExpanded ? null : item.index)}
+                        className="p-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] hover:bg-[var(--bg-subcard-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors shrink-0"
+                        title="Preview Questions"
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <Eye size={16} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Expanded Mini Question Preview */}
+                  {isExpanded && item.paper && (
+                    <div className="p-4 pt-0 border-t border-[var(--border-color)] space-y-2 mt-2">
+                      <p className="text-xs font-bold text-[var(--text-muted)] pt-3">
+                        First Questions Sample:
+                      </p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                        {item.paper.questions.slice(0, 5).map((pq, pqi) => (
+                          <div key={pqi} className="p-2.5 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] text-xs">
+                            <span className="font-bold text-[var(--text-main)]">Q{pqi + 1}. {pq.question}</span>
+                            <div className="text-[11px] text-[var(--text-muted)] mt-1">
+                              Answer: Option {String.fromCharCode(65 + pq.answerIndex)} ({pq.options[pq.answerIndex]})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Single Paper Validation Results */}
+      {!batchValidation && validation && (
         <div className={`bento-card p-5 sm:p-6 rounded-3xl border shadow-xs ${validation.valid ? 'bg-emerald-50/40 border-emerald-200' : 'bg-rose-50/40 border-rose-200'}`}>
           <div className="flex items-center gap-2 mb-3.5">
             {validation.valid ? <CheckCircle size={20} className="text-emerald-600" /> : <XCircle size={20} className="text-rose-600" />}
@@ -259,8 +554,8 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold">{importError}</div>
       )}
 
-      {/* Preview */}
-      {showPreview && parsedPaper && validation?.valid && (
+      {/* Single Paper Preview */}
+      {!batchValidation && showPreview && parsedPaper && validation?.valid && (
         <div className="bento-card bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
           <button onClick={() => setShowPreview(!showPreview)} className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2">
@@ -300,8 +595,8 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
         </div>
       )}
 
-      {/* Import Button */}
-      {validation?.valid && parsedPaper && !duplicateWarning && (
+      {/* Single Paper Import Button */}
+      {!batchValidation && validation?.valid && parsedPaper && !duplicateWarning && (
         <div className="pt-2">
           <button
             onClick={handleImport}
@@ -318,6 +613,8 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
 
 // AI Prompt Generator Sub-component
 function AIPromptHelper() {
+  const [isBatchPrompt, setIsBatchPrompt] = useState(false);
+  const [batchPaperCount, setBatchPaperCount] = useState(5);
   const [subject, setSubject] = useState('Quantitative Aptitude');
   const [topic, setTopic] = useState('');
   const [count, setCount] = useState(10);
@@ -329,6 +626,53 @@ function AIPromptHelper() {
   const [copied, setCopied] = useState(false);
 
   const generatePrompt = () => {
+    if (isBatchPrompt) {
+      return [
+        `Generate ${batchPaperCount} distinct SSC CGL mock test papers as a single JSON array:`,
+        `Format: [ { paperTitle: "Paper 1", ... }, { paperTitle: "Paper 2", ... } ]`,
+        '',
+        `Each paper should have ${count} questions of ${difficulty} difficulty on ${subject}${topic ? ` (${topic})` : ''}.`,
+        '',
+        'Schema for each paper in the array:',
+        '```json',
+        JSON.stringify({
+          exam: "SSC CGL",
+          paperTitle: "SSC CGL Mock Test Set #1",
+          description: "Full practice mock test",
+          durationMinutes: 60,
+          totalMarks: count * 2,
+          negativeMarking: 0.5,
+          difficulty: difficulty,
+          subjects: [subject],
+          questions: [
+            {
+              id: 1,
+              subject: subject,
+              topic: topic || "Topic Name",
+              difficulty: difficulty,
+              question: "Question text here",
+              options: ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: "Exact text of correct option",
+              answerIndex: 0,
+              marks: 2,
+              negativeMarks: 0.5,
+              ...(includeHints && { hint: "Helpful hint" }),
+              ...(includeSolutions && { solution: "Detailed step-by-step solution" }),
+              ...(includeShortcuts && { shortcut: "Faster trick/shortcut" }),
+              ...(includeSuggestions && { learningSuggestion: "Related concept to revise" }),
+            }
+          ]
+        }, null, 2),
+        '```',
+        '',
+        'CRITICAL RULES:',
+        `1. Output a JSON array with exactly ${batchPaperCount} paper objects: [ { ... }, { ... } ]`,
+        '2. Return ONLY valid, parseable JSON — no markdown backticks, no comments, no extra text.',
+        '3. Each question must have 4 options and a matching correctAnswer.',
+        '4. All answers and mathematical solutions must be fully accurate.',
+      ].join('\n');
+    }
+
     const parts = [
       `Generate ${count} SSC CGL ${subject} questions`,
       topic ? `on the topic "${topic}"` : '',
@@ -380,10 +724,46 @@ function AIPromptHelper() {
 
   return (
     <div className="bento-card p-5 sm:p-6 bg-white border border-indigo-100 rounded-3xl shadow-xs space-y-4">
-      <h3 className="font-extrabold text-gray-900 text-sm flex items-center gap-2">
-        <Sparkles size={16} className="text-indigo-600" /> AI Question Generator — Prompt Builder
-      </h3>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h3 className="font-extrabold text-gray-900 text-sm flex items-center gap-2">
+          <Sparkles size={16} className="text-indigo-600" /> AI Question Generator — Prompt Builder
+        </h3>
+
+        {/* Single vs Batch Prompt Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-full text-xs font-bold self-start sm:self-auto">
+          <button
+            onClick={() => setIsBatchPrompt(false)}
+            className={`px-3 py-1 rounded-full transition-all ${
+              !isBatchPrompt ? 'bg-white text-indigo-700 shadow-2xs' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            Single Paper
+          </button>
+          <button
+            onClick={() => setIsBatchPrompt(true)}
+            className={`px-3 py-1 rounded-full transition-all flex items-center gap-1 ${
+              isBatchPrompt ? 'bg-white text-indigo-700 shadow-2xs' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Layers size={12} /> Batch Array ([...])
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {isBatchPrompt && (
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1 block">Number of Papers to Generate</label>
+            <input
+              type="number"
+              min={2}
+              max={20}
+              value={batchPaperCount}
+              onChange={e => setBatchPaperCount(Number(e.target.value))}
+              className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900"
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs font-bold text-gray-700 mb-1 block">Subject</label>
           <select value={subject} onChange={e => setSubject(e.target.value)} className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900">
@@ -398,7 +778,7 @@ function AIPromptHelper() {
           <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g., Percentage" className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 placeholder-gray-400" />
         </div>
         <div>
-          <label className="text-xs font-bold text-gray-700 mb-1 block">Number of Questions</label>
+          <label className="text-xs font-bold text-gray-700 mb-1 block">Questions per Paper</label>
           <input type="number" min={1} max={100} value={count} onChange={e => setCount(Number(e.target.value))} className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900" />
         </div>
         <div>

@@ -4,6 +4,7 @@ import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUp
 import { gradeQuestions, formatTime } from '../utils/grader';
 import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
+import QuestionPalette from './QuestionPalette';
 
 interface ExamInterfaceProps {
   paper: Paper;
@@ -297,26 +298,6 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
   const counts = getStatusCounts();
 
-  // Group questions by subject for palette
-  const subjectGroups = new Map<string, number[]>();
-  questions.forEach((q, idx) => {
-    const subj = q.subject || 'General';
-    if (!subjectGroups.has(subj)) subjectGroups.set(subj, []);
-    subjectGroups.get(subj)!.push(idx);
-  });
-
-  const getQStatus = (idx: number): 'answered' | 'marked' | 'unanswered' | 'not_visited' | 'correct' | 'incorrect' => {
-    if (marked[idx]) return 'marked';
-    if (answers[idx] !== undefined && answers[idx] !== null) {
-      if (instantFeedback || revealedQuestions[idx]) {
-        return answers[idx] === questions[idx].answerIndex ? 'correct' : 'incorrect';
-      }
-      return 'answered';
-    }
-    const maxVisited = Math.max(currentQ, ...Object.keys(answers).map(Number), -1);
-    if (idx <= maxVisited) return 'unanswered';
-    return 'not_visited';
-  };
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased selection:bg-indigo-500/20">
@@ -405,159 +386,58 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-[calc(env(safe-area-inset-bottom,0px)+4rem)] sm:pb-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Left Column: Question Palette (Desktop Sticky & Mobile Drawer) */}
-          <div className="shrink-0 lg:w-72 w-full">
+          <div className="shrink-0 lg:w-80 w-full">
             {/* Desktop Palette */}
-            <div className="hidden lg:flex bento-card p-4 sm:p-5 flex-col sticky top-20 max-h-[calc(100vh-6.5rem)] shadow-soft border border-gray-200/80">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">Question Palette</h3>
-                  <p className="text-[11px] font-semibold text-gray-400">Total {questions.length} questions</p>
-                </div>
-                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
-                  Q{currentQ + 1}
-                </span>
-              </div>
-
-              {/* Status Legend */}
-              <div className="grid grid-cols-2 gap-2 pb-3 mb-3 border-b border-gray-100 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 rounded-lg bg-emerald-500 shrink-0 shadow-xs" />
-                  <span className="text-gray-600 font-medium text-[11px]">Ans ({counts.answered})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 rounded-lg bg-purple-600 shrink-0 shadow-xs" />
-                  <span className="text-gray-600 font-medium text-[11px]">Review ({counts.marked})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 rounded-lg bg-rose-500 shrink-0 shadow-xs" />
-                  <span className="text-gray-600 font-medium text-[11px]">Visited ({counts.unanswered})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 rounded-lg bg-gray-200 shrink-0" />
-                  <span className="text-gray-600 font-medium text-[11px]">Unseen ({counts.notVisited})</span>
-                </div>
-              </div>
-
-              {/* Scrollable Questions Grid for Desktop */}
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1.5 custom-scrollbar min-h-0">
-                {Array.from(subjectGroups.entries()).map(([subject, indices]) => (
-                  <div key={subject} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-gray-800 tracking-tight truncate max-w-[170px]">
-                        {subject}
-                      </span>
-                      <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {indices.length} Qs
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {indices.map(idx => {
-                        const status = getQStatus(idx);
-                        const isCurrent = idx === currentQ;
-                        let bgClasses = 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/50';
-                        if (status === 'correct') bgClasses = 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs ring-1 ring-emerald-400';
-                        else if (status === 'incorrect') bgClasses = 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs ring-1 ring-rose-400';
-                        else if (status === 'answered') bgClasses = 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs';
-                        else if (status === 'marked') bgClasses = 'bg-purple-600 text-white hover:bg-purple-700 shadow-xs';
-                        else if (status === 'unanswered') bgClasses = 'bg-amber-500 text-white hover:bg-amber-600 shadow-xs';
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => navigateTo(idx)}
-                            className={`w-9 h-9 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${bgClasses} ${
-                              isCurrent ? 'ring-2 ring-indigo-600 ring-offset-2 scale-105 shadow-sm font-black' : ''
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="hidden lg:flex bento-card p-4 sm:p-5 flex-col sticky top-20 max-h-[calc(100vh-6.5rem)] shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)]">
+              <QuestionPalette
+                questions={questions}
+                currentQ={currentQ}
+                answers={answers}
+                marked={marked}
+                instantFeedback={instantFeedback}
+                revealedQuestions={revealedQuestions}
+                counts={counts}
+                onSelectQuestion={navigateTo}
+              />
             </div>
 
             {/* Mobile Drawer Question Palette */}
             {showPalette && (
               <div className="fixed inset-0 z-50 flex lg:hidden">
                 <div
-                  className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
                   onClick={() => setShowPalette(false)}
                 />
-                <div className="relative w-80 max-w-[85vw] h-full bg-[var(--bg-surface)] text-[var(--text-main)] p-5 flex flex-col shadow-2xl z-50 border-r border-[var(--border-color)]">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--border-color)]">
+                <div className="relative w-84 max-w-[88vw] h-full bg-[var(--bg-surface)] text-[var(--text-main)] p-4 sm:p-5 flex flex-col shadow-2xl z-50 border-r border-[var(--border-color)]">
+                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-[var(--border-color)] shrink-0">
                     <div>
                       <h3 className="text-base font-extrabold text-[var(--text-main)]">Question Palette</h3>
-                      <p className="text-xs font-semibold text-[var(--text-subtle)]">Total {questions.length} questions</p>
+                      <p className="text-xs font-semibold text-[var(--text-muted)]">Total {questions.length} questions</p>
                     </div>
                     <button
                       onClick={() => setShowPalette(false)}
                       className="p-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] shadow-xs"
+                      title="Close question palette"
                     >
                       <X size={18} />
                     </button>
                   </div>
 
-                  {/* Mobile Legend */}
-                  <div className="grid grid-cols-2 gap-2 pb-3 mb-3 border-b border-[var(--border-color)] text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 rounded-lg bg-emerald-500 shrink-0" />
-                      <span className="text-gray-700 font-medium text-[11px]">Ans ({counts.answered})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 rounded-lg bg-purple-600 shrink-0" />
-                      <span className="text-gray-700 font-medium text-[11px]">Review ({counts.marked})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 rounded-lg bg-rose-500 shrink-0" />
-                      <span className="text-gray-700 font-medium text-[11px]">Visited ({counts.unanswered})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 rounded-lg bg-gray-200 shrink-0" />
-                      <span className="text-gray-700 font-medium text-[11px]">Unseen ({counts.notVisited})</span>
-                    </div>
-                  </div>
-
-                  {/* Scrollable Questions Grid for Mobile Drawer */}
-                  <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar min-h-0">
-                    {Array.from(subjectGroups.entries()).map(([subject, indices]) => (
-                      <div key={subject} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-gray-800 tracking-tight truncate max-w-[180px]">
-                            {subject}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
-                            {indices.length} Qs
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-5 gap-2">
-                          {indices.map(idx => {
-                            const status = getQStatus(idx);
-                            const isCurrent = idx === currentQ;
-                            let bgClasses = 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200';
-                            if (status === 'correct') bgClasses = 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400';
-                            else if (status === 'incorrect') bgClasses = 'bg-rose-600 text-white shadow-xs ring-1 ring-rose-400';
-                            else if (status === 'answered') bgClasses = 'bg-indigo-600 text-white shadow-xs';
-                            else if (status === 'marked') bgClasses = 'bg-purple-600 text-white shadow-xs';
-                            else if (status === 'unanswered') bgClasses = 'bg-amber-500 text-white shadow-xs';
-
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => { navigateTo(idx); setShowPalette(false); }}
-                                className={`w-9 h-9 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${bgClasses} ${
-                                  isCurrent ? 'ring-2 ring-indigo-600 ring-offset-2 scale-105 font-black' : ''
-                                }`}
-                              >
-                                {idx + 1}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex-1 overflow-hidden min-h-0">
+                    <QuestionPalette
+                      questions={questions}
+                      currentQ={currentQ}
+                      answers={answers}
+                      marked={marked}
+                      instantFeedback={instantFeedback}
+                      revealedQuestions={revealedQuestions}
+                      counts={counts}
+                      onSelectQuestion={(idx) => {
+                        navigateTo(idx);
+                        setShowPalette(false);
+                      }}
+                      isMobileDrawer={true}
+                    />
                   </div>
                 </div>
               </div>

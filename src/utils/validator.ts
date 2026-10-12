@@ -1,19 +1,16 @@
-import { PaperJSON, QuestionJSON, ValidationResult, ValidationError, Difficulty } from '../types';
+import { PaperJSON, QuestionJSON, ValidationResult, ValidationError, Difficulty, BatchValidationResult, BatchItemValidation } from '../types';
 
 const VALID_DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 
-export function validatePaperJSON(jsonString: string): ValidationResult {
+export function validateSinglePaperObject(data: unknown, prefixLabel: string = ''): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
+  const prefix = prefixLabel ? `[${prefixLabel}] ` : '';
 
-  // Parse JSON
-  let data: unknown;
-  try {
-    data = JSON.parse(jsonString);
-  } catch (e) {
+  if (!data || typeof data !== 'object') {
     return {
       valid: false,
-      errors: [{ path: 'root', message: `Invalid JSON syntax: ${(e as Error).message}`, severity: 'error' }],
+      errors: [{ path: 'root', message: `${prefix}Paper must be an object.`, severity: 'error' }],
       warnings: [],
       questionCount: 0,
       totalMarks: 0,
@@ -22,39 +19,34 @@ export function validatePaperJSON(jsonString: string): ValidationResult {
     };
   }
 
-  if (!data || typeof data !== 'object') {
-    return {
-      valid: false,
-      errors: [{ path: 'root', message: 'JSON must be an object.', severity: 'error' }],
-      warnings: [],
-      questionCount: 0, totalMarks: 0, subjects: [], duration: 0,
-    };
-  }
-
   const paper = data as Record<string, unknown>;
 
   // Validate paper-level fields
   if (!paper.paperTitle || typeof paper.paperTitle !== 'string') {
-    errors.push({ path: 'paperTitle', message: 'Missing or invalid "paperTitle" (must be a non-empty string).', severity: 'error' });
+    errors.push({ path: 'paperTitle', message: `${prefix}Missing or invalid "paperTitle" (must be a non-empty string).`, severity: 'error' });
   }
 
   if (!paper.durationMinutes || typeof paper.durationMinutes !== 'number' || paper.durationMinutes <= 0) {
-    errors.push({ path: 'durationMinutes', message: 'Missing or invalid "durationMinutes" (must be a positive number).', severity: 'error' });
+    errors.push({ path: 'durationMinutes', message: `${prefix}Missing or invalid "durationMinutes" (must be a positive number).`, severity: 'error' });
   }
 
   if (!paper.totalMarks || typeof paper.totalMarks !== 'number' || paper.totalMarks <= 0) {
-    warnings.push({ path: 'totalMarks', message: '"totalMarks" is missing or invalid. It will be calculated from questions.', severity: 'warning' });
+    warnings.push({ path: 'totalMarks', message: `${prefix}"totalMarks" is missing or invalid. It will be calculated from questions.`, severity: 'warning' });
   }
 
   if (paper.negativeMarking !== undefined && (typeof paper.negativeMarking !== 'number' || paper.negativeMarking < 0)) {
-    warnings.push({ path: 'negativeMarking', message: '"negativeMarking" should be a non-negative number.', severity: 'warning' });
+    warnings.push({ path: 'negativeMarking', message: `${prefix}"negativeMarking" should be a non-negative number.`, severity: 'warning' });
   }
 
   if (!paper.questions || !Array.isArray(paper.questions)) {
     return {
       valid: false,
-      errors: [{ path: 'questions', message: 'Missing or invalid "questions" array.', severity: 'error' }],
-      warnings, questionCount: 0, totalMarks: 0, subjects: [], duration: 0,
+      errors: [{ path: 'questions', message: `${prefix}Missing or invalid "questions" array.`, severity: 'error' }],
+      warnings,
+      questionCount: 0,
+      totalMarks: 0,
+      subjects: [],
+      duration: 0,
     };
   }
 
@@ -181,11 +173,143 @@ export function validatePaperJSON(jsonString: string): ValidationResult {
   };
 }
 
+export function validatePaperJSON(jsonString: string): ValidationResult {
+  let data: unknown;
+  try {
+    data = JSON.parse(jsonString);
+  } catch (e) {
+    return {
+      valid: false,
+      errors: [{ path: 'root', message: `Invalid JSON syntax: ${(e as Error).message}`, severity: 'error' }],
+      warnings: [],
+      questionCount: 0,
+      totalMarks: 0,
+      subjects: [],
+      duration: 0,
+    };
+  }
+
+  // If array, validate first or return informative message
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return {
+        valid: false,
+        errors: [{ path: 'root', message: 'The provided JSON array of papers is empty.', severity: 'error' }],
+        warnings: [],
+        questionCount: 0,
+        totalMarks: 0,
+        subjects: [],
+        duration: 0,
+      };
+    }
+    return validateSinglePaperObject(data[0], 'Paper 1');
+  }
+
+  return validateSinglePaperObject(data);
+}
+
+export function validateInputJSON(jsonString: string): BatchValidationResult {
+  let data: unknown;
+  try {
+    data = JSON.parse(jsonString);
+  } catch (e) {
+    const errorResult: ValidationResult = {
+      valid: false,
+      errors: [{ path: 'root', message: `Invalid JSON syntax: ${(e as Error).message}`, severity: 'error' }],
+      warnings: [],
+      questionCount: 0,
+      totalMarks: 0,
+      subjects: [],
+      duration: 0,
+    };
+    return {
+      isBatch: false,
+      totalPapers: 0,
+      validCount: 0,
+      items: [],
+      singleResult: errorResult,
+      singlePaper: null,
+    };
+  }
+
+  // Check if batch array: either raw Array or { papers: [...] }
+  let paperArray: unknown[] | null = null;
+  if (Array.isArray(data)) {
+    paperArray = data;
+  } else if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).papers)) {
+    paperArray = (data as Record<string, unknown>).papers as unknown[];
+  }
+
+  if (paperArray) {
+    const items: BatchItemValidation[] = paperArray.map((item, idx) => {
+      const val = validateSinglePaperObject(item, `Paper ${idx + 1}`);
+      const title = (item && typeof item === 'object' && typeof (item as Record<string, unknown>).paperTitle === 'string')
+        ? (item as Record<string, unknown>).paperTitle as string
+        : `Paper ${idx + 1}`;
+      const paper = val.valid ? (item as PaperJSON) : null;
+      return {
+        index: idx,
+        title,
+        paper,
+        validation: val,
+        selected: val.valid,
+      };
+    });
+
+    const validCount = items.filter(it => it.validation.valid).length;
+    return {
+      isBatch: true,
+      totalPapers: items.length,
+      validCount,
+      items,
+      singleResult: items[0]?.validation,
+      singlePaper: items[0]?.paper,
+    };
+  }
+
+  // Single paper
+  const singleVal = validateSinglePaperObject(data);
+  const singlePaper = singleVal.valid ? (data as PaperJSON) : null;
+  return {
+    isBatch: false,
+    totalPapers: 1,
+    validCount: singleVal.valid ? 1 : 0,
+    items: [{
+      index: 0,
+      title: (data && typeof data === 'object' && typeof (data as Record<string, unknown>).paperTitle === 'string')
+        ? (data as Record<string, unknown>).paperTitle as string
+        : 'Paper 1',
+      paper: singlePaper,
+      validation: singleVal,
+      selected: singleVal.valid,
+    }],
+    singleResult: singleVal,
+    singlePaper,
+  };
+}
+
 export function parsePaperJSON(jsonString: string): PaperJSON | null {
   try {
-    const data = JSON.parse(jsonString) as PaperJSON;
-    return data;
+    const data = JSON.parse(jsonString);
+    if (Array.isArray(data)) return data[0] || null;
+    if (data && typeof data === 'object' && Array.isArray(data.papers)) return data.papers[0] || null;
+    return data as PaperJSON;
   } catch {
     return null;
+  }
+}
+
+export function parseInputJSON(jsonString: string): { isBatch: boolean; papers: PaperJSON[]; single: PaperJSON | null } {
+  try {
+    const data = JSON.parse(jsonString);
+    if (Array.isArray(data)) {
+      return { isBatch: true, papers: data as PaperJSON[], single: data[0] || null };
+    }
+    if (data && typeof data === 'object' && Array.isArray(data.papers)) {
+      return { isBatch: true, papers: data.papers as PaperJSON[], single: data.papers[0] || null };
+    }
+    return { isBatch: false, papers: [data as PaperJSON], single: data as PaperJSON };
+  } catch {
+    return { isBatch: false, papers: [], single: null };
   }
 }
