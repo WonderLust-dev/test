@@ -1,7 +1,7 @@
 // SSC CGL Exam Platform - Service Worker
-// Version: 1.0.0
+// Version: 2.0.0
 
-const CACHE_VERSION = 'sscp-v1';
+const CACHE_VERSION = 'sscp-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -14,17 +14,23 @@ const STATIC_ASSETS = [
   './icons/icon.svg',
 ];
 
-// Maximum number of dynamic cache entries
-const MAX_DYNAMIC_CACHE = 50;
+// Maximum number of dynamic cache entries (non-critical files)
+const MAX_DYNAMIC_CACHE = 80;
 
-// Install event - cache static assets
+// Install event - safely cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
+  console.log('[SW] Installing v2...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => {
-        console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+      .then(async (cache) => {
+        console.log('[SW] Caching app shell assets');
+        for (const asset of STATIC_ASSETS) {
+          try {
+            await cache.add(asset);
+          } catch (err) {
+            console.warn('[SW] Could not precache:', asset, err);
+          }
+        }
       })
       .then(() => {
         console.log('[SW] Installation complete');
@@ -38,7 +44,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
+  console.log('[SW] Activating v2...');
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
@@ -52,7 +58,7 @@ self.addEventListener('activate', (event) => {
         );
       })
       .then(() => {
-        console.log('[SW] Activation complete');
+        console.log('[SW] Activation complete - clients claimed');
         return self.clients.claim(); // Take control of all clients
       })
   );
@@ -61,37 +67,68 @@ self.addEventListener('activate', (event) => {
 // Fetch event - serve from cache or network
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip non-GET requests
   if (request.method !== 'GET') return;
 
-  // Skip Supabase API requests (always go to network)
+  const url = new URL(request.url);
+
+  // Skip chrome-extension or other non-http schemes
+  if (!url.protocol.startsWith('http')) return;
+
+  // Let Supabase API requests pass through to network (database.ts handles offline fallback)
   if (url.hostname.includes('supabase.co')) {
     event.respondWith(networkFirst(request));
     return;
   }
 
-  // Skip external requests
-  if (url.origin !== location.origin) return;
-
-  // For navigation requests (HTML pages), use stale-while-revalidate
+  // Handle SPA navigation requests (HTML pages)
   if (request.mode === 'navigate') {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(handleNavigation(request));
     return;
   }
 
-  // For static assets, use cache-first
+  // Handle static assets (JS, CSS, images, icons, fonts)
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  // For other requests, use network-first
+  // For other same-origin requests, use network-first with cache fallback
   event.respondWith(networkFirst(request));
 });
 
-// Cache-first strategy: Try cache, fallback to network
+// Navigation handler: tries network first, but reliably returns cached SPA shell (index.html) when offline
+async function handleNavigation(request) {
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, response.clone());
+      return response;
+    }
+  } catch (error) {
+    // Offline or network error - fall through to cached app shell
+  }
+
+  const cachedMatch = await caches.match(request);
+  if (cachedMatch) return cachedMatch;
+
+  // Find cached index.html under any relative path
+  const fallback =
+    (await caches.match('./index.html')) ||
+    (await caches.match('./')) ||
+    (await caches.match('/index.html')) ||
+    (await caches.match('index.html'));
+
+  if (fallback) return fallback;
+
+  return new Response('Offline - SSC CGL Prep', {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: { 'Content-Type': 'text/plain' },
+  });
+}
+
+// Cache-first strategy for static assets: Return from cache immediately, fetch & cache if missing
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) {
@@ -100,15 +137,17 @@ async function cacheFirst(request) {
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response && response.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, response.clone());
       trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE);
     }
     return response;
   } catch (error) {
-    console.error('[SW] Cache-first failed:', error);
-    return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+    // Try ignoreSearch fallback
+    const fallback = await caches.match(request, { ignoreSearch: true });
+    if (fallback) return fallback;
+    return new Response('Asset Offline', { status: 503, statusText: 'Offline' });
   }
 }
 
@@ -116,7 +155,7 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response && response.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, response.clone());
       trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE);
@@ -128,9 +167,11 @@ async function networkFirst(request) {
       return cached;
     }
 
-    // For navigation requests, return the cached index.html
     if (request.mode === 'navigate') {
-      const fallback = await caches.match('/index.html');
+      const fallback =
+        (await caches.match('./index.html')) ||
+        (await caches.match('./')) ||
+        (await caches.match('/index.html'));
       if (fallback) return fallback;
     }
 
@@ -138,45 +179,40 @@ async function networkFirst(request) {
   }
 }
 
-// Stale-while-revalidate: Return cache immediately, update in background
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(STATIC_CACHE);
-  const cached = await cache.match(request);
-
-  const networkPromise = fetch(request).then((response) => {
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  }).catch(() => cached);
-
-  return cached || networkPromise;
-}
-
 // Check if request is for a static asset
 function isStaticAsset(pathname) {
+  const lower = pathname.toLowerCase();
   return (
-    pathname.endsWith('.js') ||
-    pathname.endsWith('.css') ||
-    pathname.endsWith('.png') ||
-    pathname.endsWith('.jpg') ||
-    pathname.endsWith('.jpeg') ||
-    pathname.endsWith('.svg') ||
-    pathname.endsWith('.ico') ||
-    pathname.endsWith('.woff') ||
-    pathname.endsWith('.woff2') ||
-    pathname.startsWith('/assets/')
+    lower.endsWith('.js') ||
+    lower.endsWith('.css') ||
+    lower.endsWith('.png') ||
+    lower.endsWith('.jpg') ||
+    lower.endsWith('.jpeg') ||
+    lower.endsWith('.svg') ||
+    lower.endsWith('.ico') ||
+    lower.endsWith('.webp') ||
+    lower.endsWith('.woff') ||
+    lower.endsWith('.woff2') ||
+    lower.endsWith('.ttf') ||
+    lower.includes('/assets/') ||
+    lower.startsWith('/assets/')
   );
 }
 
-// Trim cache to maximum size
+// Trim cache to maximum size, but never delete critical JS or CSS bundles
 async function trimCache(cacheName, maxItems) {
-  const cache = await caches.open(cacheName);
-  const keys = await cache.keys();
-  if (keys.length > maxItems) {
-    await cache.delete(keys[0]);
-    trimCache(cacheName, maxItems);
-  }
+  try {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxItems) {
+      // Find a non-critical asset to delete
+      const candidate = keys.find(k => {
+        const u = k.url.toLowerCase();
+        return !u.endsWith('.js') && !u.endsWith('.css') && !u.includes('index-');
+      }) || keys[0];
+      await cache.delete(candidate);
+    }
+  } catch {}
 }
 
 // Listen for messages from the main app

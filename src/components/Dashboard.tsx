@@ -963,7 +963,13 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
                   <h3 className="font-extrabold text-gray-900 text-sm sm:text-base leading-snug line-clamp-2 flex-1">
                     {paper.title}
                   </h3>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1"
+                      title="Stored locally on this device • Ready to take offline anytime"
+                    >
+                      <CheckCircle size={10} className="text-emerald-600" /> Offline Ready
+                    </span>
                     {paper.is_demo && (
                       <span className="badge badge-warning">Demo</span>
                     )}

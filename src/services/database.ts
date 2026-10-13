@@ -11,6 +11,8 @@ const LS_KEYS = {
   bookmarks: 'sscp_bookmarks',
   mistakes: 'sscp_mistakes',
   session: 'sscp_session',
+  pendingSyncAttempts: 'sscp_pending_sync_attempts',
+  pendingSyncBookmarks: 'sscp_pending_sync_bookmarks',
 };
 
 function lsGet<T>(key: string): T[] {
@@ -117,7 +119,9 @@ export async function getPapers(userId?: string): Promise<Paper[]> {
         });
         if (result && result.length > 0) {
           const localIds = new Set(localPapers.map(p => p.id));
-          return [...localPapers, ...result.filter(p => !localIds.has(p.id))];
+          const merged = [...localPapers, ...result.filter(p => !localIds.has(p.id))];
+          lsSet(LS_KEYS.papers, merged); // Cache locally for offline test-taking
+          return merged;
         }
         return localPapers;
       });
@@ -137,10 +141,12 @@ export async function getPapers(userId?: string): Promise<Paper[]> {
       return (data || []) as Paper[];
     });
     if (result) {
-      // Merge with any local-only papers
+      // Merge with any local-only papers and persist locally for offline access
       const remoteIds = new Set(result.map(p => p.id));
       const localOnly = localPapers.filter(p => !remoteIds.has(p.id));
-      return [...localOnly, ...result];
+      const merged = [...localOnly, ...result];
+      lsSet(LS_KEYS.papers, merged); // Cache locally for offline test-taking
+      return merged;
     }
     return localPapers;
   });
@@ -161,7 +167,15 @@ export async function getPaperById(paperId: string): Promise<Paper | null> {
         }
         return data as Paper | null;
       });
-      if (result) return result;
+      if (result) {
+        // Cache paper into local storage so it can be taken offline later
+        const currentPapers = lsGet<Paper>(LS_KEYS.papers);
+        if (!currentPapers.some(p => p.id === result.id)) {
+          currentPapers.unshift(result);
+          lsSet(LS_KEYS.papers, currentPapers);
+        }
+        return result;
+      }
     }
     return null;
   });
@@ -385,19 +399,34 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
   lsSet(LS_KEYS.attemptQuestions, allQs);
 
   if (isRemoteUser(attempt.user_id)) {
-    const result = await sbWithResult<Attempt>(async () => {
-      const { data, error } = await supabase!.from('attempts').insert(newAttempt).select().single();
-      if (error) return { data: null, error };
-      if (data) {
-        const qs = newQuestions.map(q => ({ ...q, attempt_id: data.id }));
-        const { error: qError } = await supabase!.from('attempt_questions').insert(qs);
-        if (qError) return { data: null, error: qError };
+    let synced = false;
+    if (navigator.onLine) {
+      try {
+        const result = await sbWithResult<Attempt>(async () => {
+          const { data, error } = await supabase!.from('attempts').insert(newAttempt).select().single();
+          if (error) return { data: null, error };
+          if (data) {
+            const qs = newQuestions.map(q => ({ ...q, attempt_id: data.id }));
+            const { error: qError } = await supabase!.from('attempt_questions').insert(qs);
+            if (qError) return { data: null, error: qError };
+          }
+          return { data, error: null };
+        });
+
+        if (result.success && result.data) {
+          synced = true;
+          return result.data;
+        }
+      } catch {
+        synced = false;
       }
-      return { data, error: null };
-    });
-    
-    if (result.success && result.data) {
-      return result.data;
+    }
+
+    // If offline or remote sync didn't succeed, queue for background sync
+    if (!synced) {
+      const pending = lsGet<{ attempt: Attempt; questions: AttemptQuestion[] }>(LS_KEYS.pendingSyncAttempts);
+      pending.push({ attempt: newAttempt, questions: newQuestions });
+      lsSet(LS_KEYS.pendingSyncAttempts, pending);
     }
   }
 
@@ -436,11 +465,17 @@ export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'created_at'>)
   invalidateCache('bookmarks');
   const newBookmark: Bookmark = { ...bookmark, id: generateId(), created_at: new Date().toISOString() };
   if (isRemoteUser(bookmark.user_id)) {
-    const result = await sb(async () => {
-      const { data } = await supabase!.from('bookmarks').insert(newBookmark).select().single();
-      return data as Bookmark;
-    });
-    if (result) return result;
+    if (navigator.onLine) {
+      const result = await sb(async () => {
+        const { data } = await supabase!.from('bookmarks').insert(newBookmark).select().single();
+        return data as Bookmark;
+      });
+      if (result) return result;
+    }
+    // Offline or failed - queue for background sync
+    const pendingBm = lsGet<Bookmark>(LS_KEYS.pendingSyncBookmarks);
+    pendingBm.push(newBookmark);
+    lsSet(LS_KEYS.pendingSyncBookmarks, pendingBm);
   }
   const bookmarks = lsGet<Bookmark>(LS_KEYS.bookmarks);
   bookmarks.unshift(newBookmark);
@@ -593,4 +628,108 @@ export function downloadJSON(json: string, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// Offline Sync Service
+// ============================================================
+
+export function getPendingSyncCount(): number {
+  const pendingAttempts = lsGet<{ attempt: Attempt; questions: AttemptQuestion[] }>(LS_KEYS.pendingSyncAttempts);
+  const pendingBookmarks = lsGet<Bookmark>(LS_KEYS.pendingSyncBookmarks);
+  return pendingAttempts.length + pendingBookmarks.length;
+}
+
+export function isPaperAvailableOffline(paperId: string): boolean {
+  const localPapers = lsGet<Paper>(LS_KEYS.papers);
+  const p = localPapers.find(item => item.id === paperId);
+  return Boolean(p && p.raw_json && Array.isArray(p.raw_json.questions) && p.raw_json.questions.length > 0);
+}
+
+export function savePaperForOffline(paper: Paper): void {
+  const localPapers = lsGet<Paper>(LS_KEYS.papers);
+  const idx = localPapers.findIndex(p => p.id === paper.id);
+  if (idx >= 0) {
+    localPapers[idx] = paper;
+  } else {
+    localPapers.unshift(paper);
+  }
+  lsSet(LS_KEYS.papers, localPapers);
+}
+
+export async function syncPendingOfflineData(userId?: string): Promise<{ syncedAttempts: number; syncedBookmarks: number }> {
+  if (!navigator.onLine) return { syncedAttempts: 0, syncedBookmarks: 0 };
+
+  let effectiveUserId = userId;
+  if (!effectiveUserId && isSupabaseConfigured && supabase) {
+    try {
+      const { data } = await supabase.auth.getUser();
+      effectiveUserId = data.user?.id;
+    } catch {}
+  }
+
+  if (!isRemoteUser(effectiveUserId)) return { syncedAttempts: 0, syncedBookmarks: 0 };
+
+  let syncedAttempts = 0;
+  let syncedBookmarks = 0;
+
+  // 1. Sync pending attempts
+  const pendingAttempts = lsGet<{ attempt: Attempt; questions: AttemptQuestion[] }>(LS_KEYS.pendingSyncAttempts);
+  if (pendingAttempts.length > 0) {
+    const remainingAttempts: typeof pendingAttempts = [];
+    for (const item of pendingAttempts) {
+      try {
+        const attemptToSync = { ...item.attempt, user_id: effectiveUserId! };
+        const result = await sbWithResult<Attempt>(async () => {
+          const { data, error } = await supabase!.from('attempts').upsert(attemptToSync).select().single();
+          if (error) return { data: null, error };
+          if (data && item.questions.length > 0) {
+            const qs = item.questions.map(q => ({ ...q, attempt_id: data.id }));
+            const { error: qError } = await supabase!.from('attempt_questions').upsert(qs);
+            if (qError) return { data: null, error: qError };
+          }
+          return { data, error: null };
+        });
+
+        if (result.success) {
+          syncedAttempts++;
+        } else {
+          remainingAttempts.push(item);
+        }
+      } catch {
+        remainingAttempts.push(item);
+      }
+    }
+    lsSet(LS_KEYS.pendingSyncAttempts, remainingAttempts);
+  }
+
+  // 2. Sync pending bookmarks
+  const pendingBookmarks = lsGet<Bookmark>(LS_KEYS.pendingSyncBookmarks);
+  if (pendingBookmarks.length > 0) {
+    const remainingBm: Bookmark[] = [];
+    for (const bm of pendingBookmarks) {
+      try {
+        const bmToSync = { ...bm, user_id: effectiveUserId! };
+        const res = await sb(async () => {
+          const { error } = await supabase!.from('bookmarks').upsert(bmToSync);
+          if (error) throw error;
+          return true;
+        });
+        if (res) {
+          syncedBookmarks++;
+        } else {
+          remainingBm.push(bm);
+        }
+      } catch {
+        remainingBm.push(bm);
+      }
+    }
+    lsSet(LS_KEYS.pendingSyncBookmarks, remainingBm);
+  }
+
+  if (syncedAttempts > 0 || syncedBookmarks > 0) {
+    invalidateCache();
+  }
+
+  return { syncedAttempts, syncedBookmarks };
 }

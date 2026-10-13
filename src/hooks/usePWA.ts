@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { syncPendingOfflineData, getPendingSyncCount } from '../services/database';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -9,6 +10,9 @@ interface UsePWAReturn {
   isInstallable: boolean;
   isInstalled: boolean;
   isOffline: boolean;
+  wasOffline: boolean;
+  pendingSyncCount: number;
+  syncNow: () => Promise<void>;
   install: () => Promise<void>;
   dismissInstall: () => void;
   updateAvailable: boolean;
@@ -19,6 +23,8 @@ export function usePWA(): UsePWAReturn {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [wasOffline, setWasOffline] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => getPendingSyncCount());
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
@@ -29,19 +35,53 @@ export function usePWA(): UsePWAReturn {
     setIsInstalled(isStandalone || isIOSInstalled);
   }, []);
 
-  // Listen for online/offline events
+  const refreshPendingCount = useCallback(() => {
+    setPendingSyncCount(getPendingSyncCount());
+  }, []);
+
+  const syncNow = useCallback(async () => {
+    if (!navigator.onLine) return;
+    try {
+      await syncPendingOfflineData();
+      refreshPendingCount();
+    } catch (e) {
+      console.warn('[PWA] Manual sync failed:', e);
+    }
+  }, [refreshPendingCount]);
+
+  // Listen for online/offline events & auto-sync
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = async () => {
+      setIsOffline(false);
+      setWasOffline(true);
+      // Auto-dismiss the "back online" confirmation banner after 4 seconds
+      setTimeout(() => setWasOffline(false), 4000);
+
+      try {
+        await syncPendingOfflineData();
+        refreshPendingCount();
+      } catch (err) {
+        console.warn('[PWA] Auto-sync on reconnection failed:', err);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOffline(true);
+      refreshPendingCount();
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Refresh pending count periodically (e.g. after tests are completed)
+    const interval = setInterval(refreshPendingCount, 5000);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
     };
-  }, []);
+  }, [refreshPendingCount]);
 
   // Listen for beforeinstallprompt event
   useEffect(() => {
@@ -120,6 +160,9 @@ export function usePWA(): UsePWAReturn {
     isInstallable: !!deferredPrompt && !isInstalled,
     isInstalled,
     isOffline,
+    wasOffline,
+    pendingSyncCount,
+    syncNow,
     install,
     dismissInstall,
     updateAvailable,

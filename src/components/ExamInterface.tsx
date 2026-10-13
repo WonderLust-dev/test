@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Paper, QuestionJSON, ExamSession, AttemptQuestion } from '../types';
 import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake, addBookmark, removeBookmark, getBookmarks } from '../services/database';
 import { gradeQuestions, formatTime } from '../utils/grader';
-import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen, WifiOff } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 import QuestionPalette from './QuestionPalette';
 
@@ -31,8 +31,21 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   const [instantFeedback, setInstantFeedback] = useState<boolean>(mode === 'practice');
   const [revealedQuestions, setRevealedQuestions] = useState<Record<number, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const startTimeRef = useRef(startTime);
   const lastQRef = useRef(0);
+
+  // Monitor network connectivity for peace of mind
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const handleSubmitRef = useRef<(auto?: boolean) => void>(() => {});
   const deadlineRef = useRef<number>(0); // Absolute deadline timestamp
 
@@ -368,6 +381,17 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 <Clock size={14} className={isTimerCritical ? 'text-rose-500' : isTimerWarning ? 'text-amber-500' : 'text-[var(--text-muted)]'} />
                 <span>{formatTime(timeLeft)}</span>
               </div>
+
+              {/* Offline Peace-of-Mind Pill */}
+              {!isOnline && (
+                <div
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[11px] font-bold shrink-0 animate-fadeIn"
+                  title="Offline mode: All answers, time, and test progress are saved locally on this device"
+                >
+                  <WifiOff size={13} className="text-amber-500" />
+                  <span className="hidden sm:inline">Offline (Saved)</span>
+                </div>
+              )}
 
               {/* Submit Test Button */}
               <button

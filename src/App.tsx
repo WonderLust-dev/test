@@ -20,7 +20,7 @@ type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
 function AppContent() {
   const { user, openLogin, openSignup, signOut, isGuest, loading } = useAuthModal();
   const effectiveUserId = user?.id || 'guest';
-  const { isInstallable, isOffline, install, dismissInstall, updateAvailable, update } = usePWA();
+  const { isInstallable, isOffline, wasOffline, pendingSyncCount, syncNow, install, dismissInstall, updateAvailable, update } = usePWA();
 
   const [view, setView] = useState<View>('dashboard');
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
@@ -569,7 +569,12 @@ function AppContent() {
       )}
 
       {/* PWA Components */}
-      <OfflineIndicator isOffline={isOffline} />
+      <OfflineIndicator
+        isOffline={isOffline}
+        wasOffline={wasOffline}
+        pendingSyncCount={pendingSyncCount}
+        onSyncNow={syncNow}
+      />
       {isInstallable && <PWAInstallPrompt onInstall={install} onDismiss={dismissInstall} />}
       {updateAvailable && <UpdateAvailable onUpdate={update} />}
     </div>
