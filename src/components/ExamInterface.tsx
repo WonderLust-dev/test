@@ -300,10 +300,10 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased selection:bg-indigo-500/20">
+    <div className="h-screen flex flex-col bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased overflow-hidden selection:bg-indigo-500/20">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)] shadow-xs">
-        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-2.5 sm:py-3">
+      <header className="shrink-0 z-30 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)] shadow-xs">
+        <div className="max-w-[1600px] w-full mx-auto px-2.5 sm:px-4 py-2 sm:py-2.5">
           <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
@@ -382,163 +382,161 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-[calc(env(safe-area-inset-bottom,0px)+4rem)] sm:pb-8">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Left Column: Question Palette (Desktop Sticky & Mobile Drawer) */}
-          <div className="shrink-0 lg:w-80 w-full">
-            {/* Desktop Palette */}
-            <div className="hidden lg:flex bento-card p-4 sm:p-5 flex-col sticky top-20 max-h-[calc(100vh-6.5rem)] shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)]">
-              <QuestionPalette
-                questions={questions}
-                currentQ={currentQ}
-                answers={answers}
-                marked={marked}
-                instantFeedback={instantFeedback}
-                revealedQuestions={revealedQuestions}
-                counts={counts}
-                onSelectQuestion={navigateTo}
-              />
+      {/* Main Container - Strict 1-Screen CBT Layout */}
+      <main className="flex-1 min-h-0 overflow-hidden max-w-[1600px] w-full mx-auto p-2 sm:p-3 flex flex-col lg:flex-row gap-2.5 sm:gap-3.5">
+        {/* Left Column: Question Palette (Desktop Fixed Container & Mobile Drawer) */}
+        <div className="hidden lg:flex lg:w-76 xl:w-80 h-full flex-col shrink-0 min-h-0">
+          <div className="bento-card p-3 sm:p-3.5 h-full flex flex-col overflow-hidden shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)] rounded-2xl">
+            <QuestionPalette
+              questions={questions}
+              currentQ={currentQ}
+              answers={answers}
+              marked={marked}
+              instantFeedback={instantFeedback}
+              revealedQuestions={revealedQuestions}
+              counts={counts}
+              onSelectQuestion={navigateTo}
+            />
+          </div>
+        </div>
+
+        {/* Mobile Drawer Question Palette */}
+        {showPalette && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+              onClick={() => setShowPalette(false)}
+            />
+            <div className="relative w-84 max-w-[88vw] h-full bg-[var(--bg-surface)] text-[var(--text-main)] p-3 sm:p-4 flex flex-col shadow-2xl z-50 border-r border-[var(--border-color)]">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-color)] shrink-0">
+                <div>
+                  <h3 className="text-sm font-extrabold text-[var(--text-main)]">Question Palette</h3>
+                  <p className="text-[11px] font-semibold text-[var(--text-muted)]">Total {questions.length} questions</p>
+                </div>
+                <button
+                  onClick={() => setShowPalette(false)}
+                  className="p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] shadow-xs"
+                  title="Close question palette"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-hidden min-h-0">
+                <QuestionPalette
+                  questions={questions}
+                  currentQ={currentQ}
+                  answers={answers}
+                  marked={marked}
+                  instantFeedback={instantFeedback}
+                  revealedQuestions={revealedQuestions}
+                  counts={counts}
+                  onSelectQuestion={(idx) => {
+                    navigateTo(idx);
+                    setShowPalette(false);
+                  }}
+                  isMobileDrawer={true}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right Column: Question Content & Action Area */}
+        <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col bento-card p-3 sm:p-4.5 shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)] rounded-2xl overflow-hidden">
+            {/* 1. Question Header (Fixed / shrink-0) */}
+            <div className="shrink-0 flex flex-col gap-2 pb-2.5 mb-2.5 border-b border-[var(--border-color)]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] rounded-lg sm:rounded-xl text-xs sm:text-sm font-black shadow-xs shrink-0">
+                    {currentQ + 1}
+                  </span>
+                  <span className="text-xs font-bold text-[var(--text-muted)]">
+                    Question {currentQ + 1} of {questions.length}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <button
+                    onClick={toggleBookmark}
+                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                      bookmarkedMap[String(q.id)]
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 shadow-xs'
+                        : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                    }`}
+                    title="Bookmark Question [B]"
+                  >
+                    {bookmarkedMap[String(q.id)] ? (
+                      <BookmarkCheck size={13} className="text-amber-500 fill-amber-500" />
+                    ) : (
+                      <Bookmark size={13} />
+                    )}
+                    <span className="hidden xs:inline">{bookmarkedMap[String(q.id)] ? 'Saved' : 'Bookmark'}</span>
+                  </button>
+                  <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 bg-[var(--bg-subcard)] rounded-lg text-[var(--text-main)] border border-[var(--border-color)]">
+                    <span className="text-emerald-500 font-mono">+{q.marks}</span>
+                    {q.negativeMarks !== undefined && (
+                      <span className="text-rose-500 font-mono">-{q.negativeMarks}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Subject, Topic, Difficulty Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-[10px] sm:text-[11px] font-bold">
+                  {q.subject}
+                </span>
+                {q.topic && (
+                  <span className="px-2 py-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] rounded-full text-[10px] sm:text-[11px] font-medium truncate max-w-[200px]">
+                    {q.topic}
+                  </span>
+                )}
+                {q.difficulty && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold capitalize border ${
+                    q.difficulty === 'easy'
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      : q.difficulty === 'hard'
+                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                      : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                  }`}>
+                    {q.difficulty}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Mobile Drawer Question Palette */}
-            {showPalette && (
-              <div className="fixed inset-0 z-50 flex lg:hidden">
-                <div
-                  className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-                  onClick={() => setShowPalette(false)}
-                />
-                <div className="relative w-84 max-w-[88vw] h-full bg-[var(--bg-surface)] text-[var(--text-main)] p-4 sm:p-5 flex flex-col shadow-2xl z-50 border-r border-[var(--border-color)]">
-                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-[var(--border-color)] shrink-0">
-                    <div>
-                      <h3 className="text-base font-extrabold text-[var(--text-main)]">Question Palette</h3>
-                      <p className="text-xs font-semibold text-[var(--text-muted)]">Total {questions.length} questions</p>
-                    </div>
-                    <button
-                      onClick={() => setShowPalette(false)}
-                      className="p-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] shadow-xs"
-                      title="Close question palette"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-hidden min-h-0">
-                    <QuestionPalette
-                      questions={questions}
-                      currentQ={currentQ}
-                      answers={answers}
-                      marked={marked}
-                      instantFeedback={instantFeedback}
-                      revealedQuestions={revealedQuestions}
-                      counts={counts}
-                      onSelectQuestion={(idx) => {
-                        navigateTo(idx);
-                        setShowPalette(false);
-                      }}
-                      isMobileDrawer={true}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Question Content */}
-          <div className="flex-1 min-w-0 w-full">
-            {/* Question Card */}
-            <div className="bento-card p-4 sm:p-7 mb-5 shadow-soft border border-[var(--border-color)]">
-              {/* Question Header */}
-              <div className="flex flex-col gap-3 mb-5 pb-4 border-b border-[var(--border-color)]">
-                {/* Top Row: Q Counter + Bookmark + Marks */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black shadow-xs shrink-0">
-                      {currentQ + 1}
-                    </span>
-                    <span className="text-xs font-bold text-[var(--text-muted)]">
-                      Question {currentQ + 1} of {questions.length}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={toggleBookmark}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                        bookmarkedMap[String(q.id)]
-                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 shadow-xs'
-                          : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                      }`}
-                      title="Bookmark Question [B]"
-                    >
-                      {bookmarkedMap[String(q.id)] ? (
-                        <BookmarkCheck size={14} className="text-amber-500 fill-amber-500" />
-                      ) : (
-                        <Bookmark size={14} />
-                      )}
-                      <span className="hidden xs:inline">{bookmarkedMap[String(q.id)] ? 'Saved' : 'Bookmark'}</span>
-                    </button>
-                    <div className="flex items-center gap-1.5 text-xs font-bold px-2 sm:px-2.5 py-1.5 bg-[var(--bg-subcard)] rounded-xl text-[var(--text-main)] border border-[var(--border-color)]">
-                      <span className="text-emerald-500">+{q.marks}</span>
-                      {q.negativeMarks !== undefined && (
-                        <span className="text-rose-500">-{q.negativeMarks}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Second Row: Subject, Topic, Difficulty Pills */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-[11px] font-bold">
-                    {q.subject}
-                  </span>
-                  {q.topic && (
-                    <span className="px-2.5 py-1 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] rounded-full text-[11px] font-medium">
-                      {q.topic}
-                    </span>
-                  )}
-                  {q.difficulty && (
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold capitalize border ${
-                      q.difficulty === 'easy'
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                        : q.difficulty === 'hard'
-                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                        : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                    }`}>
-                      {q.difficulty}
-                    </span>
-                  )}
-                </div>
-              </div>
-
+            {/* 2. Scrollable Question Content (Question text, passage, image, options, instant solutions) */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar space-y-3 sm:space-y-4">
               {/* Passage (if any) */}
               {q.passage && (
-                <div className="mb-5 p-4 bg-[var(--bg-subcard)] rounded-2xl border-l-4 border-indigo-500 text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
+                <div className="p-3 sm:p-3.5 bg-[var(--bg-subcard)] rounded-xl border-l-4 border-indigo-500 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
                   {q.passage}
                 </div>
               )}
 
               {/* Question Text */}
-              <p className="text-base sm:text-lg font-bold text-[var(--text-main)] mb-6 leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm sm:text-base font-bold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
                 {q.question}
               </p>
 
               {/* Image */}
               {q.image && (
-                <div className="mb-6 rounded-2xl border border-[var(--border-color)] overflow-hidden shadow-xs">
+                <div className="rounded-xl border border-[var(--border-color)] overflow-hidden shadow-xs max-w-lg">
                   <img src={q.image} alt="Question Diagram" className="max-w-full h-auto" />
                 </div>
               )}
 
               {/* Formula */}
               {q.formula && (
-                <div className="mb-5 p-3.5 bg-amber-500/10 rounded-2xl text-sm font-mono text-amber-400 border border-amber-500/20">
+                <div className="p-2.5 bg-amber-500/10 rounded-xl text-xs sm:text-sm font-mono text-amber-400 border border-amber-500/20">
                   📐 {q.formula}
                 </div>
               )}
 
               {/* Options */}
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-2.5">
                 {q.options.map((opt, idx) => {
                   const isSelected = answers[currentQ] === idx;
                   const hasAnswered = answers[currentQ] !== undefined && answers[currentQ] !== null;
@@ -573,28 +571,28 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
                         }
                       }}
-                      className={`w-full text-left p-3.5 sm:p-4 rounded-2xl transition-all shadow-xs group flex items-center gap-3.5 ${optionStyle}`}
+                      className={`w-full text-left p-2.5 sm:p-3 rounded-xl transition-all shadow-xs group flex items-center gap-2.5 sm:gap-3 ${optionStyle}`}
                     >
-                      <span className={`w-8 h-8 rounded-xl text-xs flex items-center justify-center shrink-0 transition-colors ${badgeStyle}`}>
+                      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs flex items-center justify-center shrink-0 transition-colors ${badgeStyle}`}>
                         {String.fromCharCode(65 + idx)}
                       </span>
-                      <span className="text-sm sm:text-base leading-relaxed flex-1">
+                      <span className="text-xs sm:text-sm leading-relaxed flex-1">
                         {opt}
                       </span>
                       {hasAnswered && isRevealed && isCorrect && (
-                        <span className="flex items-center gap-1 text-xs font-extrabold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-full shrink-0">
-                          <CheckCircle size={14} className="text-emerald-400" />
+                        <span className="flex items-center gap-1 text-[11px] font-extrabold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
+                          <CheckCircle size={13} className="text-emerald-400" />
                           <span>Correct</span>
                         </span>
                       )}
                       {hasAnswered && isRevealed && isSelected && !isCorrect && (
-                        <span className="flex items-center gap-1 text-xs font-extrabold text-rose-400 bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 rounded-full shrink-0">
-                          <XCircle size={14} className="text-rose-400" />
+                        <span className="flex items-center gap-1 text-[11px] font-extrabold text-rose-400 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-full shrink-0">
+                          <XCircle size={13} className="text-rose-400" />
                           <span>Your Choice</span>
                         </span>
                       )}
                       {isSelected && !(hasAnswered && isRevealed) && (
-                        <CheckCircle size={20} className="text-indigo-400 shrink-0 ml-auto" />
+                        <CheckCircle size={18} className="text-indigo-400 shrink-0 ml-auto" />
                       )}
                     </button>
                   );
@@ -603,9 +601,9 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
               {/* Instant Answer Check Trigger (when answer is selected but not yet revealed) */}
               {answers[currentQ] !== undefined && answers[currentQ] !== null && !(instantFeedback || revealedQuestions[currentQ]) && (
-                <div className="mt-5 p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-indigo-900 text-xs font-semibold">
-                    <Zap size={16} className="text-indigo-600 shrink-0" />
+                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 text-[var(--text-main)] text-xs font-semibold">
+                    <Zap size={15} className="text-amber-400 shrink-0" />
                     <span>Answer selected. Want to check if it's correct right away?</span>
                   </div>
                   <button
@@ -613,141 +611,135 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                       setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
                       setShowLearning(currentQ);
                     }}
-                    className="w-full sm:w-auto btn btn-primary text-xs py-2 px-4 rounded-full flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1.5 px-3 rounded-lg font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all"
                   >
                     <Zap size={13} className="text-amber-300 fill-amber-300" />
                     <span>Check Answer Now</span>
                   </button>
                 </div>
               )}
+
+              {/* Instant Feedback & Solution Section (revealed in practice mode OR when Instant Check is toggled/revealed) */}
+              {answers[currentQ] !== undefined && answers[currentQ] !== null && (instantFeedback || revealedQuestions[currentQ]) && (
+                <div className="p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] transition-all space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[var(--border-color)]">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white shadow-xs shrink-0 ${
+                        answers[currentQ] === q.answerIndex ? 'bg-emerald-600' : 'bg-rose-600'
+                      }`}>
+                        {answers[currentQ] === q.answerIndex ? <CheckCircle size={18} /> : <XCircle size={18} />}
+                      </div>
+                      <div>
+                        <div className="text-xs sm:text-sm font-extrabold flex items-center gap-2">
+                          {answers[currentQ] === q.answerIndex ? (
+                            <span className="text-emerald-500">Correct! (+{q.marks} Marks)</span>
+                          ) : (
+                            <span className="text-rose-500">Incorrect ({q.negativeMarks ? `-${q.negativeMarks}` : '-0.5'} Marks)</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-muted)] font-medium mt-0.5">
+                          Correct Answer: <strong className="text-emerald-500 font-bold">Option {String.fromCharCode(65 + q.answerIndex)}: {q.options[q.answerIndex]}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setShowLearning(showLearning === currentQ ? null : currentQ)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)] flex items-center gap-1.5 self-start sm:self-auto transition-all"
+                    >
+                      <BookOpen size={13} className="text-indigo-400" />
+                      <span>{showLearning === currentQ ? 'Hide Explanation' : 'View Full Solution'}</span>
+                    </button>
+                  </div>
+
+                  {/* Detailed Solution / Hints / Notes */}
+                  {(showLearning === currentQ || instantFeedback) && (
+                    <div className="space-y-2.5 text-xs sm:text-sm animate-fadeIn">
+                      {q.solution && (
+                        <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-[var(--text-main)]">
+                          <p className="font-extrabold text-[11px] uppercase tracking-wider text-emerald-400 mb-1 flex items-center gap-1.5">
+                            <BookOpen size={13} className="text-emerald-400" /> Step-by-Step Solution
+                          </p>
+                          <p className="text-[var(--text-main)] whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-medium">{q.solution}</p>
+                        </div>
+                      )}
+                      {q.hint && (
+                        <div className="p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/20 text-[var(--text-main)]">
+                          <p className="font-extrabold text-[11px] uppercase tracking-wider text-blue-400 mb-0.5 flex items-center gap-1.5">
+                            <Lightbulb size={12} /> Key Hint
+                          </p>
+                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.hint}</p>
+                        </div>
+                      )}
+                      {q.shortcut && (
+                        <div className="p-2.5 bg-purple-500/10 rounded-xl border border-purple-500/20 text-[var(--text-main)]">
+                          <p className="font-extrabold text-[11px] uppercase tracking-wider text-purple-400 mb-0.5 flex items-center gap-1.5">
+                            <Zap size={12} className="text-purple-400" /> Exam Speed Shortcut
+                          </p>
+                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.shortcut}</p>
+                        </div>
+                      )}
+                      {q.learningSuggestion && (
+                        <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 text-[var(--text-main)]">
+                          <p className="font-extrabold text-[11px] uppercase tracking-wider text-amber-400 mb-0.5 flex items-center gap-1.5">
+                            <Target size={12} /> Concept Takeaway
+                          </p>
+                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.learningSuggestion}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Instant Feedback & Solution Section (revealed in practice mode OR when Instant Check is toggled/revealed) */}
-            {answers[currentQ] !== undefined && answers[currentQ] !== null && (instantFeedback || revealedQuestions[currentQ]) && (
-              <div className="bento-card p-5 sm:p-6 mb-5 shadow-soft border border-gray-200/80 transition-all">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-white shadow-xs shrink-0 ${
-                      answers[currentQ] === q.answerIndex ? 'bg-emerald-600' : 'bg-rose-600'
-                    }`}>
-                      {answers[currentQ] === q.answerIndex ? <CheckCircle size={20} /> : <XCircle size={20} />}
-                    </div>
-                    <div>
-                      <div className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-2">
-                        {answers[currentQ] === q.answerIndex ? (
-                          <span className="text-emerald-700">Correct! (+{q.marks} Marks)</span>
-                        ) : (
-                          <span className="text-rose-700">Incorrect ({q.negativeMarks ? `-${q.negativeMarks}` : '-0.5'} Marks)</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 font-semibold mt-0.5">
-                        Correct Answer is <strong className="text-emerald-700">Option {String.fromCharCode(65 + q.answerIndex)}: {q.options[q.answerIndex]}</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setShowLearning(showLearning === currentQ ? null : currentQ)}
-                    className="btn btn-outline text-xs py-1.5 px-3.5 rounded-full flex items-center gap-1.5 self-start sm:self-auto"
-                  >
-                    <BookOpen size={13} className="text-indigo-600" />
-                    <span>{showLearning === currentQ ? 'Hide Explanation' : 'View Full Solution'}</span>
-                  </button>
-                </div>
-
-                {/* Detailed Solution / Hints / Notes */}
-                {(showLearning === currentQ || instantFeedback) && (
-                  <div className="mt-4 space-y-3 text-sm animate-fadeIn">
-                    {q.solution && (
-                      <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-100 text-emerald-950">
-                        <p className="font-extrabold text-xs uppercase tracking-wider text-emerald-800 mb-1.5 flex items-center gap-1.5">
-                          <BookOpen size={14} className="text-emerald-600" /> Step-by-Step Solution
-                        </p>
-                        <p className="text-emerald-900 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-medium">{q.solution}</p>
-                      </div>
-                    )}
-                    {q.hint && (
-                      <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-100 text-blue-900">
-                        <p className="font-extrabold text-xs uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1.5">
-                          <Lightbulb size={13} /> Key Hint
-                        </p>
-                        <p className="text-blue-800 text-xs sm:text-sm font-medium">{q.hint}</p>
-                      </div>
-                    )}
-                    {q.shortcut && (
-                      <div className="p-3.5 bg-purple-50/80 rounded-2xl border border-purple-100 text-purple-900">
-                        <p className="font-extrabold text-xs uppercase tracking-wider text-purple-700 mb-1 flex items-center gap-1.5">
-                          <Zap size={13} className="text-purple-600" /> Exam Speed Shortcut
-                        </p>
-                        <p className="text-purple-800 text-xs sm:text-sm font-medium">{q.shortcut}</p>
-                      </div>
-                    )}
-                    {q.learningSuggestion && (
-                      <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-100 text-amber-900">
-                        <p className="font-extrabold text-xs uppercase tracking-wider text-amber-700 mb-1 flex items-center gap-1.5">
-                          <Target size={13} /> Concept Takeaway
-                        </p>
-                        <p className="text-amber-800 text-xs sm:text-sm font-medium">{q.learningSuggestion}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Navigation Bottom Controls */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center sm:justify-between gap-2.5 sm:gap-3">
-              <div className="contents sm:flex sm:items-center sm:gap-2">
+            {/* 3. Docked Bottom Action Bar (Fixed / shrink-0 at bottom of question card) */}
+            <div className="shrink-0 pt-2.5 sm:pt-3 border-t border-[var(--border-color)] mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
                   disabled={currentQ === 0}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 sm:px-4 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
                 >
                   <ChevronLeft size={16} /> Previous
                 </button>
                 <button
                   onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
                   disabled={currentQ === questions.length - 1}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 sm:px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md active:scale-95"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3.5 sm:px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md active:scale-95"
                 >
                   Next <ChevronRight size={16} />
                 </button>
               </div>
 
-              <div className="contents sm:flex sm:items-center sm:gap-2">
+              {/* Center keyboard hints - visible on desktop/tablets */}
+              <div className="hidden xl:flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
+                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">1-4</kbd> Ans</span>
+                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">N/P</kbd> Nav</span>
+                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">B</kbd> Bookmark</span>
+                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">R</kbd> Review</span>
+                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">C</kbd> Clear</span>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   onClick={toggleReview}
-                  className={`w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
                     marked[currentQ]
                       ? 'bg-purple-500/15 border border-purple-500/40 text-purple-400 font-bold'
                       : 'bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)]'
                   }`}
                 >
-                  {marked[currentQ] ? <FlagOff size={15} /> : <Flag size={15} />}
+                  {marked[currentQ] ? <FlagOff size={14} /> : <Flag size={14} />}
                   <span className="truncate">{marked[currentQ] ? 'Unmark Review' : 'Mark Review'}</span>
                 </button>
                 <button
                   onClick={clearAnswer}
-                  className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
                 >
-                  <Eraser size={15} /> Clear
+                  <Eraser size={14} /> Clear
                 </button>
               </div>
-            </div>
-
-            {/* Keyboard Shortcuts Helper Bar */}
-            <div className="mt-5 p-3 bento-card border border-[var(--border-color)] hidden sm:flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-subtle)] shadow-xs">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <span className="font-bold text-[var(--text-main)]">Shortcuts:</span>
-                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">1-4</kbd> Select</span>
-                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">N / P</kbd> Next/Prev</span>
-                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">B</kbd> Bookmark</span>
-                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">R</kbd> Review</span>
-                <span><kbd className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] font-bold border border-[var(--border-color)]">C</kbd> Clear</span>
-              </div>
-              <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Auto-saving
-              </span>
             </div>
           </div>
         </div>
@@ -755,24 +747,24 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
       {/* Exit Confirmation Modal */}
       {showExitConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-[var(--border-color)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
                 <AlertTriangle size={22} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Exit Examination?</h3>
-                <p className="text-xs text-gray-500">Your test progress is saved</p>
+                <h3 className="text-lg font-bold text-[var(--text-main)]">Exit Examination?</h3>
+                <p className="text-xs text-[var(--text-muted)]">Your test progress is saved</p>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+            <p className="text-sm text-[var(--text-muted)] mb-6 leading-relaxed">
               Your answered questions and elapsed time are safely saved locally. You can resume this paper at any time from your dashboard.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowExitConfirm(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-bold text-sm"
+                className="flex-1 px-4 py-2.5 bg-[var(--bg-subcard)] text-[var(--text-main)] border border-[var(--border-color)] rounded-xl hover:bg-[var(--bg-subcard-hover)] transition-colors font-bold text-sm"
               >
                 Keep Practicing
               </button>
@@ -789,43 +781,43 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
       {/* Submit Confirmation Modal */}
       {showSubmit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-[var(--border-color)]">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0">
                 <Send size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Submit Test?</h3>
-                <p className="text-xs text-gray-500">Review your attempt summary</p>
+                <h3 className="text-lg font-bold text-[var(--text-main)]">Submit Test?</h3>
+                <p className="text-xs text-[var(--text-muted)]">Review your attempt summary</p>
               </div>
             </div>
-            <div className="mb-6 space-y-2 text-sm bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
-              <div className="flex justify-between py-1 border-b border-gray-200/60">
-                <span className="text-gray-600 font-medium">Answered</span>
-                <span className="font-bold text-emerald-600">{counts.answered}</span>
+            <div className="mb-6 space-y-2 text-sm bg-[var(--bg-subcard)] p-4 rounded-2xl border border-[var(--border-color)]">
+              <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Answered</span>
+                <span className="font-bold text-emerald-500 font-mono">{counts.answered}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-200/60">
-                <span className="text-gray-600 font-medium">Marked for Review</span>
-                <span className="font-bold text-purple-600">{counts.marked}</span>
+              <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Marked for Review</span>
+                <span className="font-bold text-purple-500 font-mono">{counts.marked}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-200/60">
-                <span className="text-gray-600 font-medium">Not Answered</span>
-                <span className="font-bold text-rose-600">{counts.unanswered}</span>
+              <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Not Answered</span>
+                <span className="font-bold text-rose-500 font-mono">{counts.unanswered}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-200/60">
-                <span className="text-gray-600 font-medium">Not Visited</span>
-                <span className="font-bold text-gray-500">{counts.notVisited}</span>
+              <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Not Visited</span>
+                <span className="font-bold text-[var(--text-muted)] font-mono">{counts.notVisited}</span>
               </div>
-              <div className="flex justify-between pt-1 font-extrabold text-gray-900">
+              <div className="flex justify-between pt-1 font-extrabold text-[var(--text-main)]">
                 <span>Total Questions</span>
-                <span>{questions.length}</span>
+                <span className="font-mono">{questions.length}</span>
               </div>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSubmit(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-bold text-sm"
+                className="flex-1 px-4 py-2.5 bg-[var(--bg-subcard)] text-[var(--text-main)] border border-[var(--border-color)] rounded-xl hover:bg-[var(--bg-subcard-hover)] transition-colors font-bold text-sm"
               >
                 Continue Exam
               </button>

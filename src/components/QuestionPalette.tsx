@@ -146,35 +146,33 @@ export default function QuestionPalette({
   };
 
   return (
-    <div className={`flex flex-col h-full space-y-3.5 ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 overflow-hidden space-y-2 ${className}`}>
       {/* Header Info + Jump To Box */}
-      <div className="space-y-2.5 pb-2.5 border-b border-[var(--border-color)]">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm sm:text-base font-extrabold text-[var(--text-main)] tracking-tight">
+      <div className="shrink-0 pb-2 border-b border-[var(--border-color)]">
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-extrabold text-[var(--text-main)] tracking-tight truncate">
               Question Palette
             </h3>
-            <p className="text-[11px] font-semibold text-[var(--text-muted)]">
-              {questions.length} questions • Current: <span className="text-indigo-500 font-extrabold">Q{currentQ + 1}</span>
+            <p className="text-[10px] font-semibold text-[var(--text-muted)] truncate">
+              {questions.length} Qs • Current: <span className="text-indigo-500 font-extrabold">Q{currentQ + 1}</span>
             </p>
           </div>
 
           {/* Jump to Question Direct Form */}
-          <form onSubmit={handleJump} className="flex items-center gap-1.5 shrink-0">
-            <div className="relative">
-              <input
-                type="number"
-                min={1}
-                max={questions.length}
-                value={jumpInput}
-                onChange={e => { setJumpInput(e.target.value); setJumpError(''); }}
-                placeholder="Q#"
-                className="w-14 sm:w-16 px-2 py-1 text-xs font-mono font-bold bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-indigo-500 text-center"
-              />
-            </div>
+          <form onSubmit={handleJump} className="flex items-center gap-1 shrink-0">
+            <input
+              type="number"
+              min={1}
+              max={questions.length}
+              value={jumpInput}
+              onChange={e => { setJumpInput(e.target.value); setJumpError(''); }}
+              placeholder="Q#"
+              className="w-12 sm:w-14 px-1.5 py-1 text-xs font-mono font-bold bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-lg text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-indigo-500 text-center"
+            />
             <button
               type="submit"
-              className="p-1 px-2 text-xs font-bold bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 rounded-xl transition-all shadow-2xs"
+              className="px-2 py-1 text-xs font-bold bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 rounded-lg transition-all shadow-2xs"
               title="Jump to question"
             >
               Go
@@ -183,14 +181,14 @@ export default function QuestionPalette({
         </div>
 
         {jumpError && (
-          <p className="text-[10px] font-bold text-rose-500">{jumpError}</p>
+          <p className="text-[10px] font-bold text-rose-500 mt-1">{jumpError}</p>
         )}
       </div>
 
       {/* Interactive Status Filter Chips */}
-      <div className="space-y-1.5 pb-2.5 border-b border-[var(--border-color)]">
-        <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
-          <span className="flex items-center gap-1"><Filter size={11} /> Filter by Status</span>
+      <div className="shrink-0 space-y-1 pb-1.5 border-b border-[var(--border-color)]">
+        <div className="flex items-center justify-between text-[10px] font-bold text-[var(--text-muted)]">
+          <span className="flex items-center gap-1"><Filter size={10} /> Status Filter</span>
           {statusFilter !== 'all' && (
             <button
               onClick={() => setStatusFilter('all')}
@@ -200,80 +198,80 @@ export default function QuestionPalette({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5 text-xs">
+        <div className="flex flex-wrap gap-1 text-[10px]">
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-0.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
               statusFilter === 'all'
                 ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
                 : 'bg-[var(--bg-subcard)] text-[var(--text-main)] border border-[var(--border-color)] hover:bg-[var(--bg-subcard-hover)]'
             }`}
           >
             <span>All</span>
-            <span className="text-[10px] opacity-75 font-mono">({questions.length})</span>
+            <span className="opacity-75 font-mono">({questions.length})</span>
           </button>
 
           <button
             onClick={() => setStatusFilter('answered')}
-            className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-0.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
               statusFilter === 'answered'
                 ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400'
                 : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span>Attempted</span>
-            <span className="text-[10px] font-mono">({attemptedCount})</span>
+            <span className="font-mono">({attemptedCount})</span>
           </button>
 
           <button
             onClick={() => setStatusFilter('marked')}
-            className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-0.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
               statusFilter === 'marked'
                 ? 'bg-purple-600 text-white shadow-xs ring-1 ring-purple-400'
                 : 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
             <span>Review</span>
-            <span className="text-[10px] font-mono">({counts.marked})</span>
+            <span className="font-mono">({counts.marked})</span>
           </button>
 
           <button
             onClick={() => setStatusFilter('unanswered')}
-            className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-0.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
               statusFilter === 'unanswered'
                 ? 'bg-amber-500 text-white shadow-xs ring-1 ring-amber-400'
                 : 'bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
             <span>Visited</span>
-            <span className="text-[10px] font-mono">({counts.unanswered})</span>
+            <span className="font-mono">({counts.unanswered})</span>
           </button>
 
           <button
             onClick={() => setStatusFilter('not_visited')}
-            className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-0.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
               statusFilter === 'not_visited'
                 ? 'bg-gray-600 text-white shadow-xs'
                 : 'bg-[var(--bg-subcard)] text-[var(--text-muted)] border border-[var(--border-color)] hover:bg-[var(--bg-subcard-hover)]'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
             <span>Unseen</span>
-            <span className="text-[10px] font-mono">({counts.notVisited})</span>
+            <span className="font-mono">({counts.notVisited})</span>
           </button>
         </div>
       </div>
 
       {/* Subject Tabs (if multi-subject) */}
       {hasMultipleSubjects && (
-        <div className="space-y-1">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+        <div className="shrink-0 space-y-1 pb-1 border-b border-[var(--border-color)]">
+          <div className="flex gap-1 overflow-x-auto pb-0.5 custom-scrollbar">
             <button
               onClick={() => { setSelectedSubject('all'); setActiveChunk(0); }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${
                 selectedSubject === 'all'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]'
@@ -287,7 +285,7 @@ export default function QuestionPalette({
                 <button
                   key={s}
                   onClick={() => { setSelectedSubject(s); setActiveChunk(0); }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${
                     selectedSubject === s
                       ? 'bg-indigo-600 text-white shadow-2xs'
                       : 'bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]'
@@ -303,14 +301,14 @@ export default function QuestionPalette({
 
       {/* Pagination Chunks (Q1-50, Q51-100, etc.) for large question sets */}
       {isChunkingNeeded && (
-        <div className="space-y-1.5 pb-2 border-b border-[var(--border-color)]">
-          <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
+        <div className="shrink-0 space-y-1 pb-1.5 border-b border-[var(--border-color)]">
+          <div className="flex items-center justify-between text-[10px] font-bold text-[var(--text-muted)]">
             <span>Blocks of 50 Questions:</span>
-            <span className="text-[10px] font-mono">
-              Showing Q{activeChunk * CHUNK_SIZE + 1}–{Math.min((activeChunk + 1) * CHUNK_SIZE, filteredIndices.length)}
+            <span className="text-[9px] font-mono">
+              Q{activeChunk * CHUNK_SIZE + 1}–{Math.min((activeChunk + 1) * CHUNK_SIZE, filteredIndices.length)}
             </span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {Array.from({ length: totalChunks }).map((_, cIdx) => {
               const startNum = cIdx * CHUNK_SIZE + 1;
               const endNum = Math.min((cIdx + 1) * CHUNK_SIZE, filteredIndices.length);
@@ -321,9 +319,9 @@ export default function QuestionPalette({
                 <button
                   key={cIdx}
                   onClick={() => setActiveChunk(cIdx)}
-                  className={`px-2 py-1 rounded-xl text-[11px] font-extrabold transition-all border ${
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all border ${
                     isActive
-                      ? 'bg-indigo-500/15 border-indigo-500 text-indigo-400 shadow-2xs ring-1 ring-indigo-500/50'
+                      ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400 shadow-2xs ring-1 ring-indigo-500/40'
                       : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
                   } ${isCurrentQInChunk && !isActive ? 'border-amber-400/60 text-amber-400' : ''}`}
                 >
@@ -337,10 +335,10 @@ export default function QuestionPalette({
       )}
 
       {/* Questions Grid */}
-      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-[180px] max-h-[50vh] lg:max-h-[calc(100vh-22rem)]">
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar py-0.5">
         {displayIndices.length === 0 ? (
-          <div className="py-8 px-3 text-center text-xs text-[var(--text-muted)] space-y-2">
-            <p className="font-semibold">
+          <div className="py-6 px-3 text-center text-xs text-[var(--text-muted)] space-y-2">
+            <p className="font-semibold text-xs">
               {statusFilter === 'answered'
                 ? 'No questions attempted yet in this section.'
                 : statusFilter === 'marked'
@@ -350,18 +348,17 @@ export default function QuestionPalette({
             {statusFilter !== 'all' && (
               <button
                 onClick={() => setStatusFilter('all')}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-500 hover:text-indigo-400 border border-[var(--border-color)] bg-[var(--bg-subcard)] transition-colors"
+                className="px-3 py-1 rounded-xl text-xs font-bold text-indigo-500 hover:text-indigo-400 border border-[var(--border-color)] bg-[var(--bg-subcard)] transition-colors"
               >
                 Show All Questions ({questions.length})
               </button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-5 gap-2 sm:gap-2.5">
+          <div className="grid grid-cols-5 gap-1.5">
             {displayIndices.map(idx => {
               const status = getQStatus(idx);
               const isCurrent = idx === currentQ;
-              const hasBookmark = false; // Could be extended
 
               let bgClasses = 'bg-[var(--bg-subcard)] text-[var(--text-main)] border border-[var(--border-color)] hover:bg-[var(--bg-subcard-hover)]';
               if (status === 'correct') {
@@ -380,7 +377,7 @@ export default function QuestionPalette({
                 <button
                   key={idx}
                   onClick={() => onSelectQuestion(idx)}
-                  className={`relative w-full aspect-square max-w-[46px] mx-auto rounded-xl text-xs flex items-center justify-center transition-all ${bgClasses} ${
+                  className={`relative w-full aspect-square max-w-[36px] sm:max-w-[38px] mx-auto rounded-xl text-xs flex items-center justify-center transition-all ${bgClasses} ${
                     isCurrent
                       ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-[var(--bg-surface)] scale-105 font-black shadow-md z-10'
                       : ''
@@ -391,7 +388,7 @@ export default function QuestionPalette({
 
                   {/* Micro indicator badge for marked for review when answered */}
                   {marked[idx] && answers[idx] !== undefined && answers[idx] !== null && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-1 ring-white" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-white" />
                   )}
                 </button>
               );
@@ -401,7 +398,7 @@ export default function QuestionPalette({
       </div>
 
       {/* Summary Footer */}
-      <div className="pt-2 border-t border-[var(--border-color)] flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
+      <div className="shrink-0 pt-1.5 border-t border-[var(--border-color)] flex items-center justify-between text-[10px] font-bold text-[var(--text-muted)]">
         <span>Showing {displayIndices.length} of {filteredIndices.length}</span>
         <span className="text-emerald-500 font-mono font-extrabold">{counts.answered} done</span>
       </div>
