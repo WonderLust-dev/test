@@ -84,51 +84,9 @@ export default function ResultsPage({
         // 2. Lookup in database/localStorage
         let p = await getPaperById(a.paper_id);
 
-        // 3. If paper not found, but initialPaper exists with same title or general match
+        // 3. Fallback to initialPaper if database lookup fails
         if (!p && initialPaper) {
           p = initialPaper;
-        }
-
-        // 4. If paper still not found in DB (e.g. custom quick drill), reconstruct from AttemptQuestion[]
-        if (!p && qs.length > 0) {
-          p = {
-            id: a.paper_id,
-            user_id: a.user_id,
-            exam: 'SSC CGL',
-            title: a.paper_title || 'Quick Practice Drill',
-            duration_minutes: Math.max(5, Math.ceil(a.time_spent_seconds / 60)),
-            total_marks: a.total_marks || qs.length * 2,
-            negative_marking: 0.5,
-            question_count: qs.length,
-            subjects: Array.from(new Set(qs.map(q => q.subject).filter(Boolean))),
-            raw_json: {
-              exam: 'SSC CGL',
-              paperTitle: a.paper_title || 'Quick Practice Drill',
-              durationMinutes: Math.max(5, Math.ceil(a.time_spent_seconds / 60)),
-              totalMarks: a.total_marks || qs.length * 2,
-              negativeMarking: 0.5,
-              subjects: Array.from(new Set(qs.map(q => q.subject).filter(Boolean))),
-              questions: qs.map((q, idx) => ({
-                id: q.question_id || idx + 1,
-                subject: q.subject || 'General',
-                topic: q.topic || 'General',
-                question: q.question_text || `Question ${idx + 1}`,
-                options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
-                correctAnswer: q.options?.[q.correct_answer] || '',
-                answerIndex: q.correct_answer ?? 0,
-                marks: 2,
-                negativeMarks: 0.5,
-                solution: q.solution,
-                shortcut: q.shortcut,
-                hint: q.hint,
-                learningSuggestion: q.learning_suggestion,
-              })),
-            },
-            created_at: a.started_at,
-            updated_at: a.completed_at,
-            visibility: 'private',
-          };
-          saveCustomPaper(p);
         }
 
         if (isMounted) {
@@ -436,21 +394,8 @@ export default function ResultsPage({
                 return true;
               })
               .map(({ aq, originalIdx }) => {
-                const q = questions[originalIdx] || {
-                  id: aq.question_id || originalIdx + 1,
-                  subject: aq.subject || 'General',
-                  topic: aq.topic || 'General',
-                  question: aq.question_text || `Question ${originalIdx + 1}`,
-                  options: aq.options || ['A', 'B', 'C', 'D'],
-                  correctAnswer: aq.options?.[aq.correct_answer] || '',
-                  answerIndex: aq.correct_answer ?? 0,
-                  marks: 2,
-                  negativeMarks: 0.5,
-                  solution: aq.solution,
-                  shortcut: aq.shortcut,
-                  hint: aq.hint,
-                  learningSuggestion: aq.learning_suggestion,
-                };
+                const q = questions[originalIdx];
+                if (!q) return null;
                 const isExpanded = expandedQs[originalIdx] ?? false;
 
                 return (

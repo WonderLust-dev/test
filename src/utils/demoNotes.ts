@@ -172,7 +172,7 @@ The Constitution of India guarantees 6 Fundamental Rights to all citizens:
     file_size: 1980,
     is_pinned: false,
     emoji: '📖',
-    font_style: 'mono',
+    font_style: 'serif',
     content: `================================================================================
 SSC CGL REVISION NOTES: HIGH-FREQUENCY ONE-WORD SUBSTITUTIONS & IDIOMS
 ================================================================================

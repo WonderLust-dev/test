@@ -27,7 +27,7 @@ export function slugify(text: string): string {
     .replace(/\s+/g, '-');
 }
 
-// Extract Table of Contents items from markdown content
+// Extract Table of Contents items from markdown & text content
 export function extractHeadings(markdown: string): TocItem[] {
   const headings: TocItem[] = [];
   const lines = markdown.split('\n');
@@ -38,6 +38,14 @@ export function extractHeadings(markdown: string): TocItem[] {
       const text = match[2].trim();
       const id = slugify(text);
       headings.push({ id, text, level });
+      continue;
+    }
+    const partMatch = line.match(/^(PART|CHAPTER|SECTION|MODULE)\s+([0-9IVXLCDM]+)[:\-–\s]+(.+)$/i);
+    if (partMatch) {
+      const text = `${partMatch[1]} ${partMatch[2]}: ${partMatch[3].trim()}`;
+      const id = slugify(text);
+      headings.push({ id, text, level: 2 });
+      continue;
     }
   }
   return headings;
@@ -76,16 +84,7 @@ export default function MarkdownViewer({
     mono: 'font-mono',
   }[fontStyle];
 
-  // If plain text file, render with preserved whitespace and structured divider highlights
-  if (fileType === 'txt') {
-    return (
-      <div className={`font-mono text-[var(--text-main)] leading-relaxed whitespace-pre-wrap select-text p-4 sm:p-6 bg-[var(--bg-subcard)]/40 rounded-2xl border border-[var(--border-color)] overflow-x-auto ${fontClasses} ${className}`}>
-        {content}
-      </div>
-    );
-  }
-
-  // Parse markdown into structured block tokens
+  // Parse markdown & text into structured block tokens
   const blocks = useMemo(() => {
     return parseMarkdownBlocks(content);
   }, [content]);
@@ -107,6 +106,8 @@ export default function MarkdownViewer({
 
 type Block =
   | { type: 'heading'; level: number; text: string; id: string }
+  | { type: 'chapter_banner'; chapterNumber?: string; title: string; id: string }
+  | { type: 'definition'; number?: string; term: string; meaning: string; context?: string }
   | { type: 'alert'; alertType: 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION'; text: string }
   | { type: 'notion_callout'; emoji: string; text: string }
   | { type: 'toggle'; title: string; content: string }
@@ -148,14 +149,83 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 3. Horizontal Rule (---, ***, ___)
-    if (/^(\*{3,}|-{3,}|_{3,})$/.test(line.trim())) {
+    // 3. Chapter / Part Banner (e.g. PART 1: GOVERNMENTS & SYSTEMS OF RULE)
+    const chapterMatch = line.match(/^(PART|CHAPTER|SECTION|MODULE)\s+([0-9IVXLCDM]+)[:\-–\s]+(.+)$/i);
+    if (chapterMatch) {
+      const chapterNumber = `${chapterMatch[1].toUpperCase()} ${chapterMatch[2]}`;
+      const title = chapterMatch[3].trim();
+      blocks.push({
+        type: 'chapter_banner',
+        chapterNumber,
+        title,
+        id: slugify(`${chapterNumber}-${title}`),
+      });
+      i++;
+      continue;
+    }
+
+    // 4. Horizontal Rule (---, ***, ___, ===)
+    if (/^([*_\-=]{3,})$/.test(line.trim())) {
       blocks.push({ type: 'hr' });
       i++;
       continue;
     }
 
-    // 4. Math Blocks ($$ ... $$)
+    // 5. Definitions: e.g. 1. Plutocracy   : Government by the wealthy class.
+    const defMatch = line.match(/^(\d+)\.\s+([A-Za-z\s"'\-]+?)\s*:\s*(.+)$/);
+    if (defMatch) {
+      const number = defMatch[1];
+      const term = defMatch[2].trim().replace(/^"|"$/g, '');
+      const meaning = defMatch[3].trim();
+      blocks.push({
+        type: 'definition',
+        number,
+        term,
+        meaning,
+      });
+      i++;
+      continue;
+    }
+
+    // 6. Idioms with multi-line Meaning/Context:
+    // e.g. 1. "Bite the bullet"
+    //         Meaning: To face a difficult situation...
+    //         Context: SSC CGL 2022 Tier 1...
+    const idiomMatch = line.match(/^(\d+)\.\s+("[^"]+"|[A-Za-z\s\-]+)\s*$/);
+    if (idiomMatch && i + 1 < lines.length && /^\s*(Meaning|Definition)[:\-–]/i.test(lines[i + 1])) {
+      const number = idiomMatch[1];
+      const term = idiomMatch[2].trim().replace(/^"|"$/g, '');
+      i++;
+      const meaningLine = lines[i].replace(/^\s*(Meaning|Definition)[:\-–]\s*/i, '').trim();
+      let context: string | undefined = undefined;
+      if (i + 1 < lines.length && /^\s*(Context|Note|Example)[:\-–]/i.test(lines[i + 1])) {
+        i++;
+        context = lines[i].replace(/^\s*(Context|Note|Example)[:\-–]\s*/i, '').trim();
+      }
+      blocks.push({
+        type: 'definition',
+        number,
+        term,
+        meaning: meaningLine,
+        context,
+      });
+      i++;
+      continue;
+    }
+
+    // 7. Study Tips & Rules (e.g. Tip: Revise root words like "Cide"...)
+    const tipMatch = line.match(/^(Tip|Rule|Shortcut)[:\-–]\s*(.+)$/i);
+    if (tipMatch) {
+      blocks.push({
+        type: 'alert',
+        alertType: 'TIP',
+        text: tipMatch[2].trim(),
+      });
+      i++;
+      continue;
+    }
+
+    // 8. Math Blocks ($$ ... $$)
     if (line.trim().startsWith('$$')) {
       const singleMatch = line.trim().match(/^\$\$(.+?)\$\$$/);
       if (singleMatch) {
@@ -411,6 +481,50 @@ function renderBlock(
         <h4 id={block.id} className="text-sm sm:text-base font-bold text-[var(--text-main)] pt-1 mt-2">
           {content}
         </h4>
+      );
+    }
+
+    case 'chapter_banner': {
+      return (
+        <div id={block.id} className="pt-6 pb-3 my-4 border-b border-[var(--border-color)]">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#E0564C]/15 text-[#E0564C] border border-[#E0564C]/30 font-mono">
+              {block.chapterNumber || 'Chapter'}
+            </span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] tracking-tight">
+            {renderInline(block.title, searchQuery)}
+          </h2>
+        </div>
+      );
+    }
+
+    case 'definition': {
+      return (
+        <div className="p-3.5 sm:p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-subcard)]/60 my-2.5 shadow-2xs hover:border-[#E0564C]/40 transition-colors">
+          <div className="flex items-start gap-3">
+            {block.number && (
+              <span className="w-6 h-6 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[11px] font-black flex items-center justify-center shrink-0 text-[var(--text-muted)] mt-0.5 shadow-2xs font-mono">
+                {block.number}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="font-extrabold text-sm sm:text-base text-[var(--text-main)] tracking-tight">
+                  {block.term}
+                </span>
+                {block.context && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    {block.context}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-[var(--text-main)]/90 leading-relaxed font-normal">
+                {renderInline(block.meaning, searchQuery)}
+              </p>
+            </div>
+          </div>
+        </div>
       );
     }
 

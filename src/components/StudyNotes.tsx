@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { StudyNote, NoteFilters } from '../types';
 import { getNotes, saveNote, saveNotesBatch, updateNote, deleteNote, togglePinNote, downloadNote } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
+import EReaderView, { ReaderGeometricMotif } from './EReaderView';
 import { convertNotionHtmlToMarkdown } from '../utils/notionParser';
 import {
   FileText,
@@ -678,22 +679,31 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredNotes.map(note => {
+          {filteredNotes.map((note, idx) => {
             const isMd = note.file_type === 'md';
+            const readNr = String(idx + 1).padStart(2, '0');
             return (
               <div
                 key={note.id}
                 onClick={() => setActiveNote(note)}
-                className={`bento-card p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-soft group relative ${
+                className={`bento-card p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-soft group relative overflow-hidden ${
                   note.is_pinned
                     ? 'border-amber-500/30 bg-[var(--bg-surface)] ring-1 ring-amber-500/20'
-                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-indigo-500/40'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[#E0564C]/50'
                 }`}
               >
-                <div>
+                {/* Decorative Geometric Art in Top Right */}
+                <div className="absolute -right-6 -top-6 w-28 h-28 opacity-15 pointer-events-none group-hover:scale-105 transition-transform">
+                  <ReaderGeometricMotif className="w-full h-full" />
+                </div>
+
+                <div className="relative z-10">
                   {/* Top Row: Badges & Pin */}
                   <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border border-[#E0564C]/30 bg-[#E0564C]/10 text-[#E0564C]">
+                        Read nr. {readNr}
+                      </span>
                       <span
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
                           isMd
@@ -704,7 +714,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                         {note.file_type}
                       </span>
                       {note.subject && (
-                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] truncate max-w-[150px]">
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] truncate max-w-[130px]">
                           {note.subject}
                         </span>
                       )}
@@ -728,7 +738,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     <span className="text-xl shrink-0 select-none leading-none pt-0.5">
                       {note.emoji || (isMd ? '📝' : '📄')}
                     </span>
-                    <h3 className="font-extrabold text-[var(--text-main)] text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-indigo-400 transition-colors">
+                    <h3 className="font-extrabold text-[var(--text-main)] text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-[#E0564C] transition-colors">
                       {note.title}
                     </h3>
                   </div>
@@ -740,41 +750,43 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 </div>
 
                 {/* Footer Row: Reading stats & Action buttons */}
-                <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)] font-medium">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 font-mono">
-                      <Clock size={12} /> {getReadTime(note.content)}
-                    </span>
-                    <span>•</span>
-                    <span className="font-mono">{formatFileSize(note.file_size)}</span>
+                <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)] font-medium relative z-10">
+                  <div className="flex items-center gap-1 font-mono">
+                    <Clock size={12} />
+                    <span>{getReadTime(note.content)}</span>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setEditingNote(note);
-                        setEditorTab('write');
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)] transition-colors"
-                      title="Edit note"
-                    >
-                      <Edit3 size={13} />
-                    </button>
-                    <button
-                      onClick={e => handleDownload(e, note)}
-                      className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)] transition-colors"
-                      title="Download file"
-                    >
-                      <Download size={13} />
-                    </button>
-                    <button
-                      onClick={e => handleDelete(e, note)}
-                      className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                      title="Delete note"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-[#E0564C] group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                      Begin Reading →
+                    </span>
+                    <div className="flex items-center gap-0.5 border-l border-[var(--border-color)] pl-1.5 ml-0.5">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setEditingNote(note);
+                          setEditorTab('write');
+                        }}
+                        className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)] transition-colors"
+                        title="Edit note"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                      <button
+                        onClick={e => handleDownload(e, note)}
+                        className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)] transition-colors"
+                        title="Download file"
+                      >
+                        <Download size={12} />
+                      </button>
+                      <button
+                        onClick={e => handleDelete(e, note)}
+                        className="p-1 rounded-md text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        title="Delete note"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -784,8 +796,9 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       ) : (
         /* List View */
         <div className="bento-card rounded-3xl border border-[var(--border-color)] bg-[var(--bg-surface)] divide-y divide-[var(--border-color)] overflow-hidden shadow-soft">
-          {filteredNotes.map(note => {
+          {filteredNotes.map((note, idx) => {
             const isMd = note.file_type === 'md';
+            const readNr = String(idx + 1).padStart(2, '0');
             return (
               <div
                 key={note.id}
@@ -793,6 +806,9 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 className="p-4 sm:p-4.5 hover:bg-[var(--bg-subcard)]/60 transition-colors cursor-pointer flex items-center justify-between gap-3 group"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border border-[#E0564C]/30 bg-[#E0564C]/10 text-[#E0564C] shrink-0 hidden xs:inline">
+                    Read nr. {readNr}
+                  </span>
                   <span
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg border ${
                       isMd
@@ -805,7 +821,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate group-hover:text-indigo-400 transition-colors">
+                      <h4 className="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate group-hover:text-[#E0564C] transition-colors">
                         {note.title}
                       </h4>
                       {note.is_pinned && (
@@ -822,7 +838,10 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-black text-[#E0564C] group-hover:translate-x-0.5 transition-transform hidden sm:inline">
+                    Begin Reading →
+                  </span>
                   <button
                     onClick={e => handleTogglePin(e, note.id)}
                     className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-amber-400"
@@ -853,201 +872,38 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       )}
 
       {/* ============================================================ */}
-      {/* FULL READER MODE (MODAL / FULL-SCREEN FOCUS) */}
+      {/* IMMERSIVE E-READER MODE (MATCHES IMAGE 2 REFERENCE) */}
       {/* ============================================================ */}
       {activeNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn">
-          <div
-            className={`bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] flex flex-col shadow-2xl transition-all duration-200 overflow-hidden ${
-              isFullScreen
-                ? 'fixed inset-0 rounded-none'
-                : 'w-full max-w-5xl h-full sm:h-[92vh] sm:rounded-3xl'
-            }`}
-          >
-            {/* Reader Header */}
-            <header className="shrink-0 p-3.5 sm:p-4.5 border-b border-[var(--border-color)] bg-[var(--bg-surface)] flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-2xl sm:text-3xl shrink-0 select-none leading-none">
-                  {activeNote.emoji || (activeNote.file_type === 'md' ? '📝' : '📄')}
-                </span>
-
-                <div className="min-w-0">
-                  <h2 className="text-sm sm:text-lg font-extrabold text-[var(--text-main)] truncate tracking-tight">
-                    {activeNote.title}
-                  </h2>
-                  <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
-                    <span className="font-semibold text-indigo-400">{activeNote.subject || 'General'}</span>
-                    <span>•</span>
-                    <span className="font-mono">⏱️ {getReadTime(activeNote.content)} ({activeNote.content.trim().split(/\s+/).filter(Boolean).length} words)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reader Controls */}
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                {/* Font Style (Sans / Serif / Mono) */}
-                <div className="hidden sm:flex items-center p-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
-                  {(['sans', 'serif', 'mono'] as const).map(style => (
-                    <button
-                      key={style}
-                      onClick={() => setReaderFontStyle(style)}
-                      className={`px-2 py-1 rounded-lg text-[10px] capitalize font-bold transition-all ${
-                        readerFontStyle === style
-                          ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                      }`}
-                      title={`${style.toUpperCase()} font`}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Font Size Selector */}
-                <div className="hidden sm:flex items-center p-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
-                  {(['sm', 'base', 'lg', 'xl'] as const).map(size => (
-                    <button
-                      key={size}
-                      onClick={() => setReaderFontSize(size)}
-                      className={`px-2 py-1 rounded-lg text-[10px] uppercase font-bold transition-all ${
-                        readerFontSize === size
-                          ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                      }`}
-                      title={`Font size ${size}`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Full Width Toggle */}
-                <button
-                  onClick={() => setReaderWidth(w => w === 'normal' ? 'full' : 'normal')}
-                  className={`hidden sm:flex p-2 rounded-xl border text-xs font-bold transition-all ${
-                    readerWidth === 'full'
-                      ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                      : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                  }`}
-                  title={readerWidth === 'full' ? 'Standard reading width' : 'Full width reading'}
-                >
-                  <AlignLeft size={15} />
-                </button>
-
-                {/* TOC Toggle for Markdown */}
-                {activeNote.file_type === 'md' && activeTocHeadings.length > 0 && (
-                  <button
-                    onClick={() => setShowToc(!showToc)}
-                    className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-                      showToc
-                        ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                        : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                    }`}
-                    title="Toggle Table of Contents"
-                  >
-                    <Hash size={15} />
-                  </button>
-                )}
-
-                {/* Copy full text */}
-                <button
-                  onClick={() => handleCopyNote(activeNote)}
-                  className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
-                  title="Copy full note content"
-                >
-                  {copiedNoteId === activeNote.id ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
-                </button>
-
-                {/* Edit Note */}
-                <button
-                  onClick={() => {
-                    setEditingNote(activeNote);
-                    setEditorTab('write');
-                  }}
-                  className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
-                  title="Edit note"
-                >
-                  <Edit3 size={15} />
-                </button>
-
-                {/* Download */}
-                <button
-                  onClick={() => downloadNote(activeNote)}
-                  className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
-                  title="Download note"
-                >
-                  <Download size={15} />
-                </button>
-
-                {/* Fullscreen Toggle */}
-                <button
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="hidden sm:block p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
-                  title={isFullScreen ? 'Exit fullscreen' : 'Fullscreen reader'}
-                >
-                  {isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                </button>
-
-                {/* Close Reader */}
-                <button
-                  onClick={() => {
-                    setActiveNote(null);
-                    setIsFullScreen(false);
-                    setShowToc(false);
-                  }}
-                  className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
-                  title="Close reader"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </header>
-
-            {/* Reader Content Body (with optional TOC side panel) */}
-            <div className="flex-1 min-h-0 flex overflow-hidden">
-              {/* Table of Contents Side Panel */}
-              {showToc && activeNote.file_type === 'md' && activeTocHeadings.length > 0 && (
-                <aside className="w-64 shrink-0 border-r border-[var(--border-color)] p-4 overflow-y-auto custom-scrollbar bg-[var(--bg-subcard)]/40 hidden md:block">
-                  <div className="text-xs font-black uppercase text-[var(--text-muted)] mb-3 tracking-wider flex items-center gap-1.5">
-                    <Hash size={13} />
-                    <span>Table of Contents</span>
-                  </div>
-                  <nav className="space-y-1">
-                    {activeTocHeadings.map(h => (
-                      <a
-                        key={h.id}
-                        href={`#${h.id}`}
-                        onClick={e => {
-                          e.preventDefault();
-                          const el = document.getElementById(h.id);
-                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        style={{ paddingLeft: `${(h.level - 1) * 10 + 6}px` }}
-                        className="block text-xs py-1 text-[var(--text-muted)] hover:text-indigo-400 hover:bg-[var(--bg-subcard)] rounded-lg truncate transition-colors font-medium"
-                      >
-                        {h.text}
-                      </a>
-                    ))}
-                  </nav>
-                </aside>
-              )}
-
-              {/* Main Reading Area */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
-                <div className={`mx-auto transition-all duration-200 ${readerWidth === 'full' ? 'max-w-5xl' : 'max-w-3xl'}`}>
-                  <MarkdownViewer
-                    content={activeNote.content}
-                    fileType={activeNote.file_type}
-                    fontSize={readerFontSize}
-                    fontStyle={readerFontStyle}
-                    searchQuery={readerSearch}
-                    onToggleTask={handleToggleTask}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EReaderView
+          note={activeNote}
+          readNumber={Math.max(1, filteredNotes.findIndex(n => n.id === activeNote.id) + 1)}
+          totalNotesCount={filteredNotes.length || notes.length}
+          onBack={() => {
+            setActiveNote(null);
+            setIsFullScreen(false);
+            setShowToc(false);
+          }}
+          onTogglePin={id => handleTogglePin({ stopPropagation: () => {} } as any, id)}
+          onEditNote={noteToEdit => {
+            setActiveNote(null);
+            setEditingNote(noteToEdit);
+            setEditorTab('write');
+          }}
+          onNextNote={() => {
+            const currentIdx = filteredNotes.findIndex(n => n.id === activeNote.id);
+            if (currentIdx >= 0 && currentIdx < filteredNotes.length - 1) {
+              setActiveNote(filteredNotes[currentIdx + 1]);
+            }
+          }}
+          onPrevNote={() => {
+            const currentIdx = filteredNotes.findIndex(n => n.id === activeNote.id);
+            if (currentIdx > 0) {
+              setActiveNote(filteredNotes[currentIdx - 1]);
+            }
+          }}
+          onToggleTask={handleToggleTask}
+        />
       )}
 
       {/* ============================================================ */}
