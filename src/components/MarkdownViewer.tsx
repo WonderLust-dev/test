@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Check, ExternalLink, Info, AlertTriangle, Lightbulb, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Copy, Check, ExternalLink, Info, AlertTriangle, Lightbulb, AlertCircle, ShieldAlert, ChevronRight } from 'lucide-react';
+import { extractLeadingEmoji } from '../utils/notionParser';
 
 interface MarkdownViewerProps {
   content: string;
   fileType?: 'md' | 'txt';
   fontSize?: 'sm' | 'base' | 'lg' | 'xl';
+  fontStyle?: 'sans' | 'serif' | 'mono';
   searchQuery?: string;
   className?: string;
+  onToggleTask?: (taskIndex: number, newChecked: boolean) => void;
 }
 
 interface TocItem {
@@ -44,8 +47,10 @@ export default function MarkdownViewer({
   content,
   fileType = 'md',
   fontSize = 'base',
+  fontStyle = 'sans',
   searchQuery = '',
   className = '',
+  onToggleTask,
 }: MarkdownViewerProps) {
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
@@ -65,6 +70,12 @@ export default function MarkdownViewer({
     xl: 'text-lg sm:text-xl',
   }[fontSize];
 
+  const fontStyleClass = {
+    sans: 'font-sans',
+    serif: 'font-serif',
+    mono: 'font-mono',
+  }[fontStyle];
+
   // If plain text file, render with preserved whitespace and structured divider highlights
   if (fileType === 'txt') {
     return (
@@ -80,10 +91,10 @@ export default function MarkdownViewer({
   }, [content]);
 
   return (
-    <article className={`space-y-4 text-[var(--text-main)] leading-relaxed select-text font-sans ${fontClasses} ${className}`}>
+    <article className={`space-y-4 text-[var(--text-main)] leading-relaxed select-text ${fontStyleClass} ${fontClasses} ${className}`}>
       {blocks.map((block, idx) => (
         <React.Fragment key={idx}>
-          {renderBlock(block, idx, copiedCodeId, handleCopyCode, searchQuery)}
+          {renderBlock(block, idx, copiedCodeId, handleCopyCode, searchQuery, onToggleTask)}
         </React.Fragment>
       ))}
     </article>
@@ -97,10 +108,13 @@ export default function MarkdownViewer({
 type Block =
   | { type: 'heading'; level: number; text: string; id: string }
   | { type: 'alert'; alertType: 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION'; text: string }
+  | { type: 'notion_callout'; emoji: string; text: string }
+  | { type: 'toggle'; title: string; content: string }
+  | { type: 'math_block'; formula: string }
   | { type: 'blockquote'; text: string }
   | { type: 'code'; language: string; code: string }
   | { type: 'table'; headers: string[]; rows: string[][] }
-  | { type: 'list'; ordered: boolean; items: Array<{ text: string; checked?: boolean }> }
+  | { type: 'list'; ordered: boolean; items: Array<{ text: string; checked?: boolean; globalTaskIndex?: number }> }
   | { type: 'hr' }
   | { type: 'paragraph'; text: string };
 
@@ -108,6 +122,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
   const blocks: Block[] = [];
   const lines = markdown.split(/\r?\n/);
   let i = 0;
+  let taskCounter = 0;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -140,7 +155,32 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 4. Code Blocks (```lang ... ```)
+    // 4. Math Blocks ($$ ... $$)
+    if (line.trim().startsWith('$$')) {
+      const singleMatch = line.trim().match(/^\$\$(.+?)\$\$$/);
+      if (singleMatch) {
+        blocks.push({
+          type: 'math_block',
+          formula: singleMatch[1].trim(),
+        });
+        i++;
+        continue;
+      }
+      const mathLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('$$')) {
+        mathLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++; // skip closing $$
+      blocks.push({
+        type: 'math_block',
+        formula: mathLines.join('\n').trim(),
+      });
+      continue;
+    }
+
+    // 5. Code Blocks (```lang ... ```)
     if (line.trim().startsWith('```')) {
       const language = line.trim().slice(3).trim();
       const codeLines: string[] = [];
@@ -158,7 +198,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 5. GitHub Style Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION])
+    // 6. GitHub Style Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION])
     const alertMatch = line.match(/^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
     if (alertMatch) {
       const alertType = alertMatch[1].toUpperCase() as 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION';
@@ -176,21 +216,80 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 6. Standard Blockquote (> text)
+    // 7. Notion Callouts (> 💡 text) or Standard Blockquote (> text)
     if (line.trim().startsWith('>')) {
       const quoteLines: string[] = [];
       while (i < lines.length && lines[i].trim().startsWith('>')) {
         quoteLines.push(lines[i].replace(/^>\s?/, ''));
         i++;
       }
+      const fullQuote = quoteLines.join('\n').trim();
+      const { emoji, remaining } = extractLeadingEmoji(fullQuote);
+      if (emoji) {
+        blocks.push({
+          type: 'notion_callout',
+          emoji,
+          text: remaining,
+        });
+      } else {
+        blocks.push({
+          type: 'blockquote',
+          text: fullQuote,
+        });
+      }
+      continue;
+    }
+
+    // 8. Collapsible Toggles (<details><summary>...</summary>...</details> or ▶ Title)
+    if (line.trim().toLowerCase().startsWith('<details>')) {
+      let summary = 'Toggle details';
+      const toggleLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().toLowerCase().includes('</details>')) {
+        const cur = lines[i];
+        const sumMatch = cur.match(/<summary>(.*?)<\/summary>/i);
+        if (sumMatch) {
+          summary = sumMatch[1].trim();
+        } else {
+          toggleLines.push(cur);
+        }
+        i++;
+      }
+      if (i < lines.length) i++; // skip closing </details>
       blocks.push({
-        type: 'blockquote',
-        text: quoteLines.join('\n').trim(),
+        type: 'toggle',
+        title: summary,
+        content: toggleLines.join('\n').trim(),
       });
       continue;
     }
 
-    // 7. Markdown Tables (| col1 | col2 |)
+    const toggleMatch = line.match(/^[▶▸]\s+(.+)$/);
+    if (toggleMatch) {
+      const title = toggleMatch[1].trim();
+      const toggleLines: string[] = [];
+      i++;
+      while (
+        i < lines.length &&
+        lines[i].trim() !== '' &&
+        !lines[i].match(/^#{1,6}\s/) &&
+        !lines[i].match(/^[▶▸]\s/) &&
+        !lines[i].trim().startsWith('```') &&
+        !lines[i].trim().startsWith('$$') &&
+        !lines[i].trim().startsWith('>')
+      ) {
+        toggleLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({
+        type: 'toggle',
+        title,
+        content: toggleLines.join('\n').trim(),
+      });
+      continue;
+    }
+
+    // 9. Markdown Tables (| col1 | col2 |)
     if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('|') && /[-:]+/.test(lines[i + 1])) {
       const headers = line.split('|').map(s => s.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1 || arr.length <= 2);
       i += 2; // skip header and delimiter line
@@ -204,14 +303,14 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 8. Lists (- [ ] Task, - Unordered, 1. Ordered)
+    // 10. Lists (- [ ] Task, - Unordered, 1. Ordered)
     const taskMatch = line.match(/^[-*]\s+\[([ xX])\]\s+(.+)$/);
     const unordMatch = line.match(/^[-*+]\s+(.+)$/);
     const ordMatch = line.match(/^\d+\.\s+(.+)$/);
 
     if (taskMatch || unordMatch || ordMatch) {
       const ordered = Boolean(ordMatch && !taskMatch);
-      const items: Array<{ text: string; checked?: boolean }> = [];
+      const items: Array<{ text: string; checked?: boolean; globalTaskIndex?: number }> = [];
 
       while (i < lines.length) {
         const curLine = lines[i];
@@ -220,7 +319,12 @@ function parseMarkdownBlocks(markdown: string): Block[] {
         const oMatch = curLine.match(/^\d+\.\s+(.+)$/);
 
         if (tMatch) {
-          items.push({ text: tMatch[2], checked: tMatch[1].toLowerCase() === 'x' });
+          const taskIdx = taskCounter++;
+          items.push({
+            text: tMatch[2],
+            checked: tMatch[1].toLowerCase() === 'x',
+            globalTaskIndex: taskIdx,
+          });
           i++;
         } else if (uMatch) {
           items.push({ text: uMatch[1] });
@@ -237,13 +341,16 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 9. Standard Paragraph (consume continuous lines)
+    // 11. Standard Paragraph (consume continuous lines)
     const paraLines: string[] = [];
     while (
       i < lines.length &&
       lines[i].trim() !== '' &&
       !lines[i].match(/^#{1,6}\s/) &&
       !lines[i].trim().startsWith('```') &&
+      !lines[i].trim().startsWith('$$') &&
+      !lines[i].trim().toLowerCase().startsWith('<details>') &&
+      !lines[i].match(/^[▶▸]\s/) &&
       !lines[i].trim().startsWith('>') &&
       !/^(\*{3,}|-{3,}|_{3,})$/.test(lines[i].trim()) &&
       !lines[i].match(/^[-*+]\s/) &&
@@ -273,7 +380,8 @@ function renderBlock(
   key: number,
   copiedCodeId: string | null,
   handleCopyCode: (code: string, id: string) => void,
-  searchQuery: string
+  searchQuery: string,
+  onToggleTask?: (taskIndex: number, newChecked: boolean) => void
 ) {
   switch (block.type) {
     case 'heading': {
@@ -303,6 +411,54 @@ function renderBlock(
         <h4 id={block.id} className="text-sm sm:text-base font-bold text-[var(--text-main)] pt-1 mt-2">
           {content}
         </h4>
+      );
+    }
+
+    case 'notion_callout':
+      return (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--bg-subcard)]/80 border border-[var(--border-color)] my-3 shadow-2xs hover:border-indigo-500/30 transition-colors">
+          <div className="text-2xl select-none shrink-0 pt-0.5 leading-none">
+            {block.emoji}
+          </div>
+          <div className="flex-1 min-w-0 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed font-medium">
+            {renderInline(block.text, searchQuery)}
+          </div>
+        </div>
+      );
+
+    case 'toggle':
+      return (
+        <details className="group my-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-subcard)]/40 overflow-hidden transition-all">
+          <summary className="cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm text-[var(--text-main)] hover:bg-[var(--bg-subcard)]/80 transition-colors list-none">
+            <ChevronRight size={15} className="text-indigo-400 transition-transform duration-200 group-open:rotate-90 shrink-0" />
+            <span className="flex-1">{renderInline(block.title, searchQuery)}</span>
+          </summary>
+          <div className="px-4 py-3 pt-2 text-xs sm:text-sm border-t border-[var(--border-color)]/50 text-[var(--text-main)]/90 leading-relaxed bg-[var(--bg-surface)]">
+            {block.content.split('\n').map((line, lIdx) => (
+              <p key={lIdx} className="my-1">
+                {renderInline(line, searchQuery)}
+              </p>
+            ))}
+          </div>
+        </details>
+      );
+
+    case 'math_block': {
+      const mathId = `math_${key}`;
+      const isCopied = copiedCodeId === mathId;
+      return (
+        <div className="my-3 p-3.5 sm:p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-amber-300 font-mono text-xs sm:text-sm overflow-x-auto custom-scrollbar flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex-1 text-center py-1 overflow-x-auto font-semibold tracking-wide">
+            {block.formula}
+          </div>
+          <button
+            onClick={() => handleCopyCode(block.formula, mathId)}
+            className="shrink-0 p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 transition-colors text-xs cursor-pointer"
+            title="Copy formula"
+          >
+            {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+          </button>
+        </div>
       );
     }
 
@@ -424,14 +580,29 @@ function renderBlock(
       return (
         <ul className="space-y-1.5 my-2.5 pl-1 text-[var(--text-main)]">
           {block.items.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-2 leading-relaxed">
+            <li key={idx} className="flex items-start gap-2.5 leading-relaxed">
               {item.checked !== undefined ? (
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  readOnly
-                  className="mt-1 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0 shrink-0 cursor-default"
-                />
+                onToggleTask && item.globalTaskIndex !== undefined ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggleTask(item.globalTaskIndex!, !item.checked)}
+                    className={`mt-0.5 w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer ${
+                      item.checked
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                        : 'border-[var(--border-color)] bg-[var(--bg-subcard)] hover:border-indigo-400'
+                    }`}
+                    title={item.checked ? 'Mark uncompleted' : 'Mark completed'}
+                  >
+                    {item.checked && <Check size={11} className="stroke-[3]" />}
+                  </button>
+                ) : (
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    readOnly
+                    className="mt-1 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0 shrink-0 cursor-default"
+                  />
+                )
               ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0 inline-block" />
               )}

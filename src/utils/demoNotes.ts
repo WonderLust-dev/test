@@ -11,10 +11,11 @@ export const DEMO_NOTES: Array<Omit<StudyNote, 'id' | 'created_at' | 'updated_at
     tags: ['Formulas', 'Algebra', 'Trigonometry', 'Shortcuts', 'High Yield'],
     file_size: 3420,
     is_pinned: true,
+    emoji: '📐',
+    font_style: 'sans',
     content: `# SSC CGL Quantitative Aptitude — Essential Formulas & Speed Shortcuts
 
-> [!TIP]
-> Revise these formulas every morning before attempting mock tests. In SSC CGL Tier 1 & 2, direct application of these identities saves 15–20 minutes.
+> 💡 **Quick Revision Tip**: Revise these formulas every morning before attempting mock tests. In SSC CGL Tier 1 & 2, direct application of these identities saves 15–20 minutes.
 
 ---
 
@@ -100,10 +101,11 @@ export const DEMO_NOTES: Array<Omit<StudyNote, 'id' | 'created_at' | 'updated_at
     tags: ['Polity', 'Constitution', 'Articles', 'Amendments', 'GK'],
     file_size: 2850,
     is_pinned: true,
+    emoji: '🏛️',
+    font_style: 'sans',
     content: `# Indian Polity & Constitution — Quick Revision Guide
 
-> [!IMPORTANT]
-> Articles 12–35 (Fundamental Rights) and Articles 52–78 (The Union Executive) account for over 60% of Polity questions in SSC CGL.
+> 📌 **Exam Rule**: Articles 12–35 (Fundamental Rights) and Articles 52–78 (The Union Executive) account for over 60% of Polity questions in SSC CGL.
 
 ---
 
@@ -169,6 +171,8 @@ The Constitution of India guarantees 6 Fundamental Rights to all citizens:
     tags: ['English', 'Vocabulary', 'One Word', 'Idioms'],
     file_size: 1980,
     is_pinned: false,
+    emoji: '📖',
+    font_style: 'mono',
     content: `================================================================================
 SSC CGL REVISION NOTES: HIGH-FREQUENCY ONE-WORD SUBSTITUTIONS & IDIOMS
 ================================================================================

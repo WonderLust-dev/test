@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { StudyNote, NoteFilters } from '../types';
 import { getNotes, saveNote, saveNotesBatch, updateNote, deleteNote, togglePinNote, downloadNote } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
+import { convertNotionHtmlToMarkdown } from '../utils/notionParser';
 import {
   FileText,
   Upload,
@@ -28,6 +29,15 @@ import {
   Menu,
   Copy,
   Hash,
+  Columns,
+  CheckSquare,
+  Code2,
+  Quote,
+  Heading1,
+  Heading2,
+  Table,
+  Type,
+  AlignLeft,
 } from 'lucide-react';
 
 interface StudyNotesProps {
@@ -42,6 +52,12 @@ const SUBJECT_OPTIONS = [
   'General Intelligence & Reasoning',
   'Computer Knowledge',
   'General Studies',
+];
+
+const NOTION_EMOJIS = [
+  '📐', '🏛️', '📖', '💡', '⚡', '🎯', '🧠', '📝',
+  '📊', '🔍', '🏆', '🌟', '⏱️', '📌', '🔬', '🧮',
+  '⚖️', '🌍', '💻', '🔖',
 ];
 
 export default function StudyNotes({ userId }: StudyNotesProps) {
@@ -59,6 +75,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   // Reader Mode
   const [activeNote, setActiveNote] = useState<StudyNote | null>(null);
   const [readerFontSize, setReaderFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
+  const [readerFontStyle, setReaderFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [readerWidth, setReaderWidth] = useState<'normal' | 'full'>('normal');
   const [readerSearch, setReaderSearch] = useState('');
   const [showToc, setShowToc] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -73,7 +91,10 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   // Editor Modal (Create / Edit)
   const [editingNote, setEditingNote] = useState<Partial<StudyNote> | null>(null);
-  const [editorTab, setEditorTab] = useState<'write' | 'preview'>('write');
+  const [editorTab, setEditorTab] = useState<'write' | 'split' | 'preview'>('write');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pasteNotification, setPasteNotification] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load notes
   const loadNotes = async () => {
@@ -262,6 +283,96 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setShowUploadModal(false);
   };
 
+  useEffect(() => {
+    if (activeNote) {
+      setReaderFontStyle(activeNote.font_style || 'sans');
+    }
+  }, [activeNote?.id]);
+
+  // Smart paste: transforms Notion / rich text HTML from clipboard into clean Markdown
+  const handleSmartPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = e.clipboardData.getData('text/html');
+    if (!html) return;
+
+    const markdown = convertNotionHtmlToMarkdown(html);
+    if (!markdown || !markdown.trim()) return;
+
+    e.preventDefault();
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentContent = editingNote?.content || '';
+    const newContent = currentContent.slice(0, start) + markdown + currentContent.slice(end);
+
+    setEditingNote(prev => prev ? { ...prev, content: newContent } : null);
+    setPasteNotification('✨ Formatted from Notion / Rich Text');
+    setTimeout(() => setPasteNotification(null), 3500);
+
+    setTimeout(() => {
+      textarea.focus();
+      const pos = start + markdown.length;
+      textarea.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  // Quick-insert snippet into editor textarea
+  const insertSnippet = (snippet: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setEditingNote(prev => prev ? { ...prev, content: (prev.content || '') + snippet } : null);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = text.substring(0, start) + snippet + text.substring(end);
+    setEditingNote(prev => prev ? { ...prev, content: newText } : null);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = start + snippet.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  // Interactive Checklist checkbox toggle in reader view (persists to DB)
+  const handleToggleTask = async (taskIndex: number, newChecked: boolean) => {
+    if (!activeNote) return;
+    let currentTask = 0;
+    const updatedContent = activeNote.content.replace(/([-*]\s+\[)([ xX])(\]\s+)/g, (match, prefix, check, suffix) => {
+      if (currentTask === taskIndex) {
+        currentTask++;
+        return `${prefix}${newChecked ? 'x' : ' '}${suffix}`;
+      }
+      currentTask++;
+      return match;
+    });
+
+    const updatedNote: StudyNote = {
+      ...activeNote,
+      content: updatedContent,
+      updated_at: new Date().toISOString(),
+    };
+
+    setActiveNote(updatedNote);
+    setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+    await updateNote(activeNote.id, { content: updatedContent });
+  };
+
+  // Checklist toggle in editor split/preview view
+  const handleEditorToggleTask = (taskIndex: number, newChecked: boolean) => {
+    if (!editingNote || !editingNote.content) return;
+    let currentTask = 0;
+    const updatedContent = editingNote.content.replace(/([-*]\s+\[)([ xX])(\]\s+)/g, (match, prefix, check, suffix) => {
+      if (currentTask === taskIndex) {
+        currentTask++;
+        return `${prefix}${newChecked ? 'x' : ' '}${suffix}`;
+      }
+      currentTask++;
+      return match;
+    });
+    setEditingNote(prev => prev ? { ...prev, content: updatedContent } : null);
+  };
+
   // Handle Save from Editor (Create or Update)
   const handleSaveEditor = async () => {
     if (!editingNote || !editingNote.title?.trim() || !editingNote.content?.trim()) {
@@ -277,6 +388,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         subject: editingNote.subject || 'General Studies',
         file_type: editingNote.file_type || 'md',
         tags: editingNote.tags || [],
+        emoji: editingNote.emoji || '📝',
+        font_style: editingNote.font_style || 'sans',
       });
       setNotes(prev =>
         prev.map(n =>
@@ -286,13 +399,22 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 ...editingNote,
                 title: editingNote.title!.trim(),
                 content: editingNote.content!,
+                emoji: editingNote.emoji || '📝',
+                font_style: editingNote.font_style || 'sans',
                 updated_at: new Date().toISOString(),
               } as StudyNote
             : n
         )
       );
       if (activeNote?.id === editingNote.id) {
-        setActiveNote(prev => prev ? ({ ...prev, ...editingNote } as StudyNote) : null);
+        setActiveNote(prev => prev ? ({
+          ...prev,
+          ...editingNote,
+          title: editingNote.title!.trim(),
+          content: editingNote.content!,
+          emoji: editingNote.emoji || '📝',
+          font_style: editingNote.font_style || 'sans',
+        } as StudyNote) : null);
       }
     } else {
       // Create new
@@ -306,6 +428,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         file_name: `${editingNote.title.trim().replace(/\s+/g, '_')}.${editingNote.file_type || 'md'}`,
         file_size: new Blob([editingNote.content]).size,
         is_pinned: false,
+        emoji: editingNote.emoji || '📝',
+        font_style: editingNote.font_style || 'sans',
       });
       setNotes(prev => [saved, ...prev]);
     }
@@ -599,10 +723,15 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     </button>
                   </div>
 
-                  {/* Title */}
-                  <h3 className="font-extrabold text-[var(--text-main)] text-sm sm:text-base leading-snug line-clamp-2 mb-2 group-hover:text-indigo-400 transition-colors">
-                    {note.title}
-                  </h3>
+                  {/* Title with Notion Page Icon */}
+                  <div className="flex items-start gap-2 mb-2">
+                    <span className="text-xl shrink-0 select-none leading-none pt-0.5">
+                      {note.emoji || (isMd ? '📝' : '📄')}
+                    </span>
+                    <h3 className="font-extrabold text-[var(--text-main)] text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-indigo-400 transition-colors">
+                      {note.title}
+                    </h3>
+                  </div>
 
                   {/* Excerpt */}
                   <p className="text-xs text-[var(--text-muted)] line-clamp-3 leading-relaxed mb-4 font-normal">
@@ -665,13 +794,13 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               >
                 <div className="flex items-center gap-3.5 min-w-0">
                   <span
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-xs uppercase border ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg border ${
                       isMd
-                        ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                        : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                        ? 'bg-indigo-500/10 border-indigo-500/20'
+                        : 'bg-amber-500/10 border-amber-500/20'
                     }`}
                   >
-                    {note.file_type}
+                    {note.emoji || (isMd ? '📝' : '📄')}
                   </span>
 
                   <div className="min-w-0">
@@ -738,14 +867,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             {/* Reader Header */}
             <header className="shrink-0 p-3.5 sm:p-4.5 border-b border-[var(--border-color)] bg-[var(--bg-surface)] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase border shrink-0 ${
-                    activeNote.file_type === 'md'
-                      ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                      : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                  }`}
-                >
-                  {activeNote.file_type}
+                <span className="text-2xl sm:text-3xl shrink-0 select-none leading-none">
+                  {activeNote.emoji || (activeNote.file_type === 'md' ? '📝' : '📄')}
                 </span>
 
                 <div className="min-w-0">
@@ -753,15 +876,33 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     {activeNote.title}
                   </h2>
                   <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
-                    <span>{activeNote.subject}</span>
+                    <span className="font-semibold text-indigo-400">{activeNote.subject || 'General'}</span>
                     <span>•</span>
-                    <span>{getReadTime(activeNote.content)}</span>
+                    <span className="font-mono">⏱️ {getReadTime(activeNote.content)} ({activeNote.content.trim().split(/\s+/).filter(Boolean).length} words)</span>
                   </div>
                 </div>
               </div>
 
               {/* Reader Controls */}
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                {/* Font Style (Sans / Serif / Mono) */}
+                <div className="hidden sm:flex items-center p-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
+                  {(['sans', 'serif', 'mono'] as const).map(style => (
+                    <button
+                      key={style}
+                      onClick={() => setReaderFontStyle(style)}
+                      className={`px-2 py-1 rounded-lg text-[10px] capitalize font-bold transition-all ${
+                        readerFontStyle === style
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                      }`}
+                      title={`${style.toUpperCase()} font`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Font Size Selector */}
                 <div className="hidden sm:flex items-center p-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
                   {(['sm', 'base', 'lg', 'xl'] as const).map(size => (
@@ -779,6 +920,19 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     </button>
                   ))}
                 </div>
+
+                {/* Full Width Toggle */}
+                <button
+                  onClick={() => setReaderWidth(w => w === 'normal' ? 'full' : 'normal')}
+                  className={`hidden sm:flex p-2 rounded-xl border text-xs font-bold transition-all ${
+                    readerWidth === 'full'
+                      ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                      : 'bg-[var(--bg-subcard)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                  }`}
+                  title={readerWidth === 'full' ? 'Standard reading width' : 'Full width reading'}
+                >
+                  <AlignLeft size={15} />
+                </button>
 
                 {/* TOC Toggle for Markdown */}
                 {activeNote.file_type === 'md' && activeTocHeadings.length > 0 && (
@@ -880,12 +1034,14 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
               {/* Main Reading Area */}
               <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
-                <div className="max-w-3xl mx-auto">
+                <div className={`mx-auto transition-all duration-200 ${readerWidth === 'full' ? 'max-w-5xl' : 'max-w-3xl'}`}>
                   <MarkdownViewer
                     content={activeNote.content}
                     fileType={activeNote.file_type}
                     fontSize={readerFontSize}
+                    fontStyle={readerFontStyle}
                     searchQuery={readerSearch}
+                    onToggleTask={handleToggleTask}
                   />
                 </div>
               </div>
@@ -993,49 +1149,52 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       )}
 
       {/* ============================================================ */}
-      {/* CREATE / EDIT NOTE MODAL */}
+      {/* CREATE / EDIT NOTE MODAL (Notion-Powered) */}
       {/* ============================================================ */}
       {editingNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-5 sm:p-7 max-w-4xl w-full h-[88vh] shadow-2xl border border-[var(--border-color)] flex flex-col justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 animate-fadeIn">
+          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-4 sm:p-6 max-w-5xl w-full h-[90vh] shadow-2xl border border-[var(--border-color)] flex flex-col justify-between">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)] shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center font-bold">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center font-bold shrink-0">
                   <Edit3 size={16} />
                 </span>
-                <h3 className="text-base font-extrabold text-[var(--text-main)]">
-                  {editingNote.id ? 'Edit Study Note' : 'Create New Study Note'}
+                <h3 className="text-sm sm:text-base font-extrabold text-[var(--text-main)] truncate">
+                  {editingNote.id ? 'Edit Study Note' : 'Create Notion-Style Note'}
                 </h3>
+
+                {pasteNotification && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-fadeIn">
+                    <Sparkles size={13} />
+                    <span>{pasteNotification}</span>
+                  </span>
+                )}
               </div>
 
-              {/* Write vs Preview Tabs */}
+              {/* Write vs Split vs Preview Tabs */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center p-0.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
-                  <button
-                    onClick={() => setEditorTab('write')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                      editorTab === 'write'
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                    }`}
-                  >
-                    Write
-                  </button>
-                  <button
-                    onClick={() => setEditorTab('preview')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                      editorTab === 'preview'
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                    }`}
-                  >
-                    Preview
-                  </button>
+                  {(['write', 'split', 'preview'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setEditorTab(tab)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all ${
+                        editorTab === tab
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
                 </div>
 
                 <button
-                  onClick={() => setEditingNote(null)}
+                  onClick={() => {
+                    setEditingNote(null);
+                    setShowEmojiPicker(false);
+                  }}
                   className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 >
                   <X size={16} />
@@ -1043,70 +1202,257 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               </div>
             </div>
 
-            {/* Form Inputs (Title, Subject, Format) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 shrink-0">
-              <div className="sm:col-span-2">
+            {/* Form Inputs (Emoji, Title, Subject, Font Style) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 py-3 shrink-0">
+              <div className="sm:col-span-6 relative">
                 <label className="text-xs font-bold text-[var(--text-main)] block mb-1">
                   Note Title
                 </label>
-                <input
-                  value={editingNote.title || ''}
-                  onChange={e => setEditingNote({ ...editingNote, title: e.target.value })}
-                  placeholder="e.g. Geometry Circle Theorems & Inradius Shortcuts"
-                  className="w-full px-3.5 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="w-10 h-10 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] hover:border-indigo-500 text-xl flex items-center justify-center transition-all select-none shadow-2xs cursor-pointer"
+                      title="Choose Notion page icon"
+                    >
+                      {editingNote.emoji || '📝'}
+                    </button>
+
+                    {showEmojiPicker && (
+                      <div className="absolute top-12 left-0 z-50 p-2.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl grid grid-cols-5 gap-1.5 w-60 animate-fadeIn">
+                        {NOTION_EMOJIS.map(em => (
+                          <button
+                            key={em}
+                            type="button"
+                            onClick={() => {
+                              setEditingNote({ ...editingNote, emoji: em });
+                              setShowEmojiPicker(false);
+                            }}
+                            className="p-1.5 rounded-xl hover:bg-[var(--bg-subcard)] text-xl flex items-center justify-center transition-all cursor-pointer"
+                          >
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    value={editingNote.title || ''}
+                    onChange={e => setEditingNote({ ...editingNote, title: e.target.value })}
+                    placeholder="e.g. Geometry Circle Theorems & Inradius Shortcuts"
+                    className="flex-1 px-3.5 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div>
+              <div className="sm:col-span-3">
                 <label className="text-xs font-bold text-[var(--text-main)] block mb-1">
                   Subject
                 </label>
                 <select
                   value={editingNote.subject || SUBJECT_OPTIONS[0]}
                   onChange={e => setEditingNote({ ...editingNote, subject: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {SUBJECT_OPTIONS.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
+
+              <div className="sm:col-span-3">
+                <label className="text-xs font-bold text-[var(--text-main)] block mb-1">
+                  Font Style
+                </label>
+                <select
+                  value={editingNote.font_style || 'sans'}
+                  onChange={e => setEditingNote({ ...editingNote, font_style: e.target.value as 'sans' | 'serif' | 'mono' })}
+                  className="w-full px-3 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="sans">Default Sans-Serif</option>
+                  <option value="serif">Elegant Serif</option>
+                  <option value="mono">Technical Mono</option>
+                </select>
+              </div>
             </div>
 
             {/* Main Textarea / Live Preview Body */}
-            <div className="flex-1 min-h-0 overflow-hidden border border-[var(--border-color)] rounded-2xl bg-[var(--bg-subcard)]/40 p-2">
-              {editorTab === 'write' ? (
-                <textarea
-                  value={editingNote.content || ''}
-                  onChange={e => setEditingNote({ ...editingNote, content: e.target.value })}
-                  placeholder="Write your study notes here using Markdown (# Headings, - lists, tables, > callouts)..."
-                  className="w-full h-full p-3 bg-transparent text-[var(--text-main)] font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none custom-scrollbar"
-                />
-              ) : (
-                <div className="w-full h-full p-4 overflow-y-auto custom-scrollbar bg-[var(--bg-surface)] rounded-xl">
-                  <MarkdownViewer
-                    content={editingNote.content || ''}
-                    fileType={editingNote.file_type || 'md'}
-                  />
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col border border-[var(--border-color)] rounded-2xl bg-[var(--bg-subcard)]/40 p-2.5">
+              {/* Quick Insert Toolbar (shown for 'write' and 'split') */}
+              {editorTab !== 'preview' && (
+                <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[var(--border-color)]/60 overflow-x-auto custom-scrollbar shrink-0 text-xs">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n# ')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Heading 1"
+                    >
+                      <Heading1 size={13} /> H1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n## ')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Heading 2"
+                    >
+                      <Heading2 size={13} /> H2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n- ')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Bulleted List"
+                    >
+                      <List size={13} /> Bullet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n- [ ] ')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="To-Do Task Checkbox"
+                    >
+                      <CheckSquare size={13} /> To-Do
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n> 💡 **Tip**: ')}
+                      className="px-2 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 text-indigo-400 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Notion Callout Card"
+                    >
+                      💡 Callout
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n▶ Toggle Title\nToggle content goes here...\n')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Notion Toggle Accordion"
+                    >
+                      ▶ Toggle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n$$\n\\frac{a}{b} = c\n$$\n')}
+                      className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-600 hover:text-white border border-amber-500/30 text-amber-400 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Math Block"
+                    >
+                      $$ Math
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n| Header 1 | Header 2 |\n| :--- | :--- |\n| Row 1 | Data 1 |\n')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Markdown Table"
+                    >
+                      <Table size={13} /> Table
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n```\n// code snippet\n```\n')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Code Block"
+                    >
+                      <Code2 size={13} /> Code
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertSnippet('\n> ')}
+                      className="px-2 py-1 rounded-lg bg-[var(--bg-surface)] hover:bg-indigo-600 hover:text-white border border-[var(--border-color)] text-[var(--text-muted)] font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                      title="Quote"
+                    >
+                      <Quote size={13} /> Quote
+                    </button>
+                  </div>
+
+                  <span className="hidden lg:inline text-[10px] text-[var(--text-muted)] italic shrink-0">
+                    Paste from Notion to auto-convert
+                  </span>
                 </div>
               )}
+
+              {/* Content Workspace */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {editorTab === 'write' ? (
+                  <textarea
+                    ref={textareaRef}
+                    value={editingNote.content || ''}
+                    onChange={e => setEditingNote({ ...editingNote, content: e.target.value })}
+                    onPaste={handleSmartPaste}
+                    placeholder="Write or paste your study notes here. Pasting from Notion or web automatically converts to Markdown..."
+                    className="w-full h-full p-3 bg-transparent text-[var(--text-main)] font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none custom-scrollbar"
+                  />
+                ) : editorTab === 'split' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 h-full overflow-hidden">
+                    <div className="h-full flex flex-col border-r border-[var(--border-color)]/60 pr-2">
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-1">
+                        Markdown Source
+                      </div>
+                      <textarea
+                        ref={textareaRef}
+                        value={editingNote.content || ''}
+                        onChange={e => setEditingNote({ ...editingNote, content: e.target.value })}
+                        onPaste={handleSmartPaste}
+                        placeholder="Write markdown here..."
+                        className="flex-1 p-2.5 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] font-mono text-xs leading-relaxed resize-none focus:outline-none custom-scrollbar"
+                      />
+                    </div>
+                    <div className="h-full flex flex-col pl-1 overflow-hidden">
+                      <div className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 mb-1 flex items-center gap-1">
+                        <Sparkles size={11} /> Live Notion Preview
+                      </div>
+                      <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-[var(--bg-surface)] rounded-xl border border-[var(--border-color)]">
+                        <MarkdownViewer
+                          content={editingNote.content || ''}
+                          fileType={editingNote.file_type || 'md'}
+                          fontStyle={editingNote.font_style || 'sans'}
+                          onToggleTask={handleEditorToggleTask}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-full p-4 sm:p-6 overflow-y-auto custom-scrollbar bg-[var(--bg-surface)] rounded-xl">
+                    <div className="max-w-3xl mx-auto">
+                      <MarkdownViewer
+                        content={editingNote.content || ''}
+                        fileType={editingNote.file_type || 'md'}
+                        fontStyle={editingNote.font_style || 'sans'}
+                        onToggleTask={handleEditorToggleTask}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-3 shrink-0">
-              <button
-                onClick={() => setEditingNote(null)}
-                className="btn btn-outline text-xs py-2 px-4 rounded-xl font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEditor}
-                className="btn btn-primary text-xs py-2 px-5 rounded-xl font-bold shadow-xs flex items-center gap-1.5"
-              >
-                <Check size={14} />
-                <span>Save Note</span>
-              </button>
+            <div className="flex items-center justify-between pt-3 shrink-0">
+              <div className="text-xs text-[var(--text-muted)] font-medium">
+                {editingNote.content
+                  ? `${editingNote.content.trim().split(/\s+/).filter(Boolean).length} words • ${editingNote.file_type || 'md'}`
+                  : ''}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingNote(null);
+                    setShowEmojiPicker(false);
+                  }}
+                  className="btn btn-outline text-xs py-2 px-4 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditor}
+                  className="btn btn-primary text-xs py-2 px-5 rounded-xl font-bold shadow-xs flex items-center gap-1.5"
+                >
+                  <Check size={14} />
+                  <span>Save Note</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

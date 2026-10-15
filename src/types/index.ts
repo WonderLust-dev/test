@@ -292,6 +292,8 @@ export interface StudyNote {
   created_at: string;
   updated_at: string;
   is_pinned?: boolean;
+  emoji?: string; // Notion-style page icon
+  font_style?: 'sans' | 'serif' | 'mono';
 }
 
 export interface NoteFilters {
