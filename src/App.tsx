@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getPaperById, savePaper, getPapers, getAttempts, saveCustomPaper } from './services/database';
 import { DEMO_PAPER } from './utils/demoData';
 import { Paper, QuestionJSON } from './types';
@@ -254,10 +255,10 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] flex flex-col md:flex-row font-sans text-gray-900">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full bg-[var(--bg-app)] flex flex-col md:flex-row font-sans text-[var(--text-main)] overflow-hidden">
       {/* Desktop Left Sidebar (Matching Image 2) */}
       {view !== 'exam' && view !== 'review' && (
-        <aside className="hidden md:flex flex-col w-64 shrink-0 bg-[#F4F5F7] p-5 border-r border-gray-200/80 sticky top-0 h-screen justify-between z-30 select-none">
+        <aside className="hidden md:flex flex-col w-64 shrink-0 bg-[var(--bg-app)] p-5 border-r border-[var(--border-color)] h-full justify-between z-30 select-none overflow-y-auto custom-scrollbar">
           <div>
             {/* Brand Logo & Title */}
             <button
@@ -268,10 +269,10 @@ function AppContent() {
                 <BookOpen size={20} className="text-emerald-400" />
               </div>
               <div>
-                <div className="text-sm font-extrabold tracking-tight text-gray-900 leading-tight">
+                <div className="text-sm font-extrabold tracking-tight text-[var(--text-main)] leading-tight">
                   SSC CGL Prep
                 </div>
-                <div className="text-[11px] font-semibold text-gray-400">
+                <div className="text-[11px] font-semibold text-[var(--text-muted)]">
                   Tier 1 & 2 Platform
                 </div>
               </div>
@@ -295,11 +296,11 @@ function AppContent() {
                     onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
                     className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-semibold transition-all ${
                       isActive
-                        ? 'bg-white text-gray-900 shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                        ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-xs border border-[var(--border-color)] font-bold'
+                        : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)]'
                     }`}
                   >
-                    <item.icon size={18} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                    <item.icon size={18} className={isActive ? 'text-[var(--text-main)]' : 'text-[var(--text-subtle)]'} />
                     <span>{item.label}</span>
                   </button>
                 );
@@ -308,40 +309,40 @@ function AppContent() {
           </div>
 
           {/* Bottom of Sidebar: Install App, Theme Switcher & Profile / Status */}
-          <div className="pt-4 border-t border-gray-200/80 space-y-3">
+          <div className="pt-4 border-t border-[var(--border-color)] space-y-3">
             {canInstall && (
               <button
                 onClick={openInstallModal}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-800 bg-white hover:bg-gray-50 border border-gray-200 shadow-2xs transition-all group"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-[var(--text-main)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subcard)] border border-[var(--border-color)] shadow-2xs transition-all group"
               >
                 <div className="flex items-center gap-2.5">
-                  <Download size={15} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <Download size={15} className="text-emerald-500 group-hover:scale-110 transition-transform" />
                   <span>Install App</span>
                 </div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-md font-bold">Offline</span>
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-1.5 py-0.2 rounded-md font-bold">Offline</span>
               </button>
             )}
 
             <ThemeSwitcher variant="full" />
 
             {user ? (
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white border border-gray-100 shadow-2xs">
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
                     {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-gray-900 truncate">
+                    <div className="text-xs font-bold text-[var(--text-main)] truncate">
                       {user.user_metadata?.display_name || 'SSC Aspirant'}
                     </div>
-                    <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                    <div className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
                     </div>
                   </div>
                 </div>
                 <button
                   onClick={() => signOut()}
-                  className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition-colors"
+                  className="p-1.5 text-[var(--text-muted)] hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
                   title="Logout"
                 >
                   <LogOut size={15} />
@@ -349,15 +350,15 @@ function AppContent() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="p-2.5 rounded-2xl bg-white border border-gray-100 text-center">
-                  <div className="text-[11px] font-bold text-amber-600 flex items-center justify-center gap-1">
+                <div className="p-2.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-center">
+                  <div className="text-[11px] font-bold text-amber-500 flex items-center justify-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Guest Mode
                   </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">Local Storage Active</div>
+                  <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Local Storage Active</div>
                 </div>
                 <button
                   onClick={openLogin}
-                  className="w-full btn btn-outline text-xs py-2 rounded-full font-bold"
+                  className="w-full btn btn-outline text-xs py-2 rounded-full font-bold cursor-pointer"
                 >
                   Sign In
                 </button>
@@ -368,10 +369,10 @@ function AppContent() {
       )}
 
       {/* Main Workspace Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] md:pb-8">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Header Bar */}
         {view !== 'exam' && view !== 'review' && (
-          <header className="sticky top-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
+          <header className="shrink-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               {/* Mobile Hamburger Drawer Trigger */}
               <button
@@ -403,7 +404,7 @@ function AppContent() {
                         : dashboardTab)
                     : view === 'import' ? 'Import Paper' : 'Exam Results'}
                 </h1>
-                <div className="text-[10px] sm:text-xs font-semibold text-gray-400 truncate hidden xs:block">
+                <div className="text-[10px] sm:text-xs font-semibold text-[var(--text-muted)] truncate hidden xs:block">
                   SSC CGL Tier 1 & 2 Platform
                 </div>
               </div>
@@ -414,13 +415,13 @@ function AppContent() {
               <ThemeSwitcher variant="compact" />
 
               {view === 'import' ? (
-                <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-1.5 sm:py-2 px-3 sm:px-4 rounded-full flex items-center gap-1.5">
+                <button onClick={handleBackToDashboard} className="btn btn-outline text-xs py-1.5 sm:py-2 px-3 sm:px-4 rounded-full flex items-center gap-1.5 cursor-pointer">
                   <ArrowLeft size={14} /> <span className="hidden xs:inline">Back</span>
                 </button>
               ) : (
                 <button
                   onClick={() => setView('import')}
-                  className="btn btn-outline text-xs p-2 sm:px-3.5 sm:py-2 rounded-full shadow-2xs flex items-center gap-1.5 shrink-0"
+                  className="btn btn-outline text-xs p-2 sm:px-3.5 sm:py-2 rounded-full shadow-2xs flex items-center gap-1.5 shrink-0 cursor-pointer"
                   title="Import Paper"
                 >
                   <PlusCircle size={15} />
@@ -432,7 +433,7 @@ function AppContent() {
               {user ? (
                 <button
                   onClick={() => setShowAccountModal(true)}
-                  className="relative group p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0"
+                  className="relative group p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0 cursor-pointer"
                   title={`${user.user_metadata?.display_name || user.email} (Manage Account)`}
                   aria-label="Manage Account"
                 >
@@ -444,7 +445,7 @@ function AppContent() {
               ) : (
                 <button
                   onClick={openLogin}
-                  className="btn btn-primary text-xs py-1.5 px-3 sm:px-4 rounded-full shadow-xs flex items-center gap-1.5 shrink-0"
+                  className="btn btn-primary text-xs py-1.5 px-3 sm:px-4 rounded-full shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
                   title="Sign In to sync tests"
                 >
                   <LogIn size={13} />
@@ -456,7 +457,7 @@ function AppContent() {
         )}
 
         {/* Content Viewport */}
-        <main className={`flex-1 ${view === 'exam' || view === 'review' ? 'p-0' : 'px-3 sm:px-8 py-4 sm:py-6'}`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar ${view === 'exam' || view === 'review' ? 'p-0' : 'px-3 sm:px-8 py-4 sm:py-6 pb-24 md:pb-8'}`}>
           {view === 'dashboard' && (
             <Dashboard
               userId={effectiveUserId}
@@ -712,26 +713,26 @@ function AppContent() {
       )}
 
       {/* Mobile & Desktop Account Modal */}
-      {showAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white text-gray-900 rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-gray-200/80 relative">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+      {showAccountModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-[var(--border-color)] relative">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                   {user ? (user.user_metadata?.display_name || 'A')[0].toUpperCase() : 'G'}
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">
+                  <h3 className="text-sm font-extrabold text-[var(--text-main)]">
                     {user ? (user.user_metadata?.display_name || 'SSC Aspirant') : 'Guest User'}
                   </h3>
-                  <div className="text-[11px] font-semibold text-gray-400 truncate max-w-[180px]">
+                  <div className="text-[11px] font-semibold text-[var(--text-muted)] truncate max-w-[180px]">
                     {user ? user.email : 'Local Storage Mode'}
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setShowAccountModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-subcard)] cursor-pointer"
                 aria-label="Close"
               >
                 <X size={17} />
@@ -740,12 +741,12 @@ function AppContent() {
 
             {user ? (
               <div className="space-y-4">
-                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs font-bold text-emerald-800">Cloud Sync Active</span>
+                    <span className="text-xs font-bold text-emerald-500">Cloud Sync Active</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-emerald-600">Cross-device</span>
+                  <span className="text-[10px] font-semibold text-emerald-500/80">Cross-device</span>
                 </div>
 
                 {/* Theme Selector inside Modal */}
@@ -756,19 +757,19 @@ function AppContent() {
                     await signOut();
                     setShowAccountModal(false);
                   }}
-                  className="w-full btn btn-outline text-xs py-2.5 rounded-full flex items-center justify-center gap-2 text-rose-600 hover:bg-rose-50 hover:border-rose-200 font-bold"
+                  className="w-full btn btn-outline text-xs py-2.5 rounded-full flex items-center justify-center gap-2 text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/30 font-bold cursor-pointer"
                 >
                   <LogOut size={15} /> Sign Out
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-100">
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span className="text-xs font-bold text-amber-800">Local Storage Active</span>
+                    <span className="text-xs font-bold text-amber-500">Local Storage Active</span>
                   </div>
-                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                  <p className="text-[11px] text-amber-400/90 leading-relaxed">
                     You're currently taking tests locally. Sign in or create a free account to sync tests and bookmarks between your phone and laptop!
                   </p>
                 </div>
@@ -778,7 +779,7 @@ function AppContent() {
                     setShowAccountModal(false);
                     openLogin();
                   }}
-                  className="w-full btn btn-primary text-xs py-2.5 rounded-full flex items-center justify-center gap-2 font-bold shadow-xs"
+                  className="w-full btn btn-primary text-xs py-2.5 rounded-full flex items-center justify-center gap-2 font-bold shadow-xs cursor-pointer"
                 >
                   <LogIn size={15} /> Sign In / Create Account
                 </button>
@@ -787,7 +788,8 @@ function AppContent() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* PWA Components */}

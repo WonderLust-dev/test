@@ -160,6 +160,16 @@ export default function EReaderView({
     };
   }, []);
 
+  // Lock body scroll when E-reader is active
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
   // Handle Scroll Progress
   const handleScroll = () => {
     const el = scrollContainerRef.current;
@@ -243,7 +253,7 @@ export default function EReaderView({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme}`}
+      className={`fixed inset-0 z-[100] flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme}`}
       style={{
         backgroundColor: 'var(--reader-bg)',
         color: 'var(--reader-text)',

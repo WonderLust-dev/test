@@ -183,22 +183,24 @@ export default function Dashboard({
   return (
     <div className="max-w-7xl mx-auto animate-fadeIn space-y-6">
       {/* Top Bento Navigation Tabs */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-gray-100/80 rounded-2xl overflow-x-auto hide-scrollbar w-fit max-w-full">
+      <div className="flex items-center gap-1.5 p-1.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-2xl overflow-x-auto hide-scrollbar w-fit max-w-full shadow-2xs">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-white text-gray-900 shadow-xs'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-xs border border-[var(--border-color)] font-bold'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)]/60'
             }`}
           >
-            <tab.icon size={15} className={activeTab === tab.id ? 'text-gray-900' : 'text-gray-400'} />
+            <tab.icon size={15} className={activeTab === tab.id ? 'text-[var(--text-main)]' : 'text-[var(--text-subtle)]'} />
             <span>{tab.label}</span>
             {tab.count !== undefined && tab.count > 0 && (
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === tab.id ? 'bg-gray-100 text-gray-800' : 'bg-gray-200/70 text-gray-600'
+                activeTab === tab.id
+                  ? 'bg-[var(--bg-subcard)] text-[var(--text-main)] border border-[var(--border-color)]'
+                  : 'bg-black/5 dark:bg-white/5 text-[var(--text-muted)]'
               }`}>
                 {tab.count}
               </span>

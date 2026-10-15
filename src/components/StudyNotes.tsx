@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { StudyNote, NoteFilters } from '../types';
 import { getNotes, saveNote, saveNotesBatch, updateNote, deleteNote, togglePinNote, downloadNote } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
@@ -874,7 +875,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       {/* ============================================================ */}
       {/* IMMERSIVE E-READER MODE (MATCHES IMAGE 2 REFERENCE) */}
       {/* ============================================================ */}
-      {activeNote && (
+      {activeNote && createPortal(
         <EReaderView
           note={activeNote}
           readNumber={Math.max(1, filteredNotes.findIndex(n => n.id === activeNote.id) + 1)}
@@ -903,14 +904,15 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             }
           }}
           onToggleTask={handleToggleTask}
-        />
+        />,
+        document.body
       )}
 
       {/* ============================================================ */}
       {/* UPLOAD NOTES MODAL */}
       {/* ============================================================ */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
+      {showUploadModal && createPortal(
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl border border-[var(--border-color)] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2">
@@ -932,7 +934,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                   setShowUploadModal(false);
                   setPendingFiles([]);
                 }}
-                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -946,7 +948,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               <select
                 value={uploadSubject}
                 onChange={e => setUploadSubject(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
                 {SUBJECT_OPTIONS.map(s => (
                   <option key={s} value={s}>{s}</option>
@@ -971,7 +973,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     <span className="text-[var(--text-muted)] font-mono">{formatFileSize(f.size)}</span>
                     <button
                       onClick={() => setPendingFiles(prev => prev.filter((_, i) => i !== idx))}
-                      className="p-1 text-[var(--text-muted)] hover:text-rose-400"
+                      className="p-1 text-[var(--text-muted)] hover:text-rose-400 cursor-pointer"
                       title="Remove file"
                     >
                       <X size={13} />
@@ -988,27 +990,28 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                   setShowUploadModal(false);
                   setPendingFiles([]);
                 }}
-                className="flex-1 btn btn-outline text-xs py-2.5 rounded-xl font-bold"
+                className="flex-1 btn btn-outline text-xs py-2.5 rounded-xl font-bold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmUpload}
-                className="flex-1 btn btn-primary text-xs py-2.5 rounded-xl font-bold shadow-xs flex items-center justify-center gap-1.5"
+                className="flex-1 btn btn-primary text-xs py-2.5 rounded-xl font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Check size={14} />
                 <span>Save to Notes Library</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ============================================================ */}
       {/* CREATE / EDIT NOTE MODAL (Notion-Powered) */}
       {/* ============================================================ */}
-      {editingNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 animate-fadeIn">
+      {editingNote && createPortal(
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 animate-fadeIn">
           <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl p-4 sm:p-6 max-w-5xl w-full h-[90vh] shadow-2xl border border-[var(--border-color)] flex flex-col justify-between">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)] shrink-0">
@@ -1311,7 +1314,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
