@@ -12,7 +12,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText, Menu } from 'lucide-react';
+import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText, Menu, Download } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
@@ -20,7 +20,23 @@ type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
 function AppContent() {
   const { user, openLogin, openSignup, signOut, isGuest, loading } = useAuthModal();
   const effectiveUserId = user?.id || 'guest';
-  const { isInstallable, isOffline, wasOffline, pendingSyncCount, syncNow, install, dismissInstall, updateAvailable, update } = usePWA();
+  const {
+    isInstallable,
+    isInstalled,
+    isIOS,
+    canInstall,
+    isOffline,
+    wasOffline,
+    pendingSyncCount,
+    showInstallModal,
+    syncNow,
+    install,
+    dismissInstall,
+    openInstallModal,
+    closeInstallModal,
+    updateAvailable,
+    update,
+  } = usePWA();
 
   const [view, setView] = useState<View>('dashboard');
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
@@ -283,8 +299,21 @@ function AppContent() {
             </nav>
           </div>
 
-          {/* Bottom of Sidebar: Theme Switcher & Profile / Status */}
+          {/* Bottom of Sidebar: Install App, Theme Switcher & Profile / Status */}
           <div className="pt-4 border-t border-gray-200/80 space-y-3">
+            {canInstall && (
+              <button
+                onClick={openInstallModal}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-800 bg-white hover:bg-gray-50 border border-gray-200 shadow-2xs transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Download size={15} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <span>Install App</span>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-md font-bold">Offline</span>
+              </button>
+            )}
+
             <ThemeSwitcher variant="full" />
 
             {user ? (
@@ -604,6 +633,22 @@ function AppContent() {
                   <PlusCircle size={16} className="text-gray-500" />
                   <span>Import JSON Papers</span>
                 </button>
+
+                {canInstall && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openInstallModal();
+                    }}
+                    className="w-full mt-2 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 transition-all shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Download size={16} className="text-emerald-600" />
+                      <span>Install App (Offline Ready)</span>
+                    </div>
+                    <span className="text-[9px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">PWA</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -742,7 +787,15 @@ function AppContent() {
         pendingSyncCount={pendingSyncCount}
         onSyncNow={syncNow}
       />
-      {isInstallable && <PWAInstallPrompt onInstall={install} onDismiss={dismissInstall} />}
+      {(isInstallable || showInstallModal) && (
+        <PWAInstallPrompt
+          onInstall={install}
+          onDismiss={dismissInstall}
+          showModal={showInstallModal}
+          onCloseModal={closeInstallModal}
+          isIOS={isIOS}
+        />
+      )}
       {updateAvailable && <UpdateAvailable onUpdate={update} />}
     </div>
   );

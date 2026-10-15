@@ -1,7 +1,7 @@
 // SSC CGL Exam Platform - Service Worker
-// Version: 2.0.0
+// Version: 3.0.0
 
-const CACHE_VERSION = 'sscp-v2';
+const CACHE_VERSION = 'sscp-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -12,14 +12,19 @@ const STATIC_ASSETS = [
   './manifest.json',
   './404.html',
   './icons/icon.svg',
+  './icons/icon-192x192.png',
+  './icons/icon-512x512.png',
+  './icons/icon-maskable-512x512.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon-32x32.png',
 ];
 
 // Maximum number of dynamic cache entries (non-critical files)
-const MAX_DYNAMIC_CACHE = 80;
+const MAX_DYNAMIC_CACHE = 100;
 
 // Install event - safely cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing v2...');
+  console.log('[SW] Installing v3...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(async (cache) => {
@@ -44,7 +49,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating v2...');
+  console.log('[SW] Activating v3...');
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
@@ -109,28 +114,46 @@ async function handleNavigation(request) {
     // Offline or network error - fall through to cached app shell
   }
 
-  const cachedMatch = await caches.match(request);
+  // 1. Try exact match in all caches (with ignoreSearch)
+  const cachedMatch = await caches.match(request, { ignoreSearch: true });
   if (cachedMatch) return cachedMatch;
 
-  // Find cached index.html under any relative path
+  // 2. Search in all caches for any cached index.html or root
+  for (const cacheName of [STATIC_CACHE, DYNAMIC_CACHE]) {
+    try {
+      const cache = await caches.open(cacheName);
+      const keys = await cache.keys();
+      for (const req of keys) {
+        const u = req.url.toLowerCase();
+        if (u.endsWith('/index.html') || u.endsWith('/') || u.includes('index.html')) {
+          const match = await cache.match(req);
+          if (match) return match;
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Fallback search with common URL patterns
   const fallback =
-    (await caches.match('./index.html')) ||
-    (await caches.match('./')) ||
-    (await caches.match('/index.html')) ||
-    (await caches.match('index.html'));
+    (await caches.match('./index.html', { ignoreSearch: true })) ||
+    (await caches.match('./', { ignoreSearch: true })) ||
+    (await caches.match('index.html', { ignoreSearch: true })) ||
+    (await caches.match('/index.html', { ignoreSearch: true }));
 
   if (fallback) return fallback;
 
-  return new Response('Offline - SSC CGL Prep', {
-    status: 503,
-    statusText: 'Service Unavailable',
-    headers: { 'Content-Type': 'text/plain' },
-  });
+  return new Response(
+    `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Offline - SSC CGL Prep</title><style>body{font-family:system-ui,-apple-system,sans-serif;background:#F4F5F7;color:#111827;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center}.card{background:#fff;border-radius:24px;padding:32px;max-width:400px;box-shadow:0 10px 25px rgba(0,0,0,0.05);border:1px solid #E5E7EB}h1{font-size:20px;margin-bottom:8px}p{font-size:13px;color:#6B7280;line-height:1.5;margin-bottom:20px}button{background:#111827;color:#fff;border:none;padding:10px 24px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer}</style></head><body><div class="card"><h1>Offline Mode Active</h1><p>The app shell is ready. Connect to the internet once to load new question papers, or tap reload to retry.</p><button onclick="window.location.reload()">Reload Application</button></div></body></html>`,
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }
+  );
 }
 
 // Cache-first strategy for static assets: Return from cache immediately, fetch & cache if missing
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, { ignoreSearch: true });
   if (cached) {
     return cached;
   }
@@ -144,10 +167,23 @@ async function cacheFirst(request) {
     }
     return response;
   } catch (error) {
-    // Try ignoreSearch fallback
-    const fallback = await caches.match(request, { ignoreSearch: true });
-    if (fallback) return fallback;
-    return new Response('Asset Offline', { status: 503, statusText: 'Offline' });
+    // If it's a JS or CSS asset and exact match missed, search in caches for any matching asset filename
+    const url = new URL(request.url);
+    const filename = url.pathname.split('/').pop();
+    if (filename) {
+      for (const cacheName of [STATIC_CACHE, DYNAMIC_CACHE]) {
+        try {
+          const cache = await caches.open(cacheName);
+          const keys = await cache.keys();
+          const found = keys.find(k => k.url.endsWith(filename));
+          if (found) {
+            const res = await cache.match(found);
+            if (res) return res;
+          }
+        } catch {}
+      }
+    }
+    return new Response('', { status: 404, statusText: 'Offline Asset Not Found' });
   }
 }
 
@@ -162,17 +198,13 @@ async function networkFirst(request) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    const cached = await caches.match(request, { ignoreSearch: true });
     if (cached) {
       return cached;
     }
 
     if (request.mode === 'navigate') {
-      const fallback =
-        (await caches.match('./index.html')) ||
-        (await caches.match('./')) ||
-        (await caches.match('/index.html'));
-      if (fallback) return fallback;
+      return handleNavigation(request);
     }
 
     return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
@@ -225,6 +257,23 @@ self.addEventListener('message', (event) => {
       names.forEach((name) => caches.delete(name));
     });
   }
+  // Client requests immediate caching of runtime scripts and stylesheets
+  if (event.data && event.data.type === 'CACHE_ASSETS' && Array.isArray(event.data.urls)) {
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      for (const url of event.data.urls) {
+        try {
+          const existing = await cache.match(url);
+          if (!existing) {
+            const res = await fetch(url);
+            if (res && res.ok) {
+              await cache.put(url, res);
+              console.log('[SW] Pre-cached runtime bundle:', url);
+            }
+          }
+        } catch {}
+      }
+    });
+  }
 });
 
 // Background sync for failed operations (optional)
@@ -235,7 +284,6 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncAttempts() {
-  // Placeholder for background sync logic
   console.log('[SW] Syncing attempts...');
 }
 
@@ -245,10 +293,10 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'SSC CGL Prep';
   const options = {
     body: data.body || 'Time to study!',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
+    icon: './icons/icon-192x192.png',
+    badge: './icons/favicon-32x32.png',
     vibrate: [200, 100, 200],
-    data: { url: data.url || '/' },
+    data: { url: data.url || './' },
     actions: [
       { action: 'study', title: 'Start Studying' },
       { action: 'dismiss', title: 'Later' },
@@ -275,4 +323,4 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-console.log('[SW] Service Worker loaded');
+console.log('[SW] Service Worker v3 loaded');

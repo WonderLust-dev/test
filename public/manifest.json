@@ -2,24 +2,37 @@
   "name": "SSC CGL Exam Prep",
   "short_name": "SSC CGL Prep",
   "description": "AI-powered SSC CGL exam preparation platform. Import question papers, take exams, analyze performance, and learn from mistakes.",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F7F9FC",
-  "theme_color": "#4F46E5",
+  "background_color": "#F4F5F7",
+  "theme_color": "#111827",
   "orientation": "portrait-primary",
   "lang": "en",
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "./icons/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "./icons/icon.svg",
-      "sizes": "192x192 512x512",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }
@@ -30,21 +43,28 @@
       "short_name": "Exam",
       "description": "Start a new exam",
       "url": "./?action=exam",
-      "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Import Paper",
-      "short_name": "Import",
-      "description": "Import a new question paper",
-      "url": "./?action=import",
-      "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "name": "Practice Hub",
+      "short_name": "Practice",
+      "description": "Drill topics and question sets",
+      "url": "./?action=practice",
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Study Notes",
+      "short_name": "Notes",
+      "description": "Formula sheets and revision notes",
+      "url": "./?action=notes",
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "View Mistakes",
       "short_name": "Mistakes",
-      "description": "Review your mistakes",
+      "description": "Review your mistake notebook",
       "url": "./?action=mistakes",
-      "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "related_applications": [],
