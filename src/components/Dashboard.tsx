@@ -19,6 +19,7 @@ interface DashboardProps {
   onStartCustomPractice: (paper: Paper) => void;
   onImport: () => void;
   onStartReview: () => void;
+  onViewResults?: (attemptId: string, paper?: Paper) => void;
   refreshKey: number;
   activeTab?: DashboardTab;
   onTabChange?: (tab: DashboardTab) => void;
@@ -31,6 +32,7 @@ export default function Dashboard({
   onStartCustomPractice,
   onImport,
   onStartReview,
+  onViewResults,
   refreshKey,
   activeTab: propTab,
   onTabChange,
@@ -219,6 +221,7 @@ export default function Dashboard({
           onStartExam={onStartExam}
           onPractice={onPractice}
           onStartReview={onStartReview}
+          onViewResults={onViewResults}
           onSelectTab={setActiveTab}
           onPracticeTopicClick={handlePracticeTopicClick}
         />
@@ -237,6 +240,7 @@ export default function Dashboard({
           onStartExam={onStartExam}
           onPractice={onPractice}
           onImport={onImport}
+          onViewResults={onViewResults}
           onRefresh={async () => {
             const p = await getPapers(effectiveUserId);
             setPapers(p);
@@ -274,7 +278,7 @@ export default function Dashboard({
         />
       )}
       {activeTab === 'analytics' && (
-        <AnalyticsTab attempts={attempts} papers={papers} />
+        <AnalyticsTab attempts={attempts} papers={papers} onViewResults={onViewResults} />
       )}
     </div>
   );
@@ -295,6 +299,7 @@ function OverviewBento({
   onStartExam,
   onPractice,
   onStartReview,
+  onViewResults,
   onSelectTab,
   onPracticeTopicClick,
 }: {
@@ -309,6 +314,7 @@ function OverviewBento({
   onStartExam: (paperId: string) => void;
   onPractice: (paperId: string) => void;
   onStartReview: () => void;
+  onViewResults?: (attemptId: string, paper?: Paper) => void;
   onSelectTab: (tab: DashboardTab) => void;
   onPracticeTopicClick: (topic: string) => void;
 }) {
@@ -369,6 +375,34 @@ function OverviewBento({
                 </div>
               </div>
             </div>
+
+            {/* Latest Attempt Review Pill */}
+            {attempts.length > 0 && (
+              <div className="mb-4 p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <Eye size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-extrabold text-gray-900 truncate">
+                      Latest Exam: {attempts[0].paper_title}
+                    </div>
+                    <div className="text-[11px] text-gray-500 font-medium">
+                      Score: {attempts[0].score}/{attempts[0].total_marks} • Accuracy: {attempts[0].accuracy}% • {formatTime(attempts[0].time_spent_seconds)}
+                    </div>
+                  </div>
+                </div>
+                {onViewResults && (
+                  <button
+                    onClick={() => onViewResults(attempts[0].id, papers.find(p => p.id === attempts[0].paper_id))}
+                    className="self-start sm:self-auto px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Review Answers & Solutions</span>
+                    <ArrowUpRight size={13} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bottom Exam Readiness Row */}
@@ -653,10 +687,11 @@ interface LibraryTabProps {
   onPractice: (id: string) => void;
   onImport: () => void;
   onRefresh: () => void;
+  onViewResults?: (attemptId: string, paper?: Paper) => void;
   userId?: string;
 }
 
-function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch, filters, setFilters, allSubjects, allExams, onStartExam, onPractice, onImport, onRefresh, userId }: LibraryTabProps) {
+function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch, filters, setFilters, allSubjects, allExams, onStartExam, onPractice, onImport, onRefresh, onViewResults, userId }: LibraryTabProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'public'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1056,10 +1091,25 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
 
                 {/* Attempt History Pill */}
                 {attemptCount > 0 && (
-                  <div className="flex items-center justify-between text-xs mb-3 px-3 py-2 bg-emerald-50/60 border border-emerald-100/80 rounded-2xl">
-                    <span className="text-gray-500 text-[11px] font-medium">{attemptCount} attempt{attemptCount > 1 ? 's' : ''}</span>
-                    {bestScore !== null && (
-                      <span className={`font-bold text-[11px] ${getAccuracyColor(bestScore)}`}>Best: {bestScore}%</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs mb-3 px-3 py-2 bg-indigo-50/60 border border-indigo-100/80 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-[11px] font-medium">{attemptCount} attempt{attemptCount > 1 ? 's' : ''}</span>
+                      {bestScore !== null && (
+                        <span className={`font-bold text-[11px] ${getAccuracyColor(bestScore)}`}>Best: {bestScore}%</span>
+                      )}
+                    </div>
+                    {onViewResults && (
+                      <button
+                        onClick={() => {
+                          const pAttempts = attempts.filter(a => String(a.paper_id) === String(paper.id));
+                          if (pAttempts.length > 0) {
+                            onViewResults(pAttempts[0].id, paper);
+                          }
+                        }}
+                        className="text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer self-start sm:self-auto hover:underline"
+                      >
+                        <Eye size={12} /> View Solutions & Review
+                      </button>
                     )}
                   </div>
                 )}
@@ -1692,7 +1742,7 @@ function BookmarksTab({
 // ============================================================
 // Analytics Tab
 // ============================================================
-function AnalyticsTab({ attempts, papers }: { attempts: Attempt[]; papers: Paper[] }) {
+function AnalyticsTab({ attempts, papers, onViewResults }: { attempts: Attempt[]; papers: Paper[]; onViewResults?: (attemptId: string, paper?: Paper) => void }) {
   if (attempts.length === 0) {
     return (
       <div className="text-center py-20 bento-card p-10">
@@ -1775,7 +1825,8 @@ function AnalyticsTab({ attempts, papers }: { attempts: Attempt[]; papers: Paper
                 <th className="pb-3 pr-4">Score</th>
                 <th className="pb-3 pr-4">Accuracy</th>
                 <th className="pb-3 pr-4">Time</th>
-                <th className="pb-3">Date</th>
+                <th className="pb-3 pr-4">Date</th>
+                <th className="pb-3 text-right">Solutions & Review</th>
               </tr>
             </thead>
             <tbody>
@@ -1787,7 +1838,18 @@ function AnalyticsTab({ attempts, papers }: { attempts: Attempt[]; papers: Paper
                     <td className={`py-3 pr-4 font-extrabold ${getAccuracyColor(pct)}`}>{a.score}/{a.total_marks}</td>
                     <td className={`py-3 pr-4 font-bold ${getAccuracyColor(a.accuracy)}`}>{a.accuracy}%</td>
                     <td className="py-3 pr-4 text-gray-500 font-medium">{formatTime(a.time_spent_seconds)}</td>
-                    <td className="py-3 text-gray-400 font-medium">{new Date(a.started_at).toLocaleDateString()}</td>
+                    <td className="py-3 pr-4 text-gray-400 font-medium">{new Date(a.started_at).toLocaleDateString()}</td>
+                    <td className="py-3 text-right">
+                      {onViewResults && (
+                        <button
+                          onClick={() => onViewResults(a.id, papers.find(p => p.id === a.paper_id))}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                        >
+                          <Eye size={12} />
+                          <span>View Solutions</span>
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

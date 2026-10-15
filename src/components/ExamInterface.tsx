@@ -256,31 +256,38 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
       mode,
     }, finalQs);
 
-    // Record mistakes
-    for (const q of finalQs) {
-      if (q.is_correct === false && q.selected_answer !== null) {
-        const question = questions[q.question_index];
-        await addOrUpdateMistake({
-          user_id: userId || 'guest',
-          paper_id: paper.id,
-          paper_title: paper.title,
-          question_id: question.id,
-          question_text: question.question,
-          subject: question.subject || '',
-          topic: question.topic || '',
-          selected_answer: q.selected_answer,
-          correct_answer: question.answerIndex,
-          options: question.options,
-          solution: question.solution,
-          shortcut: question.shortcut,
-          hint: question.hint,
-          learning_suggestion: question.learningSuggestion,
-          resolved: false,
-        }, userId);
-      }
+    // Record mistakes safely without blocking on individual failures
+    try {
+      const mistakePromises = finalQs
+        .filter(q => q.is_correct === false && q.selected_answer !== null)
+        .map(async q => {
+          const question = questions[q.question_index];
+          if (!question) return;
+          await addOrUpdateMistake({
+            user_id: userId || 'guest',
+            paper_id: paper.id,
+            paper_title: paper.title,
+            question_id: question.id,
+            question_text: question.question,
+            subject: question.subject || '',
+            topic: question.topic || '',
+            selected_answer: q.selected_answer,
+            correct_answer: question.answerIndex,
+            options: question.options,
+            solution: question.solution,
+            shortcut: question.shortcut,
+            hint: question.hint,
+            learning_suggestion: question.learningSuggestion,
+            resolved: false,
+          }, userId);
+        });
+      await Promise.allSettled(mistakePromises);
+    } catch (err) {
+      console.warn('[ExamInterface] Error recording mistakes batch:', err);
     }
 
     clearExamSession();
+    setIsSubmitting(false);
     onComplete(attempt.id);
   }, [answers, qTimes, marked, questions, paper, userId, mode, onComplete, isSubmitting, showSubmit]);
 

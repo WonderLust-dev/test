@@ -429,7 +429,22 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
 
         if (result.success && result.data) {
           synced = true;
-          return result.data;
+          const remoteAttempt = result.data;
+          const remoteId = remoteAttempt.id;
+          if (remoteId && remoteId !== newAttempt.id) {
+            const locAttempts = lsGet<Attempt>(LS_KEYS.attempts);
+            const aIdx = locAttempts.findIndex(a => a.id === newAttempt.id);
+            if (aIdx >= 0) {
+              locAttempts[aIdx] = remoteAttempt;
+              lsSet(LS_KEYS.attempts, locAttempts);
+            }
+            const locQs = lsGet<AttemptQuestion>(LS_KEYS.attemptQuestions);
+            locQs.forEach(q => {
+              if (q.attempt_id === newAttempt.id) q.attempt_id = remoteId;
+            });
+            lsSet(LS_KEYS.attemptQuestions, locQs);
+          }
+          return remoteAttempt;
         }
       } catch {
         synced = false;
@@ -448,14 +463,17 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>, questions: Omit<
 }
 
 export async function getAttemptQuestions(attemptId: string): Promise<AttemptQuestion[]> {
+  const local = lsGet<AttemptQuestion>(LS_KEYS.attemptQuestions).filter(q => q.attempt_id === attemptId);
+  if (local.length > 0) return local;
+
   if (isSupabaseConfigured && supabase) {
     const result = await sb(async () => {
       const { data } = await supabase!.from('attempt_questions').select('*').eq('attempt_id', attemptId);
       return (data || []) as AttemptQuestion[];
     });
-    if (result) return result;
+    if (result && result.length > 0) return result;
   }
-  return lsGet<AttemptQuestion>(LS_KEYS.attemptQuestions).filter(q => q.attempt_id === attemptId);
+  return local;
 }
 
 // ============================================================

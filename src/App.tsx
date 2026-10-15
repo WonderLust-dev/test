@@ -191,6 +191,12 @@ function AppContent() {
     setRefreshKey(k => k + 1);
   };
 
+  const handleViewResults = (attemptId: string, paper?: Paper) => {
+    setLastAttemptId(attemptId);
+    if (paper) setActivePaper(paper);
+    setView('results');
+  };
+
   const handleBackToDashboard = () => {
     setView('dashboard');
     setActivePaper(null);
@@ -459,6 +465,7 @@ function AppContent() {
               onStartCustomPractice={handleStartCustomPractice}
               onImport={() => setView('import')}
               onStartReview={handleStartReview}
+              onViewResults={handleViewResults}
               refreshKey={refreshKey}
               activeTab={dashboardTab}
               onTabChange={setDashboardTab}
