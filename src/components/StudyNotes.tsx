@@ -11,6 +11,7 @@ import {
   downloadNote,
   syncNotesWithCloud,
   isRemoteUser,
+  checkDuplicateNote,
 } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
@@ -53,6 +54,7 @@ import {
   Cloud,
   CloudOff,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface StudyNotesProps {
@@ -97,15 +99,42 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
 
-  // Upload Modal
+  // Upload Modal & Duplicate Header Detection
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadSubject, setUploadSubject] = useState(SUBJECT_OPTIONS[0]);
   const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; content: string; size: number; type: 'md' | 'txt' }>>([]);
+  const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper to extract note title from first heading or file name
+  const extractNoteTitle = (fileName: string, content: string): string => {
+    let title = fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    const firstHeading = content.match(/^#\s+(.+)$/m);
+    if (firstHeading && firstHeading[1].trim()) {
+      title = firstHeading[1].trim();
+    }
+    return title;
+  };
+
+  // Duplicate Header Check for pending upload files
+  const duplicatePendingFiles = useMemo(() => {
+    const existingTitles = new Set(notes.map(n => n.title.trim().toLowerCase()));
+    return pendingFiles.filter(f => {
+      const title = extractNoteTitle(f.name, f.content);
+      return existingTitles.has(title.trim().toLowerCase());
+    });
+  }, [pendingFiles, notes]);
+
   // Editor Modal (Create / Edit)
   const [editingNote, setEditingNote] = useState<Partial<StudyNote> | null>(null);
+
+  // Duplicate Header Check for note currently being edited / created
+  const existingNoteWithTitle = useMemo(() => {
+    if (!editingNote?.title?.trim()) return null;
+    const clean = editingNote.title.trim().toLowerCase();
+    return notes.find(n => n.id !== editingNote.id && n.title.trim().toLowerCase() === clean) || null;
+  }, [editingNote?.id, editingNote?.title, notes]);
   const [editorTab, setEditorTab] = useState<'write' | 'split' | 'preview'>('write');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pasteNotification, setPasteNotification] = useState<string | null>(null);
@@ -315,38 +344,74 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const handleConfirmUpload = async () => {
     if (pendingFiles.length === 0) return;
 
-    const toSave = pendingFiles.map(f => {
-      // Auto-extract title from first heading or filename
-      let title = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      const firstHeading = f.content.match(/^#\s+(.+)$/m);
-      if (firstHeading && firstHeading[1].trim()) {
-        title = firstHeading[1].trim();
+    let updatedNotes = [...notes];
+    const newItemsToSave: Array<Omit<StudyNote, 'id' | 'created_at' | 'updated_at'>> = [];
+    let overwrittenCount = 0;
+
+    for (const f of pendingFiles) {
+      let title = extractNoteTitle(f.name, f.content);
+      const cleanTitle = title.trim().toLowerCase();
+      const existing = notes.find(n => n.title.trim().toLowerCase() === cleanTitle);
+
+      if (existing && overwriteDuplicates) {
+        // Overwrite existing note with duplicate header
+        overwrittenCount++;
+        await updateNote(existing.id, {
+          content: f.content,
+          file_size: f.size,
+          file_name: f.name,
+          file_type: f.type,
+          subject: uploadSubject,
+          updated_at: new Date().toISOString(),
+        }, effectiveUserId);
+
+        updatedNotes = updatedNotes.map(n => n.id === existing.id ? {
+          ...n,
+          content: f.content,
+          file_size: f.size,
+          file_name: f.name,
+          file_type: f.type,
+          subject: uploadSubject,
+          updated_at: new Date().toISOString(),
+        } : n);
+      } else {
+        if (existing && !overwriteDuplicates) {
+          title = `${title} (New)`;
+        }
+        newItemsToSave.push({
+          user_id: effectiveUserId,
+          title,
+          content: f.content,
+          file_name: f.name,
+          file_type: f.type,
+          file_size: f.size,
+          subject: uploadSubject,
+          tags: [uploadSubject, f.type.toUpperCase()],
+          is_pinned: false,
+        });
       }
+    }
 
-      return {
-        user_id: effectiveUserId,
-        title,
-        content: f.content,
-        file_name: f.name,
-        file_type: f.type,
-        file_size: f.size,
-        subject: uploadSubject,
-        tags: [uploadSubject, f.type.toUpperCase()],
-        is_pinned: false,
-      };
-    });
+    if (newItemsToSave.length > 0) {
+      const saved = await saveNotesBatch(newItemsToSave);
+      updatedNotes = [...saved, ...updatedNotes];
+    }
 
-    const saved = await saveNotesBatch(toSave);
-    setNotes(prev => [...saved, ...prev]);
+    setNotes(updatedNotes);
     setPendingFiles([]);
     setShowUploadModal(false);
+    setOverwriteDuplicates(false);
 
     // Reset filters and focus uploaded subject so uploaded notes are immediately visible
     setSelectedSubject(uploadSubject);
     setSelectedType('all');
     setSearch('');
     setPinnedOnly(false);
-    setSyncNotification(`✅ ${saved.length} note${saved.length !== 1 ? 's' : ''} uploaded and synced with database!`);
+
+    const msg = overwrittenCount > 0
+      ? `✅ ${overwrittenCount} note(s) updated with new content, ${newItemsToSave.length} new note(s) added!`
+      : `✅ ${newItemsToSave.length} note${newItemsToSave.length !== 1 ? 's' : ''} uploaded and synced with database!`;
+    setSyncNotification(msg);
     setTimeout(() => setSyncNotification(null), 4000);
   };
 
@@ -527,10 +592,10 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setEditingNote(null);
   };
 
-  // Headings for TOC in active note
+  // Headings for TOC in active note (with duplicate title check)
   const activeTocHeadings = useMemo(() => {
     if (!activeNote || activeNote.file_type !== 'md') return [];
-    return extractHeadings(activeNote.content);
+    return extractHeadings(activeNote.content, activeNote.title);
   }, [activeNote]);
 
   return (
@@ -1115,6 +1180,30 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               ))}
             </div>
 
+            {/* Duplicate Header Check Alert */}
+            {duplicatePendingFiles.length > 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs flex flex-col gap-1.5 animate-fadeIn">
+                <div className="flex items-center gap-2 font-bold text-amber-400">
+                  <AlertTriangle size={15} className="shrink-0" />
+                  <span>Duplicate Header Warning ({duplicatePendingFiles.length} file{duplicatePendingFiles.length > 1 ? 's' : ''})</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                  Note(s) with these titles already exist in your library. Choose whether to update them or save as separate copies:
+                </p>
+                <label className="flex items-center gap-2 mt-1 cursor-pointer select-none bg-[var(--bg-subcard)] p-2 rounded-xl border border-[var(--border-color)]">
+                  <input
+                    type="checkbox"
+                    checked={overwriteDuplicates}
+                    onChange={e => setOverwriteDuplicates(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="font-semibold text-xs text-[var(--text-main)]">
+                    Overwrite existing note(s) with updated content
+                  </span>
+                </label>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex gap-2.5 pt-2">
               <button
@@ -1236,6 +1325,13 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     className="flex-1 px-3.5 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+                {/* Duplicate Header Warning */}
+                {existingNoteWithTitle && (
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-amber-400 animate-fadeIn">
+                    <AlertTriangle size={12} className="shrink-0" />
+                    <span>A note with header "{existingNoteWithTitle.title}" already exists in {existingNoteWithTitle.subject}.</span>
+                  </div>
+                )}
               </div>
 
               <div className="sm:col-span-3">

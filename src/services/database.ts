@@ -890,6 +890,32 @@ export async function getNoteById(noteId: string, userId?: string): Promise<Stud
   return notes.find(n => n.id === noteId) || null;
 }
 
+export async function checkDuplicateNote(title: string, userId?: string): Promise<StudyNote | null> {
+  const clean = title.trim().toLowerCase();
+  if (!clean) return null;
+
+  const localNotes = lsGet<StudyNote>(LS_KEYS.notes);
+  const match = localNotes.find(
+    n => n.title.trim().toLowerCase() === clean && (!userId || n.user_id === userId || n.user_id === 'guest')
+  );
+  if (match) return match;
+
+  if (isRemoteUser(userId)) {
+    const remote = await sb(async () => {
+      const { data } = await supabase!
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId!)
+        .ilike('title', title.trim())
+        .limit(1);
+      return data && data.length > 0 ? (data[0] as StudyNote) : null;
+    });
+    if (remote) return remote;
+  }
+
+  return null;
+}
+
 export async function saveNote(note: Omit<StudyNote, 'id' | 'created_at' | 'updated_at'>): Promise<StudyNote> {
   const now = new Date().toISOString();
   const newNote: StudyNote = {

@@ -21,6 +21,8 @@ interface MarkdownViewerProps {
   searchQuery?: string;
   className?: string;
   onToggleTask?: (taskIndex: number, newChecked: boolean) => void;
+  noteTitle?: string;
+  skipTitleHeading?: boolean;
 }
 
 interface TocItem {
@@ -38,27 +40,47 @@ export function slugify(text: string): string {
     .replace(/\s+/g, '-');
 }
 
-// Extract Table of Contents items from markdown & text content
-export function extractHeadings(markdown: string): TocItem[] {
+// Extract Table of Contents items from markdown & text content with duplicate header de-duplication
+export function extractHeadings(markdown: string, noteTitle?: string): TocItem[] {
   const headings: TocItem[] = [];
-  const lines = markdown.split('\n');
+  const lines = markdown.split(/\r?\n/);
+  const seenIds = new Map<string, number>();
+
   for (const line of lines) {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
       const level = match[1].length;
       const text = match[2].trim();
-      const id = slugify(text);
+      const baseId = slugify(text) || 'heading';
+      const count = seenIds.get(baseId) || 0;
+      seenIds.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-${count}`;
       headings.push({ id, text, level });
       continue;
     }
     const partMatch = line.match(/^(PART|CHAPTER|SECTION|MODULE)\s+([0-9IVXLCDM]+)[:\-–\s]+(.+)$/i);
     if (partMatch) {
       const text = `${partMatch[1]} ${partMatch[2]}: ${partMatch[3].trim()}`;
-      const id = slugify(text);
+      const baseId = slugify(text) || 'section';
+      const count = seenIds.get(baseId) || 0;
+      seenIds.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-${count}`;
       headings.push({ id, text, level: 2 });
       continue;
     }
   }
+
+  // Duplicate Header Check for Table of Contents:
+  // If the very first heading in the TOC is level 1 and repeats the noteTitle,
+  // omit it so the TOC displays actual chapters rather than repeating the book title.
+  if (noteTitle && headings.length > 0 && headings[0].level === 1) {
+    const hNorm = headings[0].text.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const tNorm = noteTitle.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (hNorm === tNorm || hNorm.includes(tNorm) || tNorm.includes(hNorm)) {
+      return headings.slice(1);
+    }
+  }
+
   return headings;
 }
 
@@ -82,6 +104,8 @@ export default function MarkdownViewer({
   searchQuery = '',
   className = '',
   onToggleTask,
+  noteTitle,
+  skipTitleHeading = false,
 }: MarkdownViewerProps) {
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
@@ -109,8 +133,25 @@ export default function MarkdownViewer({
 
   // Parse markdown & text into structured block tokens
   const blocks = useMemo(() => {
-    return parseMarkdownBlocks(content);
-  }, [content]);
+    const rawBlocks = parseMarkdownBlocks(content);
+    if (!skipTitleHeading && !noteTitle) return rawBlocks;
+
+    // Duplicate header check: if the first block is an H1 that duplicates noteTitle
+    // or if skipTitleHeading is explicitly true, suppress the duplicate first heading
+    if (rawBlocks.length > 0 && rawBlocks[0].type === 'heading' && rawBlocks[0].level === 1) {
+      if (skipTitleHeading) {
+        return rawBlocks.slice(1);
+      }
+      if (noteTitle) {
+        const hNorm = rawBlocks[0].text.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const tNorm = noteTitle.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (hNorm === tNorm || hNorm.includes(tNorm) || tNorm.includes(hNorm)) {
+          return rawBlocks.slice(1);
+        }
+      }
+    }
+    return rawBlocks;
+  }, [content, skipTitleHeading, noteTitle]);
 
   return (
     <article
@@ -160,6 +201,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
   const lines = markdown.split(/\r?\n/);
   let i = 0;
   let taskCounter = 0;
+  const seenHeadingIds = new Map<string, number>();
 
   while (i < lines.length) {
     const line = lines[i];
@@ -175,11 +217,15 @@ function parseMarkdownBlocks(markdown: string): Block[] {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const text = headingMatch[2].trim();
+      const baseId = slugify(text) || 'heading';
+      const count = seenHeadingIds.get(baseId) || 0;
+      seenHeadingIds.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-${count}`;
       blocks.push({
         type: 'heading',
         level,
         text,
-        id: slugify(text),
+        id,
       });
       i++;
       continue;
@@ -192,11 +238,15 @@ function parseMarkdownBlocks(markdown: string): Block[] {
     if (chapterMatch) {
       const chapterNumber = `${chapterMatch[1].toUpperCase()} ${chapterMatch[2]}`;
       const title = chapterMatch[3].trim();
+      const baseId = slugify(`${chapterNumber}-${title}`) || 'chapter';
+      const count = seenHeadingIds.get(baseId) || 0;
+      seenHeadingIds.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-${count}`;
       blocks.push({
         type: 'chapter_banner',
         chapterNumber,
         title,
-        id: slugify(`${chapterNumber}-${title}`),
+        id,
       });
       i++;
       continue;
@@ -438,9 +488,14 @@ function parseMarkdownBlocks(markdown: string): Block[] {
         const headers = parseTableLine(line);
         i += 2; // skip header and delimiter line
         const rows: string[][] = [];
+        const headerKey = headers.map(h => h.trim().toLowerCase()).join('||');
         while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
           const cells = parseTableLine(lines[i]);
-          if (cells.length > 0) rows.push(cells);
+          const rowKey = cells.map(c => c.trim().toLowerCase()).join('||');
+          // Duplicate header row check: if row duplicates table headers, omit it
+          if (cells.length > 0 && rowKey !== headerKey) {
+            rows.push(cells);
+          }
           i++;
         }
         blocks.push({ type: 'table', headers, rows });

@@ -134,10 +134,10 @@ export default function EReaderView({
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Table of Contents Headings
+  // Table of Contents Headings (with duplicate title check)
   const headings = useMemo(() => {
-    return extractHeadings(note.content);
-  }, [note.content]);
+    return extractHeadings(note.content, note.title);
+  }, [note.content, note.title]);
 
   // Estimated Read Time & Word Count
   const stats = useMemo(() => {
@@ -631,6 +631,8 @@ export default function EReaderView({
                 fontSize={fontSize}
                 fontStyle={fontFamily}
                 onToggleTask={onToggleTask}
+                noteTitle={note.title}
+                skipTitleHeading={true}
               />
             )}
 
