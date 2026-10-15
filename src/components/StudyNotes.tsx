@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { StudyNote, NoteFilters } from '../types';
-import { getNotes, saveNote, saveNotesBatch, updateNote, deleteNote, togglePinNote, downloadNote } from '../services/database';
+import {
+  getNotes,
+  saveNote,
+  saveNotesBatch,
+  updateNote,
+  deleteNote,
+  togglePinNote,
+  downloadNote,
+  syncNotesWithCloud,
+  isRemoteUser,
+} from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
 import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
@@ -40,6 +50,9 @@ import {
   Table,
   Type,
   AlignLeft,
+  Cloud,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 
 interface StudyNotesProps {
@@ -116,6 +129,49 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     loadNotes();
   }, [effectiveUserId]);
 
+  // Cloud Sync state & auto-reconnect listener
+  const isRemote = isRemoteUser(effectiveUserId);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotification, setSyncNotification] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Auto-sync when reconnecting
+      if (isRemote) {
+        handleManualSync();
+      }
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isRemote, effectiveUserId]);
+
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await syncNotesWithCloud(effectiveUserId);
+      if (res.success) {
+        const freshNotes = await getNotes(effectiveUserId);
+        setNotes(freshNotes);
+        setSyncNotification(`☁️ Synced with Supabase database (${freshNotes.length} notes up to date)`);
+      } else {
+        setSyncNotification(`⚠️ ${res.error || 'Sync failed'}`);
+      }
+    } catch (err: any) {
+      setSyncNotification(`⚠️ Sync failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncNotification(null), 4000);
+    }
+  };
+
   // Filtered & Sorted Notes
   const filteredNotes = useMemo(() => {
     let result = [...notes];
@@ -178,7 +234,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   // Handle Pin Toggle
   const handleTogglePin = async (e: React.MouseEvent, noteId: string) => {
     e.stopPropagation();
-    const nextState = await togglePinNote(noteId);
+    const nextState = await togglePinNote(noteId, effectiveUserId);
     setNotes(prev =>
       prev.map(n => (n.id === noteId ? { ...n, is_pinned: nextState } : n))
     );
@@ -191,7 +247,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const handleDelete = async (e: React.MouseEvent, note: StudyNote) => {
     e.stopPropagation();
     if (confirm(`Delete note "${note.title}"? This cannot be undone.`)) {
-      await deleteNote(note.id);
+      await deleteNote(note.id, effectiveUserId);
       setNotes(prev => prev.filter(n => n.id !== note.id));
       if (activeNote?.id === note.id) {
         setActiveNote(null);
@@ -284,6 +340,14 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setNotes(prev => [...saved, ...prev]);
     setPendingFiles([]);
     setShowUploadModal(false);
+
+    // Reset filters and focus uploaded subject so uploaded notes are immediately visible
+    setSelectedSubject(uploadSubject);
+    setSelectedType('all');
+    setSearch('');
+    setPinnedOnly(false);
+    setSyncNotification(`✅ ${saved.length} note${saved.length !== 1 ? 's' : ''} uploaded and synced with database!`);
+    setTimeout(() => setSyncNotification(null), 4000);
   };
 
   useEffect(() => {
@@ -369,7 +433,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
     setActiveNote(updatedNote);
     setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
-    await updateNote(activeNote.id, { content: updatedContent });
+    await updateNote(activeNote.id, { content: updatedContent }, effectiveUserId);
   };
 
   // Checklist toggle in editor split/preview view
@@ -404,7 +468,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         tags: editingNote.tags || [],
         emoji: editingNote.emoji || '📝',
         font_style: editingNote.font_style || 'sans',
-      });
+      }, effectiveUserId);
       setNotes(prev =>
         prev.map(n =>
           n.id === editingNote.id
@@ -430,6 +494,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           font_style: editingNote.font_style || 'sans',
         } as StudyNote) : null);
       }
+      setSyncNotification('✅ Note updated and saved to database!');
+      setTimeout(() => setSyncNotification(null), 3000);
     } else {
       // Create new
       const saved = await saveNote({
@@ -446,6 +512,16 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         font_style: editingNote.font_style || 'sans',
       });
       setNotes(prev => [saved, ...prev]);
+
+      // Ensure created note is visible
+      if (editingNote.subject) {
+        setSelectedSubject(editingNote.subject);
+      }
+      setSearch('');
+      setSelectedType('all');
+      setPinnedOnly(false);
+      setSyncNotification('✅ Note created and synced with database!');
+      setTimeout(() => setSyncNotification(null), 3000);
     }
 
     setEditingNote(null);
@@ -502,6 +578,33 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               <span>Upload Notes</span>
             </button>
 
+            {/* Cloud Sync Status & Manual Sync Button */}
+            {isRemote ? (
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all"
+                title={isOnline ? "Force sync with Supabase cloud database" : "Offline mode — changes queued for auto-sync"}
+              >
+                {isOnline ? (
+                  <Cloud size={14} className={isSyncing ? "animate-pulse text-indigo-400" : "text-emerald-400"} />
+                ) : (
+                  <CloudOff size={14} className="text-amber-400" />
+                )}
+                <span className="hidden sm:inline">
+                  {isSyncing ? "Syncing..." : isOnline ? "Cloud Synced" : "Offline"}
+                </span>
+                <RefreshCw size={12} className={`${isSyncing ? "animate-spin" : "opacity-70 hover:opacity-100"}`} />
+              </button>
+            ) : (
+              <div
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] flex items-center gap-1.5"
+                title="Notes stored locally in PWA. Sign in to sync across devices."
+              >
+                <span>💾 PWA Local</span>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 setEditingNote({
@@ -522,6 +625,23 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           </div>
         </div>
       </div>
+
+      {/* Cloud Sync / Upload Notification Banner */}
+      {syncNotification && (
+        <div className="p-3 sm:p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between gap-2 animate-fadeIn shadow-xs">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-emerald-400 shrink-0" />
+            <span>{syncNotification}</span>
+          </div>
+          <button
+            onClick={() => setSyncNotification(null)}
+            className="p-1 hover:bg-emerald-500/20 rounded-lg text-emerald-300 transition-colors"
+            title="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Drag & Drop Quick Upload Zone */}
       <div

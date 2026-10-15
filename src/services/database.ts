@@ -14,6 +14,7 @@ const LS_KEYS = {
   session: 'sscp_session',
   pendingSyncAttempts: 'sscp_pending_sync_attempts',
   pendingSyncBookmarks: 'sscp_pending_sync_bookmarks',
+  pendingSyncNotes: 'sscp_pending_sync_notes',
   notes: 'sscp_notes',
 };
 
@@ -669,7 +670,8 @@ export function downloadJSON(json: string, filename: string): void {
 export function getPendingSyncCount(): number {
   const pendingAttempts = lsGet<{ attempt: Attempt; questions: AttemptQuestion[] }>(LS_KEYS.pendingSyncAttempts);
   const pendingBookmarks = lsGet<Bookmark>(LS_KEYS.pendingSyncBookmarks);
-  return pendingAttempts.length + pendingBookmarks.length;
+  const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+  return pendingAttempts.length + pendingBookmarks.length + pendingNotes.length;
 }
 
 export function isPaperAvailableOffline(paperId: string): boolean {
@@ -689,8 +691,8 @@ export function savePaperForOffline(paper: Paper): void {
   lsSet(LS_KEYS.papers, localPapers);
 }
 
-export async function syncPendingOfflineData(userId?: string): Promise<{ syncedAttempts: number; syncedBookmarks: number }> {
-  if (!navigator.onLine) return { syncedAttempts: 0, syncedBookmarks: 0 };
+export async function syncPendingOfflineData(userId?: string): Promise<{ syncedAttempts: number; syncedBookmarks: number; syncedNotes: number }> {
+  if (!navigator.onLine) return { syncedAttempts: 0, syncedBookmarks: 0, syncedNotes: 0 };
 
   let effectiveUserId = userId;
   if (!effectiveUserId && isSupabaseConfigured && supabase) {
@@ -700,10 +702,11 @@ export async function syncPendingOfflineData(userId?: string): Promise<{ syncedA
     } catch {}
   }
 
-  if (!isRemoteUser(effectiveUserId)) return { syncedAttempts: 0, syncedBookmarks: 0 };
+  if (!isRemoteUser(effectiveUserId)) return { syncedAttempts: 0, syncedBookmarks: 0, syncedNotes: 0 };
 
   let syncedAttempts = 0;
   let syncedBookmarks = 0;
+  let syncedNotes = 0;
 
   // 1. Sync pending attempts
   const pendingAttempts = lsGet<{ attempt: Attempt; questions: AttemptQuestion[] }>(LS_KEYS.pendingSyncAttempts);
@@ -759,38 +762,131 @@ export async function syncPendingOfflineData(userId?: string): Promise<{ syncedA
     lsSet(LS_KEYS.pendingSyncBookmarks, remainingBm);
   }
 
-  if (syncedAttempts > 0 || syncedBookmarks > 0) {
+  // 3. Sync pending study notes
+  const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+  if (pendingNotes.length > 0) {
+    const remainingNotes: StudyNote[] = [];
+    for (const note of pendingNotes) {
+      try {
+        const noteToSync = { ...note, user_id: effectiveUserId! };
+        const res = await sb(async () => {
+          const { error } = await supabase!.from('notes').upsert(noteToSync);
+          if (error) throw error;
+          return true;
+        });
+        if (res) {
+          syncedNotes++;
+        } else {
+          remainingNotes.push(note);
+        }
+      } catch {
+        remainingNotes.push(note);
+      }
+    }
+    lsSet(LS_KEYS.pendingSyncNotes, remainingNotes);
+  }
+
+  if (syncedAttempts > 0 || syncedBookmarks > 0 || syncedNotes > 0) {
     invalidateCache();
   }
 
-  return { syncedAttempts, syncedBookmarks };
+  return { syncedAttempts, syncedBookmarks, syncedNotes };
 }
 
 // ============================================================
 // Study Notes Service (.md and .txt notes)
+// Cloud Supabase Sync + PWA Offline LocalStorage Fallback
 // ============================================================
 
 export async function getNotes(userId?: string): Promise<StudyNote[]> {
   const localNotes = lsGet<StudyNote>(LS_KEYS.notes);
 
-  // Seed demo revision notes on initial visit if notes store is empty
-  if (localNotes.length === 0) {
-    const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
-      ...n,
-      id: `seed_note_${Date.now()}_${idx}`,
-      user_id: userId || 'guest',
-      created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-      updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-    }));
-    lsSet(LS_KEYS.notes, seeded);
-    return seeded;
+  if (!isRemoteUser(userId)) {
+    // Guest or offline-only mode
+    if (localNotes.length === 0) {
+      const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
+        ...n,
+        id: `seed_note_${Date.now()}_${idx}`,
+        user_id: userId || 'guest',
+        created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+        updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+      }));
+      lsSet(LS_KEYS.notes, seeded);
+      return seeded;
+    }
+    return localNotes;
   }
 
-  return localNotes;
+  // Remote authenticated user
+  return cachedFetch<StudyNote[]>(`notes_${userId}`, 5000, async () => {
+    const remoteData = await sb(async () => {
+      const { data, error } = await supabase!
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as StudyNote[];
+    });
+
+    if (remoteData !== null) {
+      // Supabase query succeeded
+      if (remoteData.length === 0 && localNotes.length > 0) {
+        // First cloud sync: push existing local notes to Supabase
+        const notesToUpload = localNotes.map(n => ({
+          ...n,
+          user_id: userId!,
+        }));
+        await sb(async () => {
+          await supabase!.from('notes').upsert(notesToUpload);
+        });
+        lsSet(LS_KEYS.notes, notesToUpload);
+        return notesToUpload;
+      }
+
+      if (remoteData.length === 0 && localNotes.length === 0) {
+        // Fresh user: seed default demo notes
+        const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
+          ...n,
+          id: `seed_note_${Date.now()}_${idx}`,
+          user_id: userId!,
+          created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+          updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+        }));
+        await sb(async () => {
+          await supabase!.from('notes').upsert(seeded);
+        });
+        lsSet(LS_KEYS.notes, seeded);
+        return seeded;
+      }
+
+      // Check if any local notes were created while offline that aren't on Supabase
+      const remoteIds = new Set(remoteData.map(n => n.id));
+      const offlineOnlyNotes = localNotes.filter(n => !remoteIds.has(n.id) && (n.user_id === userId || n.user_id === 'guest'));
+
+      if (offlineOnlyNotes.length > 0) {
+        const notesToPush = offlineOnlyNotes.map(n => ({ ...n, user_id: userId! }));
+        await sb(async () => {
+          await supabase!.from('notes').upsert(notesToPush);
+        });
+        const combined = [...notesToPush, ...remoteData].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        lsSet(LS_KEYS.notes, combined);
+        return combined;
+      }
+
+      lsSet(LS_KEYS.notes, remoteData);
+      return remoteData;
+    }
+
+    // Network error or Supabase offline: return local cached notes
+    return localNotes;
+  });
 }
 
-export async function getNoteById(noteId: string): Promise<StudyNote | null> {
-  const notes = await getNotes();
+export async function getNoteById(noteId: string, userId?: string): Promise<StudyNote | null> {
+  const notes = await getNotes(userId);
   return notes.find(n => n.id === noteId) || null;
 }
 
@@ -803,9 +899,30 @@ export async function saveNote(note: Omit<StudyNote, 'id' | 'created_at' | 'upda
     updated_at: now,
   };
 
+  // 1. LocalStorage for instant UI response and offline resilience
   const notes = lsGet<StudyNote>(LS_KEYS.notes);
   notes.unshift(newNote);
   lsSet(LS_KEYS.notes, notes);
+  invalidateCache('notes');
+
+  // 2. Cloud Supabase Sync
+  if (isRemoteUser(note.user_id)) {
+    if (navigator.onLine) {
+      const result = await sb(async () => {
+        const { data, error } = await supabase!.from('notes').insert(newNote).select().single();
+        if (error) throw error;
+        return data as StudyNote;
+      });
+      if (result) {
+        return result;
+      }
+    }
+    // Offline or network error: add to offline sync queue
+    const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+    pending.unshift(newNote);
+    lsSet(LS_KEYS.pendingSyncNotes, pending);
+  }
+
   return newNote;
 }
 
@@ -818,41 +935,165 @@ export async function saveNotesBatch(notesToSave: Array<Omit<StudyNote, 'id' | '
     updated_at: now,
   }));
 
+  // 1. LocalStorage first
   const existingNotes = lsGet<StudyNote>(LS_KEYS.notes);
   const updated = [...newNotes, ...existingNotes];
   lsSet(LS_KEYS.notes, updated);
+  invalidateCache('notes');
+
+  // 2. Cloud Supabase Sync
+  const sampleUserId = notesToSave[0]?.user_id;
+  if (isRemoteUser(sampleUserId)) {
+    if (navigator.onLine) {
+      const result = await sb(async () => {
+        const { data, error } = await supabase!.from('notes').insert(newNotes).select();
+        if (error) throw error;
+        return (data || []) as StudyNote[];
+      });
+      if (result && result.length > 0) {
+        return result;
+      }
+    }
+    // Offline or network error: queue for background sync
+    const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+    lsSet(LS_KEYS.pendingSyncNotes, [...newNotes, ...pending]);
+  }
+
   return newNotes;
 }
 
-export async function updateNote(noteId: string, updates: Partial<StudyNote>): Promise<void> {
+export async function updateNote(noteId: string, updates: Partial<StudyNote>, userId?: string): Promise<void> {
+  const now = new Date().toISOString();
   const notes = lsGet<StudyNote>(LS_KEYS.notes);
   const idx = notes.findIndex(n => n.id === noteId);
+  let effectiveUserId = userId;
+
   if (idx >= 0) {
+    effectiveUserId = effectiveUserId || notes[idx].user_id;
     notes[idx] = {
       ...notes[idx],
       ...updates,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
     lsSet(LS_KEYS.notes, notes);
   }
+  invalidateCache('notes');
+
+  // Cloud Sync
+  if (isRemoteUser(effectiveUserId)) {
+    if (navigator.onLine) {
+      await sb(async () => {
+        const { error } = await supabase!
+          .from('notes')
+          .update({
+            ...updates,
+            updated_at: now,
+          })
+          .eq('id', noteId);
+        if (error) throw error;
+      });
+    } else {
+      const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+      const pIdx = pending.findIndex(n => n.id === noteId);
+      if (pIdx >= 0) {
+        pending[pIdx] = { ...pending[pIdx], ...updates, updated_at: now };
+        lsSet(LS_KEYS.pendingSyncNotes, pending);
+      } else if (idx >= 0) {
+        pending.unshift(notes[idx]);
+        lsSet(LS_KEYS.pendingSyncNotes, pending);
+      }
+    }
+  }
 }
 
-export async function togglePinNote(noteId: string): Promise<boolean> {
+export async function togglePinNote(noteId: string, userId?: string): Promise<boolean> {
+  const now = new Date().toISOString();
   const notes = lsGet<StudyNote>(LS_KEYS.notes);
   const idx = notes.findIndex(n => n.id === noteId);
+
   if (idx >= 0) {
     const nextState = !notes[idx].is_pinned;
+    const noteUserId = userId || notes[idx].user_id;
     notes[idx].is_pinned = nextState;
-    notes[idx].updated_at = new Date().toISOString();
+    notes[idx].updated_at = now;
     lsSet(LS_KEYS.notes, notes);
+    invalidateCache('notes');
+
+    if (isRemoteUser(noteUserId) && navigator.onLine) {
+      sb(async () => {
+        await supabase!.from('notes').update({ is_pinned: nextState, updated_at: now }).eq('id', noteId);
+      });
+    }
     return nextState;
   }
   return false;
 }
 
-export async function deleteNote(noteId: string): Promise<void> {
-  const notes = lsGet<StudyNote>(LS_KEYS.notes).filter(n => n.id !== noteId);
-  lsSet(LS_KEYS.notes, notes);
+export async function deleteNote(noteId: string, userId?: string): Promise<void> {
+  const notes = lsGet<StudyNote>(LS_KEYS.notes);
+  const target = notes.find(n => n.id === noteId);
+  const effectiveUserId = userId || target?.user_id;
+
+  lsSet(LS_KEYS.notes, notes.filter(n => n.id !== noteId));
+
+  const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes).filter(n => n.id !== noteId);
+  lsSet(LS_KEYS.pendingSyncNotes, pending);
+  invalidateCache('notes');
+
+  if (isRemoteUser(effectiveUserId) && navigator.onLine) {
+    await sb(async () => {
+      const { error } = await supabase!.from('notes').delete().eq('id', noteId);
+      if (error) throw error;
+    });
+  }
+}
+
+export async function syncNotesWithCloud(userId?: string): Promise<{ success: boolean; count: number; error?: string }> {
+  if (!isRemoteUser(userId)) {
+    return { success: true, count: 0 };
+  }
+
+  if (!navigator.onLine) {
+    return { success: false, count: 0, error: 'Offline - cannot sync with cloud right now' };
+  }
+
+  try {
+    invalidateCache('notes');
+    // 1. Sync pending notes
+    const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+    if (pendingNotes.length > 0) {
+      const remaining: StudyNote[] = [];
+      for (const note of pendingNotes) {
+        try {
+          const res = await sb(async () => {
+            const { error } = await supabase!.from('notes').upsert({ ...note, user_id: userId! });
+            if (error) throw error;
+            return true;
+          });
+          if (!res) remaining.push(note);
+        } catch {
+          remaining.push(note);
+        }
+      }
+      lsSet(LS_KEYS.pendingSyncNotes, remaining);
+    }
+
+    // 2. Fetch fresh from remote
+    const { data, error } = await supabase!
+      .from('notes')
+      .select('*')
+      .eq('user_id', userId!)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const freshNotes = (data || []) as StudyNote[];
+    lsSet(LS_KEYS.notes, freshNotes);
+    invalidateCache('notes');
+    return { success: true, count: freshNotes.length };
+  } catch (err: any) {
+    return { success: false, count: 0, error: err?.message || 'Sync failed' };
+  }
 }
 
 export function downloadNote(note: StudyNote): void {
