@@ -12,7 +12,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText } from 'lucide-react';
+import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText, Menu } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
@@ -30,6 +30,7 @@ function AppContent() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [demoLoaded, setDemoLoaded] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Load demo paper on first visit if library is empty (only after auth has resolved)
   useEffect(() => {
@@ -333,13 +334,42 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] md:pb-8">
         {/* Top Header Bar */}
         {view !== 'exam' && view !== 'review' && (
-          <header className="sticky top-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2.5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
+          <header className="sticky top-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--text-main)] truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none">
-                {view === 'dashboard'
-                  ? (dashboardTab === 'overview' ? 'Dashboard' : dashboardTab.charAt(0).toUpperCase() + dashboardTab.slice(1))
-                  : view === 'import' ? 'Import Paper' : 'Exam Results'}
-              </h1>
+              {/* Mobile Hamburger Drawer Trigger */}
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="md:hidden p-2 -ml-1 text-[var(--text-main)] hover:bg-[var(--bg-subcard)] rounded-xl border border-[var(--border-color)] transition-colors shrink-0 flex items-center justify-center shadow-2xs"
+                aria-label="Open navigation menu"
+                title="Open menu"
+              >
+                <Menu size={18} />
+              </button>
+
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg md:text-2xl font-bold tracking-tight text-[var(--text-main)] truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none leading-tight">
+                  {view === 'dashboard'
+                    ? (dashboardTab === 'overview'
+                        ? 'Dashboard'
+                        : dashboardTab === 'library'
+                        ? 'Exam Library'
+                        : dashboardTab === 'practice'
+                        ? 'Practice Hub'
+                        : dashboardTab === 'notes'
+                        ? 'Study Notes'
+                        : dashboardTab === 'mistakes'
+                        ? 'Mistakes'
+                        : dashboardTab === 'bookmarks'
+                        ? 'Bookmarks'
+                        : dashboardTab === 'analytics'
+                        ? 'Analytics'
+                        : dashboardTab)
+                    : view === 'import' ? 'Import Paper' : 'Exam Results'}
+                </h1>
+                <div className="text-[10px] sm:text-xs font-semibold text-gray-400 truncate hidden xs:block">
+                  SSC CGL Tier 1 & 2 Platform
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -439,13 +469,12 @@ function AppContent() {
 
       {/* Mobile Bottom Navigation Bar (< 768px) with Safe Area Support */}
       {view !== 'exam' && view !== 'review' && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-surface)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-1 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-lg">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-surface)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-1 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-lg">
           {[
             { id: 'overview' as const, label: 'Home', icon: LayoutDashboard },
             { id: 'library' as const, label: 'Library', icon: BookOpen },
+            { id: 'notes' as const, label: 'Notes', icon: FileText },
             { id: 'practice' as const, label: 'Drills', icon: Target },
-            { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle },
-            { id: 'analytics' as const, label: 'Stats', icon: BarChart3 },
           ].map(item => {
             const isActive = view === 'dashboard' && dashboardTab === item.id;
             return (
@@ -465,29 +494,166 @@ function AppContent() {
             );
           })}
 
-          {/* Account / Sign In Tab on Mobile */}
+          {/* Menu Drawer Button in Mobile Bottom Bar */}
           <button
-            onClick={() => {
-              if (user) {
-                setShowAccountModal(true);
-              } else {
-                openLogin();
-              }
-            }}
+            onClick={() => setMobileMenuOpen(true)}
             className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
-              showAccountModal ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-subtle)] font-medium'
+              mobileMenuOpen ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-subtle)] font-medium'
             }`}
+            aria-label="Open full menu"
           >
-            {user ? (
-              <div className="w-4.5 h-4.5 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] font-black text-[9px] flex items-center justify-center">
-                {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
-              </div>
-            ) : (
-              <LogIn size={18} className="text-[var(--text-subtle)]" />
-            )}
-            <span className="text-[10px] leading-none">{user ? 'Account' : 'Sign In'}</span>
+            <Menu size={18} className={mobileMenuOpen ? 'text-[var(--text-main)]' : 'text-[var(--text-subtle)]'} />
+            <span className="text-[10px] leading-none">Menu</span>
           </button>
         </nav>
+      )}
+
+      {/* Mobile Slide-Out Sidebar Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-fadeIn">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Drawer Panel */}
+          <div className="relative w-[290px] max-w-[85vw] bg-[var(--bg-app)] h-full flex flex-col justify-between p-4 shadow-2xl border-r border-[var(--border-color)] z-10 animate-slideInLeft overflow-y-auto">
+            <div className="space-y-4">
+              {/* Drawer Brand & Close Button */}
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                <button
+                  onClick={() => {
+                    setView('dashboard');
+                    setDashboardTab('overview');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 text-left group"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs">
+                    <BookOpen size={18} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold tracking-tight text-[var(--text-main)]">
+                      SSC CGL Prep
+                    </div>
+                    <div className="text-[10px] font-semibold text-gray-400">
+                      Tier 1 & 2 Platform
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-1.5 text-gray-400 hover:text-[var(--text-main)] rounded-full hover:bg-[var(--bg-subcard)] transition-colors"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Navigation Links */}
+              <nav className="space-y-1">
+                {[
+                  { id: 'overview' as const, label: 'Dashboard', icon: LayoutDashboard },
+                  { id: 'library' as const, label: 'Exam Library', icon: BookOpen },
+                  { id: 'practice' as const, label: 'Practice Hub', icon: Target },
+                  { id: 'notes' as const, label: 'Study Notes', icon: FileText, badge: 'New' },
+                  { id: 'mistakes' as const, label: 'Mistakes Notebook', icon: AlertTriangle },
+                  { id: 'bookmarks' as const, label: 'Saved Bookmarks', icon: Bookmark },
+                  { id: 'analytics' as const, label: 'Analytics & Trends', icon: BarChart3 },
+                ].map(item => {
+                  const isActive = view === 'dashboard' && dashboardTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setView('dashboard');
+                        setDashboardTab(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-xs font-bold border border-[var(--border-color)]'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon size={17} className={isActive ? 'text-gray-900' : 'text-gray-400'} />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800">
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Quick Actions */}
+              <div className="pt-2 border-t border-[var(--border-color)]">
+                <button
+                  onClick={() => {
+                    setView('import');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-all border border-dashed border-[var(--border-color)]"
+                >
+                  <PlusCircle size={16} className="text-gray-500" />
+                  <span>Import JSON Papers</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer Footer: Theme & Account */}
+            <div className="pt-4 border-t border-[var(--border-color)] space-y-3 mt-4">
+              <ThemeSwitcher variant="full" />
+
+              {user ? (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-gray-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      {(user.user_metadata?.display_name || 'A')[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--text-main)] truncate">
+                        {user.user_metadata?.display_name || 'SSC Aspirant'}
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOut size={15} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openLogin();
+                    }}
+                    className="w-full btn btn-primary text-xs py-2 rounded-full font-bold shadow-xs flex items-center justify-center gap-2"
+                  >
+                    <LogIn size={14} />
+                    <span>Sign In / Create Account</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Mobile & Desktop Account Modal */}

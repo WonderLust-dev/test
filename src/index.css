@@ -548,6 +548,14 @@
 }
 .animate-fadeIn { animation: fadeIn 0.4s ease forwards; }
 
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slideInLeft {
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Focus visible */
 *:focus-visible {
   outline: 2px solid var(--color-accent);
