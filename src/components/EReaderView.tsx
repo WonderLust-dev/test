@@ -92,8 +92,29 @@ export default function EReaderView({
   // Mode: 'cover' (editorial book cover) or 'read' (immersive reader)
   const [mode, setMode] = useState<'cover' | 'read'>('read');
 
-  // Reader Settings
-  const [paperTheme, setPaperTheme] = useState<ReaderPaperTheme>('paper');
+  // Reader Settings with intelligent default and localStorage persistence
+  const [paperTheme, setPaperTheme] = useState<ReaderPaperTheme>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sscp_ereader_theme') as ReaderPaperTheme | null;
+      if (saved && (saved === 'paper' || saved === 'cream' || saved === 'slate' || saved === 'midnight')) {
+        return saved;
+      }
+      const isDark =
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.documentElement.getAttribute('data-theme') === 'high-contrast' ||
+        document.documentElement.classList.contains('dark');
+      return isDark ? 'slate' : 'paper';
+    }
+    return 'paper';
+  });
+
+  const handlePaperThemeChange = (newTheme: ReaderPaperTheme) => {
+    setPaperTheme(newTheme);
+    try {
+      localStorage.setItem('sscp_ereader_theme', newTheme);
+    } catch {}
+  };
+
   const [fontFamily, setFontFamily] = useState<ReaderFontFamily>(note.font_style || 'serif');
   const [fontSize, setFontSize] = useState<ReaderFontSize>('base');
   const [readerWidth, setReaderWidth] = useState<ReaderWidth>('comfortable');
@@ -222,15 +243,11 @@ export default function EReaderView({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme} ${
-        paperTheme === 'paper'
-          ? 'bg-[#F5EFEB] text-[#2C2623]'
-          : paperTheme === 'cream'
-          ? 'bg-[#FAF8F5] text-[#1C1E21]'
-          : paperTheme === 'slate'
-          ? 'bg-[#1A1F26] text-[#E6EDF3]'
-          : 'bg-[#0D1117] text-[#C9D1D9]'
-      }`}
+      className={`fixed inset-0 z-50 flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme}`}
+      style={{
+        backgroundColor: 'var(--reader-bg)',
+        color: 'var(--reader-text)',
+      }}
     >
       {/* ============================================================ */}
       {/* 1. TOP HEADER (Matches Image 2: "E.reader", Back, Read nr, Bookmark) */}
@@ -284,29 +301,29 @@ export default function EReaderView({
           {/* Theme Quick Switcher Pill */}
           <div className="flex items-center p-0.5 rounded-xl border border-[var(--reader-border,#DFD7CF)] bg-black/5 dark:bg-white/5 text-xs">
             <button
-              onClick={() => setPaperTheme('paper')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'paper' ? 'bg-[#F5EFEB] text-[#2C2623] shadow-xs' : 'opacity-60 hover:opacity-100'}`}
+              onClick={() => handlePaperThemeChange('paper')}
+              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'paper' ? 'bg-[#F5EFEB] text-[#2C2623] shadow-xs ring-1 ring-[#DFD7CF]' : 'opacity-60 hover:opacity-100'}`}
               title="Warm Paper Theme (Image 2 Aesthetic)"
             >
               📜
             </button>
             <button
-              onClick={() => setPaperTheme('cream')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'cream' ? 'bg-[#FAF8F5] text-[#1C1E21] shadow-xs' : 'opacity-60 hover:opacity-100'}`}
+              onClick={() => handlePaperThemeChange('cream')}
+              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'cream' ? 'bg-[#FAF8F5] text-[#1C1E21] shadow-xs ring-1 ring-[#E8E0D5]' : 'opacity-60 hover:opacity-100'}`}
               title="Editorial Cream Theme"
             >
               🥛
             </button>
             <button
-              onClick={() => setPaperTheme('slate')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'slate' ? 'bg-[#21262D] text-[#E6EDF3] shadow-xs' : 'opacity-60 hover:opacity-100'}`}
+              onClick={() => handlePaperThemeChange('slate')}
+              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'slate' ? 'bg-[#21262D] text-[#E6EDF3] shadow-xs ring-1 ring-[#30363D]' : 'opacity-60 hover:opacity-100'}`}
               title="Dark Slate Theme (Image 2 Bottom Panels)"
             >
               🌑
             </button>
             <button
-              onClick={() => setPaperTheme('midnight')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'midnight' ? 'bg-[#0D1117] text-[#C9D1D9] shadow-xs' : 'opacity-60 hover:opacity-100'}`}
+              onClick={() => handlePaperThemeChange('midnight')}
+              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'midnight' ? 'bg-[#0D1117] text-[#C9D1D9] shadow-xs ring-1 ring-[#21262D]' : 'opacity-60 hover:opacity-100'}`}
               title="Midnight OLED Theme"
             >
               🖤

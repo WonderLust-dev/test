@@ -92,37 +92,37 @@
 /* Midnight Pro Dark Theme */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg-app: #0B0F19;
-  --bg-surface: #111827;
-  --bg-subcard: #162032;
-  --bg-subcard-hover: #1E293B;
-  --border-color: #1F293D;
-  --border-soft: #182234;
+  --bg-app: #0A0D14;
+  --bg-surface: #101622;
+  --bg-subcard: #161F2E;
+  --bg-subcard-hover: #1E2A3D;
+  --border-color: #1E2838;
+  --border-soft: #151D2A;
   --border-width: 1px;
 
-  --text-main: #F9FAFB;
-  --text-muted: #9CA3AF;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
   --text-subtle: #64748B;
 
   --accent-color: #10B981;
-  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-soft: rgba(16, 185, 129, 0.15);
 
-  --btn-primary-bg: #F9FAFB;
-  --btn-primary-text: #0B0F19;
+  --btn-primary-bg: #F8FAFC;
+  --btn-primary-text: #0A0D14;
   --btn-primary-hover: #FFFFFF;
 
-  --btn-outline-bg: #111827;
-  --btn-outline-border: #1F293D;
-  --btn-outline-text: #E5E7EB;
-  --btn-outline-hover: #162032;
+  --btn-outline-bg: #101622;
+  --btn-outline-border: #1E2838;
+  --btn-outline-text: #F1F5F9;
+  --btn-outline-hover: #161F2E;
 
-  --color-surface-soft: #162032;
+  --color-surface-soft: #161F2E;
   --color-accent-soft: rgba(16, 185, 129, 0.15);
 
-  --gradient-hero: linear-gradient(135deg, #111827 0%, #0F172A 100%);
+  --gradient-hero: linear-gradient(135deg, #101622 0%, #0D131F 100%);
   --gradient-accent: linear-gradient(135deg, #10B981 0%, #059669 100%);
-  --gradient-soft: linear-gradient(135deg, #0B0F19 0%, #111827 100%);
-  --gradient-brand: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  --gradient-soft: linear-gradient(135deg, #0A0D14 0%, #101622 100%);
+  --gradient-brand: linear-gradient(135deg, #161F2E 0%, #0D131F 100%);
 }
 
 /* WCAG AAA High Contrast Theme (Pure Pitch Black + Vivid High Contrast Gold/Amber) */
@@ -161,7 +161,7 @@
   --gradient-brand: linear-gradient(135deg, #080808 0%, #121212 100%);
 }
 
-/* ============ E-READER THEMES (Image 2 Match) ============ */
+/* ============ E-READER THEMES (Image 2 Match & Contrast Shielding) ============ */
 .reader-theme-paper {
   --reader-bg: #F5EFEB;
   --reader-surface: #FAF7F2;
@@ -171,6 +171,36 @@
   --reader-text-muted: #6B6059;
   --reader-accent: #E0564C;
   --reader-accent-soft: rgba(224, 86, 76, 0.12);
+
+  /* Override core theme variables so child components and MarkdownViewer adapt seamlessly */
+  --bg-app: #F5EFEB !important;
+  --bg-surface: #FAF7F2 !important;
+  --bg-subcard: #EDE5DC !important;
+  --bg-subcard-hover: #E3D9CE !important;
+  --border-color: #DFD7CF !important;
+  --border-soft: #E8E1D9 !important;
+
+  --text-main: #2C2623 !important;
+  --text-muted: #6B6059 !important;
+  --text-subtle: #8A7E75 !important;
+
+  background-color: #F5EFEB !important;
+  color: #2C2623 !important;
+}
+
+.reader-theme-paper,
+.reader-theme-paper * {
+  --reader-text: #2C2623;
+}
+.reader-theme-paper article,
+.reader-theme-paper h1,
+.reader-theme-paper h2,
+.reader-theme-paper h3,
+.reader-theme-paper h4,
+.reader-theme-paper p,
+.reader-theme-paper li,
+.reader-theme-paper blockquote {
+  color: #2C2623 !important;
 }
 
 .reader-theme-cream {
@@ -182,28 +212,118 @@
   --reader-text-muted: #5E646A;
   --reader-accent: #D9534F;
   --reader-accent-soft: rgba(217, 83, 79, 0.12);
+
+  /* Override core theme variables */
+  --bg-app: #FAF8F5 !important;
+  --bg-surface: #FFFFFF !important;
+  --bg-subcard: #F2ECE4 !important;
+  --bg-subcard-hover: #E8E0D6 !important;
+  --border-color: #E8E0D5 !important;
+  --border-soft: #EFE8DE !important;
+
+  --text-main: #1C1E21 !important;
+  --text-muted: #5E646A !important;
+  --text-subtle: #7A828A !important;
+
+  background-color: #FAF8F5 !important;
+  color: #1C1E21 !important;
+}
+
+.reader-theme-cream,
+.reader-theme-cream * {
+  --reader-text: #1C1E21;
+}
+.reader-theme-cream article,
+.reader-theme-cream h1,
+.reader-theme-cream h2,
+.reader-theme-cream h3,
+.reader-theme-cream h4,
+.reader-theme-cream p,
+.reader-theme-cream li,
+.reader-theme-cream blockquote {
+  color: #1C1E21 !important;
 }
 
 .reader-theme-slate {
-  --reader-bg: #1A1F26;
+  --reader-bg: #161B22;
   --reader-surface: #21262D;
   --reader-subcard: #282E37;
   --reader-border: #30363D;
-  --reader-text: #E6EDF3;
+  --reader-text: #F0F6FC;
   --reader-text-muted: #8B949E;
   --reader-accent: #E0564C;
   --reader-accent-soft: rgba(224, 86, 76, 0.15);
+
+  /* Override core theme variables */
+  --bg-app: #161B22 !important;
+  --bg-surface: #21262D !important;
+  --bg-subcard: #282E37 !important;
+  --bg-subcard-hover: #323A45 !important;
+  --border-color: #30363D !important;
+  --border-soft: #21262D !important;
+
+  --text-main: #F0F6FC !important;
+  --text-muted: #8B949E !important;
+  --text-subtle: #6E7681 !important;
+
+  background-color: #161B22 !important;
+  color: #F0F6FC !important;
+}
+
+.reader-theme-slate,
+.reader-theme-slate * {
+  --reader-text: #F0F6FC;
+}
+.reader-theme-slate article,
+.reader-theme-slate h1,
+.reader-theme-slate h2,
+.reader-theme-slate h3,
+.reader-theme-slate h4,
+.reader-theme-slate p,
+.reader-theme-slate li,
+.reader-theme-slate blockquote {
+  color: #F0F6FC !important;
 }
 
 .reader-theme-midnight {
-  --reader-bg: #0D1117;
-  --reader-surface: #161B22;
-  --reader-subcard: #1F242C;
-  --reader-border: #21262D;
-  --reader-text: #C9D1D9;
-  --reader-text-muted: #6E7681;
+  --reader-bg: #090D12;
+  --reader-surface: #0E141D;
+  --reader-subcard: #151D2A;
+  --reader-border: #212B3B;
+  --reader-text: #E6EDF3;
+  --reader-text-muted: #7D8590;
   --reader-accent: #6366F1;
   --reader-accent-soft: rgba(99, 102, 241, 0.15);
+
+  /* Override core theme variables */
+  --bg-app: #090D12 !important;
+  --bg-surface: #0E141D !important;
+  --bg-subcard: #151D2A !important;
+  --bg-subcard-hover: #1D2738 !important;
+  --border-color: #212B3B !important;
+  --border-soft: #151D2A !important;
+
+  --text-main: #E6EDF3 !important;
+  --text-muted: #7D8590 !important;
+  --text-subtle: #484F58 !important;
+
+  background-color: #090D12 !important;
+  color: #E6EDF3 !important;
+}
+
+.reader-theme-midnight,
+.reader-theme-midnight * {
+  --reader-text: #E6EDF3;
+}
+.reader-theme-midnight article,
+.reader-theme-midnight h1,
+.reader-theme-midnight h2,
+.reader-theme-midnight h3,
+.reader-theme-midnight h4,
+.reader-theme-midnight p,
+.reader-theme-midnight li,
+.reader-theme-midnight blockquote {
+  color: #E6EDF3 !important;
 }
 
 @layer base {
