@@ -29,6 +29,7 @@ import {
   Sliders,
   Type,
   Share2,
+  FileCode,
 } from 'lucide-react';
 
 export type ReaderPaperTheme = 'paper' | 'cream' | 'slate' | 'midnight';
@@ -122,6 +123,7 @@ export default function EReaderView({
   const [showTypographyMenu, setShowTypographyMenu] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [viewRawSource, setViewRawSource] = useState(false);
 
   // Audio / Speech Synthesis State (Image 2 Audio Feature)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -467,6 +469,19 @@ export default function EReaderView({
             </button>
           )}
 
+          {/* Toggle Raw Source View */}
+          <button
+            onClick={() => setViewRawSource(!viewRawSource)}
+            className={`p-2 rounded-xl border border-[var(--reader-border,#DFD7CF)] transition-all cursor-pointer ${
+              viewRawSource
+                ? 'bg-[#E0564C] text-white border-[#E0564C]'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80 hover:opacity-100'
+            }`}
+            title={viewRawSource ? 'Switch to Formatted Book View' : 'View Raw Markdown Source'}
+          >
+            <FileCode size={14} />
+          </button>
+
           {/* Copy Full Text */}
           <button
             onClick={handleCopy}
@@ -589,15 +604,35 @@ export default function EReaderView({
             </div>
 
             {/* ============================================================ */}
-            {/* Formatted Book Content */}
+            {/* Formatted Book Content or Raw Markdown Source */}
             {/* ============================================================ */}
-            <MarkdownViewer
-              content={note.content}
-              fileType={note.file_type}
-              fontSize={fontSize}
-              fontStyle={fontFamily}
-              onToggleTask={onToggleTask}
-            />
+            {viewRawSource ? (
+              <div className="space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-[var(--reader-border,#DFD7CF)] text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold font-mono text-[#E0564C]">Raw Markdown Source</span>
+                    <span className="opacity-60">• {note.content.split('\n').length} lines • {note.content.length} characters</span>
+                  </div>
+                  <button
+                    onClick={() => setViewRawSource(false)}
+                    className="px-3 py-1 rounded-xl bg-[#E0564C] text-white font-bold text-xs cursor-pointer hover:bg-[#d04940] transition-colors"
+                  >
+                    Switch to Book View
+                  </button>
+                </div>
+                <pre className="p-4 sm:p-5 rounded-2xl border border-[var(--reader-border,#DFD7CF)] bg-black/5 dark:bg-white/5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto whitespace-pre-wrap select-text">
+                  {note.content}
+                </pre>
+              </div>
+            ) : (
+              <MarkdownViewer
+                content={note.content}
+                fileType={note.file_type}
+                fontSize={fontSize}
+                fontStyle={fontFamily}
+                onToggleTask={onToggleTask}
+              />
+            )}
 
             {/* End of Note Editorial Badge */}
             <div className="pt-10 pb-6 text-center border-t border-[var(--reader-border,#DFD7CF)] mt-12 space-y-3">

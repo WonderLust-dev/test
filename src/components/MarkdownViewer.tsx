@@ -1,5 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Check, ExternalLink, Info, AlertTriangle, Lightbulb, AlertCircle, ShieldAlert, ChevronRight } from 'lucide-react';
+import {
+  Copy,
+  Check,
+  ExternalLink,
+  Info,
+  AlertTriangle,
+  Lightbulb,
+  AlertCircle,
+  ShieldAlert,
+  ChevronRight,
+  ImageIcon,
+} from 'lucide-react';
 import { extractLeadingEmoji } from '../utils/notionParser';
 
 interface MarkdownViewerProps {
@@ -51,6 +62,18 @@ export function extractHeadings(markdown: string): TocItem[] {
   return headings;
 }
 
+function parseTableLine(line: string): string[] {
+  const trimmed = line.trim();
+  const raw = trimmed.split('|').map((c) => c.trim());
+  if (trimmed.startsWith('|') && raw.length > 0 && raw[0] === '') {
+    raw.shift();
+  }
+  if (trimmed.endsWith('|') && raw.length > 0 && raw[raw.length - 1] === '') {
+    raw.pop();
+  }
+  return raw;
+}
+
 export default function MarkdownViewer({
   content,
   fileType = 'md',
@@ -90,7 +113,9 @@ export default function MarkdownViewer({
   }, [content]);
 
   return (
-    <article className={`space-y-4 text-[var(--text-main)] leading-relaxed select-text ${fontStyleClass} ${fontClasses} ${className}`}>
+    <article
+      className={`space-y-4 text-[var(--text-main)] leading-relaxed select-text ${fontStyleClass} ${fontClasses} ${className}`}
+    >
       {blocks.map((block, idx) => (
         <React.Fragment key={idx}>
           {renderBlock(block, idx, copiedCodeId, handleCopyCode, searchQuery, onToggleTask)}
@@ -112,10 +137,21 @@ type Block =
   | { type: 'notion_callout'; emoji: string; text: string }
   | { type: 'toggle'; title: string; content: string }
   | { type: 'math_block'; formula: string }
+  | { type: 'image'; src: string; alt: string; caption?: string }
   | { type: 'blockquote'; text: string }
   | { type: 'code'; language: string; code: string }
   | { type: 'table'; headers: string[]; rows: string[][] }
-  | { type: 'list'; ordered: boolean; items: Array<{ text: string; checked?: boolean; globalTaskIndex?: number }> }
+  | {
+      type: 'list';
+      ordered: boolean;
+      items: Array<{
+        text: string;
+        checked?: boolean;
+        globalTaskIndex?: number;
+        indent: number;
+        bullet: string;
+      }>;
+    }
   | { type: 'hr' }
   | { type: 'paragraph'; text: string };
 
@@ -150,7 +186,9 @@ function parseMarkdownBlocks(markdown: string): Block[] {
     }
 
     // 3. Chapter / Part Banner (e.g. PART 1: GOVERNMENTS & SYSTEMS OF RULE)
-    const chapterMatch = line.match(/^(PART|CHAPTER|SECTION|MODULE)\s+([0-9IVXLCDM]+)[:\-–\s]+(.+)$/i);
+    const chapterMatch = line.match(
+      /^(PART|CHAPTER|SECTION|MODULE)\s+([0-9IVXLCDM]+)[:\-–\s]+(.+)$/i
+    );
     if (chapterMatch) {
       const chapterNumber = `${chapterMatch[1].toUpperCase()} ${chapterMatch[2]}`;
       const title = chapterMatch[3].trim();
@@ -171,9 +209,33 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 5. Definitions: e.g. 1. Plutocracy   : Government by the wealthy class.
-    const defMatch = line.match(/^(\d+)\.\s+([A-Za-z\s"'\-]+?)\s*:\s*(.+)$/);
-    if (defMatch) {
+    // 5. Standalone Image Block (![alt](url "title"))
+    const imgBlockMatch = line.trim().match(/^!\[(.*?)\]\((.+?)\)$/);
+    if (imgBlockMatch) {
+      const alt = imgBlockMatch[1].trim() || 'Note image';
+      const rawSrc = imgBlockMatch[2].trim();
+      const parts = rawSrc.split(/\s+"(.*)"$/);
+      const src = parts[0].trim();
+      const caption = parts[1] || '';
+      blocks.push({
+        type: 'image',
+        alt,
+        src,
+        caption,
+      });
+      i++;
+      continue;
+    }
+
+    // 6. Definitions: ONLY for concise vocabulary/concept terms (<= 35 chars)
+    // Avoid hijacking regular numbers, questions, or notes
+    const defMatch = line.match(/^(\d+)\.\s+([A-Za-z\s"'\-]{2,35})\s*:\s*(.{3,})$/);
+    if (
+      defMatch &&
+      !/^(Note|Tip|Rule|Important|Warning|Example|Context|Question|Problem|Solution|Method)/i.test(
+        defMatch[2].trim()
+      )
+    ) {
       const number = defMatch[1];
       const term = defMatch[2].trim().replace(/^"|"$/g, '');
       const meaning = defMatch[3].trim();
@@ -187,12 +249,13 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 6. Idioms with multi-line Meaning/Context:
-    // e.g. 1. "Bite the bullet"
-    //         Meaning: To face a difficult situation...
-    //         Context: SSC CGL 2022 Tier 1...
-    const idiomMatch = line.match(/^(\d+)\.\s+("[^"]+"|[A-Za-z\s\-]+)\s*$/);
-    if (idiomMatch && i + 1 < lines.length && /^\s*(Meaning|Definition)[:\-–]/i.test(lines[i + 1])) {
+    // 7. Idioms with multi-line Meaning/Context:
+    const idiomMatch = line.match(/^(\d+)\.\s+("[^"]+"|[A-Za-z\s\-]{2,30})\s*$/);
+    if (
+      idiomMatch &&
+      i + 1 < lines.length &&
+      /^\s*(Meaning|Definition)[:\-–]/i.test(lines[i + 1])
+    ) {
       const number = idiomMatch[1];
       const term = idiomMatch[2].trim().replace(/^"|"$/g, '');
       i++;
@@ -213,7 +276,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 7. Study Tips & Rules (e.g. Tip: Revise root words like "Cide"...)
+    // 8. Study Tips & Rules (e.g. Tip: Revise root words like "Cide"...)
     const tipMatch = line.match(/^(Tip|Rule|Shortcut)[:\-–]\s*(.+)$/i);
     if (tipMatch) {
       blocks.push({
@@ -225,7 +288,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 8. Math Blocks ($$ ... $$)
+    // 9. Math Blocks ($$ ... $$)
     if (line.trim().startsWith('$$')) {
       const singleMatch = line.trim().match(/^\$\$(.+?)\$\$$/);
       if (singleMatch) {
@@ -250,7 +313,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 5. Code Blocks (```lang ... ```)
+    // 10. Code Blocks (```lang ... ```)
     if (line.trim().startsWith('```')) {
       const language = line.trim().slice(3).trim();
       const codeLines: string[] = [];
@@ -259,7 +322,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
         codeLines.push(lines[i]);
         i++;
       }
-      i++; // skip closing ```
+      if (i < lines.length) i++; // skip closing ```
       blocks.push({
         type: 'code',
         language: language || 'text',
@@ -268,10 +331,15 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 6. GitHub Style Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION])
+    // 11. GitHub Style Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION])
     const alertMatch = line.match(/^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
     if (alertMatch) {
-      const alertType = alertMatch[1].toUpperCase() as 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION';
+      const alertType = alertMatch[1].toUpperCase() as
+        | 'NOTE'
+        | 'TIP'
+        | 'IMPORTANT'
+        | 'WARNING'
+        | 'CAUTION';
       const alertLines: string[] = [];
       i++;
       while (i < lines.length && lines[i].trim().startsWith('>')) {
@@ -286,7 +354,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 7. Notion Callouts (> 💡 text) or Standard Blockquote (> text)
+    // 12. Notion Callouts (> 💡 text) or Standard Blockquote (> text)
     if (line.trim().startsWith('>')) {
       const quoteLines: string[] = [];
       while (i < lines.length && lines[i].trim().startsWith('>')) {
@@ -310,7 +378,7 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 8. Collapsible Toggles (<details><summary>...</summary>...</details> or ▶ Title)
+    // 13. Collapsible Toggles (<details><summary>...</summary>...</details> or ▶ Title)
     if (line.trim().toLowerCase().startsWith('<details>')) {
       let summary = 'Toggle details';
       const toggleLines: string[] = [];
@@ -359,72 +427,108 @@ function parseMarkdownBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // 9. Markdown Tables (| col1 | col2 |)
-    if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('|') && /[-:]+/.test(lines[i + 1])) {
-      const headers = line.split('|').map(s => s.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1 || arr.length <= 2);
-      i += 2; // skip header and delimiter line
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
-        const cells = lines[i].split('|').map(s => s.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1 || arr.length <= 2);
-        if (cells.length > 0) rows.push(cells);
-        i++;
+    // 14. Markdown Tables (| col1 | col2 |)
+    if (line.includes('|')) {
+      const isHeaderWithDelimiter =
+        i + 1 < lines.length &&
+        lines[i + 1].includes('|') &&
+        /[-:]+/.test(lines[i + 1]);
+
+      if (isHeaderWithDelimiter) {
+        const headers = parseTableLine(line);
+        i += 2; // skip header and delimiter line
+        const rows: string[][] = [];
+        while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+          const cells = parseTableLine(lines[i]);
+          if (cells.length > 0) rows.push(cells);
+          i++;
+        }
+        blocks.push({ type: 'table', headers, rows });
+        continue;
       }
-      blocks.push({ type: 'table', headers, rows });
-      continue;
     }
 
-    // 10. Lists (- [ ] Task, - Unordered, 1. Ordered)
-    const taskMatch = line.match(/^[-*]\s+\[([ xX])\]\s+(.+)$/);
-    const unordMatch = line.match(/^[-*+]\s+(.+)$/);
-    const ordMatch = line.match(/^\d+\.\s+(.+)$/);
+    // 15. Lists (- [ ] Task, - Unordered, • Unicode bullets, 1. Ordered, Indented Sub-bullets)
+    const listLineMatch = line.match(/^(\s*)([-*+•◦▪▫‣⁃–—]|\d+\.)\s+(.+)$/);
+    if (listLineMatch) {
+      const items: Array<{
+        text: string;
+        checked?: boolean;
+        globalTaskIndex?: number;
+        indent: number;
+        bullet: string;
+      }> = [];
 
-    if (taskMatch || unordMatch || ordMatch) {
-      const ordered = Boolean(ordMatch && !taskMatch);
-      const items: Array<{ text: string; checked?: boolean; globalTaskIndex?: number }> = [];
+      const initialBullet = listLineMatch[2];
+      const ordered = /^\d+\./.test(initialBullet);
 
       while (i < lines.length) {
         const curLine = lines[i];
-        const tMatch = curLine.match(/^[-*]\s+\[([ xX])\]\s+(.+)$/);
-        const uMatch = curLine.match(/^[-*+]\s+(.+)$/);
-        const oMatch = curLine.match(/^\d+\.\s+(.+)$/);
-
-        if (tMatch) {
-          const taskIdx = taskCounter++;
-          items.push({
-            text: tMatch[2],
-            checked: tMatch[1].toLowerCase() === 'x',
-            globalTaskIndex: taskIdx,
-          });
-          i++;
-        } else if (uMatch) {
-          items.push({ text: uMatch[1] });
-          i++;
-        } else if (oMatch) {
-          items.push({ text: oMatch[1] });
-          i++;
-        } else {
+        if (!curLine.trim()) {
+          // Allow loose lists if next non-empty line is also a list item
+          let nextIdx = i + 1;
+          while (nextIdx < lines.length && !lines[nextIdx].trim()) nextIdx++;
+          if (
+            nextIdx < lines.length &&
+            lines[nextIdx].match(/^(\s*)([-*+•◦▪▫‣⁃–—]|\d+\.)\s+(.+)$/)
+          ) {
+            i++;
+            continue;
+          }
           break;
         }
+
+        const match = curLine.match(/^(\s*)([-*+•◦▪▫‣⁃–—]|\d+\.)\s+(.+)$/);
+        if (!match) break;
+
+        const indentSpaces = match[1].length;
+        const indent = Math.min(3, Math.floor(indentSpaces / 2));
+        const bulletChar = match[2];
+        const contentText = match[3];
+
+        const taskMatch = contentText.match(/^\[([ xX])\]\s+(.+)$/);
+        if (taskMatch) {
+          items.push({
+            text: taskMatch[2],
+            checked: taskMatch[1].toLowerCase() === 'x',
+            globalTaskIndex: taskCounter++,
+            indent,
+            bullet: bulletChar,
+          });
+        } else {
+          items.push({
+            text: contentText,
+            indent,
+            bullet: bulletChar,
+          });
+        }
+        i++;
       }
 
-      blocks.push({ type: 'list', ordered, items });
-      continue;
+      if (items.length > 0) {
+        blocks.push({
+          type: 'list',
+          ordered,
+          items,
+        });
+        continue;
+      }
     }
 
-    // 11. Standard Paragraph (consume continuous lines)
+    // 16. Standard Paragraph (consume continuous lines until next block)
     const paraLines: string[] = [];
     while (
       i < lines.length &&
       lines[i].trim() !== '' &&
-      !lines[i].match(/^#{1,6}\s/) &&
+      !lines[i].match(/^(#{1,6})\s+/) &&
       !lines[i].trim().startsWith('```') &&
       !lines[i].trim().startsWith('$$') &&
       !lines[i].trim().toLowerCase().startsWith('<details>') &&
-      !lines[i].match(/^[▶▸]\s/) &&
+      !lines[i].match(/^[▶▸]\s+/) &&
       !lines[i].trim().startsWith('>') &&
-      !/^(\*{3,}|-{3,}|_{3,})$/.test(lines[i].trim()) &&
-      !lines[i].match(/^[-*+]\s/) &&
-      !lines[i].match(/^\d+\.\s/)
+      !/^([*_\-=]{3,})$/.test(lines[i].trim()) &&
+      !lines[i].match(/^(\s*)([-*+•◦▪▫‣⁃–—]|\d+\.)\s+/) &&
+      !lines[i].trim().match(/^!\[(.*?)\]\((.*?)\)$/)
     ) {
       paraLines.push(lines[i]);
       i++;
@@ -435,6 +539,14 @@ function parseMarkdownBlocks(markdown: string): Block[] {
         type: 'paragraph',
         text: paraLines.join('\n'),
       });
+    } else {
+      // Safety advance: if an unhandled line is encountered, render as single paragraph
+      // so zero data is EVER omitted or dropped
+      blocks.push({
+        type: 'paragraph',
+        text: lines[i],
+      });
+      i++;
     }
   }
 
@@ -458,27 +570,39 @@ function renderBlock(
       const content = renderInline(block.text, searchQuery);
       if (block.level === 1) {
         return (
-          <h1 id={block.id} className="text-xl sm:text-2xl md:text-3xl font-black text-[var(--text-main)] tracking-tight pt-3 pb-2 border-b border-[var(--border-color)] mt-4">
+          <h1
+            id={block.id}
+            className="text-xl sm:text-2xl md:text-3xl font-black text-[var(--text-main)] tracking-tight pt-3 pb-2 border-b border-[var(--border-color)] mt-4"
+          >
             {content}
           </h1>
         );
       }
       if (block.level === 2) {
         return (
-          <h2 id={block.id} className="text-lg sm:text-xl md:text-2xl font-extrabold text-[var(--text-main)] tracking-tight pt-3 pb-1 mt-4">
+          <h2
+            id={block.id}
+            className="text-lg sm:text-xl md:text-2xl font-extrabold text-[var(--text-main)] tracking-tight pt-3 pb-1 mt-4"
+          >
             {content}
           </h2>
         );
       }
       if (block.level === 3) {
         return (
-          <h3 id={block.id} className="text-base sm:text-lg md:text-xl font-bold text-[var(--text-main)] tracking-tight pt-2 mt-3">
+          <h3
+            id={block.id}
+            className="text-base sm:text-lg md:text-xl font-bold text-[var(--text-main)] tracking-tight pt-2 mt-3"
+          >
             {content}
           </h3>
         );
       }
       return (
-        <h4 id={block.id} className="text-sm sm:text-base font-bold text-[var(--text-main)] pt-1 mt-2">
+        <h4
+          id={block.id}
+          className="text-sm sm:text-base font-bold text-[var(--text-main)] pt-1 mt-2"
+        >
           {content}
         </h4>
       );
@@ -531,9 +655,7 @@ function renderBlock(
     case 'notion_callout':
       return (
         <div className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--bg-subcard)]/80 border border-[var(--border-color)] my-3 shadow-2xs hover:border-indigo-500/30 transition-colors">
-          <div className="text-2xl select-none shrink-0 pt-0.5 leading-none">
-            {block.emoji}
-          </div>
+          <div className="text-2xl select-none shrink-0 pt-0.5 leading-none">{block.emoji}</div>
           <div className="flex-1 min-w-0 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed font-medium">
             {renderInline(block.text, searchQuery)}
           </div>
@@ -544,8 +666,14 @@ function renderBlock(
       return (
         <details className="group my-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-subcard)]/40 overflow-hidden transition-all">
           <summary className="cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm text-[var(--text-main)] hover:bg-[var(--bg-subcard)]/80 transition-colors list-none">
-            <ChevronRight size={15} className="text-indigo-400 transition-transform duration-200 group-open:rotate-90 shrink-0" />
+            <ChevronRight
+              size={15}
+              className="text-indigo-400 transition-transform duration-200 group-open:rotate-90 shrink-0"
+            />
             <span className="flex-1">{renderInline(block.title, searchQuery)}</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-normal group-open:hidden">
+              (click to expand)
+            </span>
           </summary>
           <div className="px-4 py-3 pt-2 text-xs sm:text-sm border-t border-[var(--border-color)]/50 text-[var(--text-main)]/90 leading-relaxed bg-[var(--bg-surface)]">
             {block.content.split('\n').map((line, lIdx) => (
@@ -575,6 +703,33 @@ function renderBlock(
         </div>
       );
     }
+
+    case 'image':
+      return (
+        <figure className="my-4 rounded-2xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-subcard)]/50 p-2 sm:p-3 text-center">
+          <img
+            src={block.src}
+            alt={block.alt}
+            loading="lazy"
+            className="max-h-[500px] w-auto max-w-full rounded-xl mx-auto object-contain shadow-xs"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.onerror = null;
+              target.parentElement?.classList.add('p-4');
+              target.style.display = 'none';
+              const fallback = document.createElement('div');
+              fallback.className = 'text-xs text-[var(--text-muted)] flex items-center justify-center gap-1.5 py-4';
+              fallback.innerHTML = `<span>[Image: ${block.alt || 'Unavailable'}]</span>`;
+              target.parentElement?.appendChild(fallback);
+            }}
+          />
+          {(block.caption || block.alt) && (
+            <figcaption className="text-xs text-[var(--text-muted)] mt-2 font-medium italic">
+              {block.caption || block.alt}
+            </figcaption>
+          )}
+        </figure>
+      );
 
     case 'alert': {
       const config = {
@@ -608,7 +763,9 @@ function renderBlock(
       const IconComponent = config.icon;
 
       return (
-        <div className={`p-4 rounded-2xl border-l-4 border ${config.border} my-3 space-y-1.5 shadow-xs`}>
+        <div
+          className={`p-4 rounded-2xl border-l-4 border ${config.border} my-3 space-y-1.5 shadow-xs`}
+        >
           <div className="flex items-center gap-1.5 font-extrabold text-xs tracking-wider uppercase">
             <IconComponent size={15} />
             <span>{config.title}</span>
@@ -633,7 +790,9 @@ function renderBlock(
       return (
         <div className="my-4 rounded-2xl border border-[var(--border-color)] overflow-hidden bg-gray-950 text-gray-100 shadow-md">
           <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 text-xs font-mono text-gray-400">
-            <span className="uppercase text-[11px] font-bold text-gray-300">{block.language}</span>
+            <span className="uppercase text-[11px] font-bold text-gray-300">
+              {block.language}
+            </span>
             <button
               onClick={() => handleCopyCode(block.code, codeId)}
               className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 transition-colors text-[11px] font-sans"
@@ -681,10 +840,17 @@ function renderBlock(
     case 'list': {
       if (block.ordered) {
         return (
-          <ol className="list-decimal list-inside space-y-1.5 my-2.5 pl-2 text-[var(--text-main)]">
+          <ol className="space-y-1.5 my-2.5 pl-2 text-[var(--text-main)]">
             {block.items.map((item, idx) => (
-              <li key={idx} className="leading-relaxed">
-                {renderInline(item.text, searchQuery)}
+              <li
+                key={idx}
+                style={{ paddingLeft: `${item.indent * 16}px` }}
+                className="leading-relaxed flex items-start gap-2"
+              >
+                <span className="font-bold font-mono text-xs opacity-75 shrink-0">
+                  {idx + 1}.
+                </span>
+                <span className="flex-1">{renderInline(item.text, searchQuery)}</span>
               </li>
             ))}
           </ol>
@@ -694,7 +860,11 @@ function renderBlock(
       return (
         <ul className="space-y-1.5 my-2.5 pl-1 text-[var(--text-main)]">
           {block.items.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-2.5 leading-relaxed">
+            <li
+              key={idx}
+              style={{ paddingLeft: `${item.indent * 16}px` }}
+              className="flex items-start gap-2.5 leading-relaxed"
+            >
               {item.checked !== undefined ? (
                 onToggleTask && item.globalTaskIndex !== undefined ? (
                   <button
@@ -734,7 +904,7 @@ function renderBlock(
 
     case 'paragraph':
       return (
-        <p className="my-2 leading-relaxed text-[var(--text-main)]">
+        <p className="my-2 leading-relaxed text-[var(--text-main)] whitespace-pre-wrap">
           {renderInline(block.text, searchQuery)}
         </p>
       );
@@ -742,21 +912,38 @@ function renderBlock(
 }
 
 // ============================================================
-// Inline Formatter (Bold, Italic, Code, Links, Math, Search Highlight)
+// Inline Formatter (Bold, Italic, Images, Code, Links, Math, Search Highlight)
 // ============================================================
 
 function renderInline(text: string, searchQuery: string): React.ReactNode[] {
-  // Tokenize string for markdown formatting
   const tokens: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
 
   while (remaining.length > 0) {
+    // 0. Inline Images (![alt](url))
+    const imgMatch = remaining.match(/^!\[(.*?)\]\((.*?)\)/);
+    if (imgMatch) {
+      tokens.push(
+        <img
+          key={key++}
+          src={imgMatch[2]}
+          alt={imgMatch[1] || 'image'}
+          className="inline-block max-h-48 max-w-full rounded-lg border border-[var(--border-color)] my-1 align-middle"
+        />
+      );
+      remaining = remaining.slice(imgMatch[0].length);
+      continue;
+    }
+
     // 1. Inline code (`code`)
     const codeMatch = remaining.match(/^`([^`]+)`/);
     if (codeMatch) {
       tokens.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded-md font-mono text-[11px] sm:text-xs bg-[var(--bg-subcard)] border border-[var(--border-color)] text-indigo-400 font-bold mx-0.5">
+        <code
+          key={key++}
+          className="px-1.5 py-0.5 rounded-md font-mono text-[11px] sm:text-xs bg-[var(--bg-subcard)] border border-[var(--border-color)] text-indigo-400 font-bold mx-0.5"
+        >
           {codeMatch[1]}
         </code>
       );
@@ -823,7 +1010,10 @@ function renderInline(text: string, searchQuery: string): React.ReactNode[] {
     const mathMatch = remaining.match(/^\$([^$]+)\$/);
     if (mathMatch) {
       tokens.push(
-        <span key={key++} className="font-mono text-xs sm:text-sm font-bold text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 mx-0.5">
+        <span
+          key={key++}
+          className="font-mono text-xs sm:text-sm font-bold text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 mx-0.5"
+        >
           {mathMatch[1]}
         </span>
       );
@@ -831,8 +1021,20 @@ function renderInline(text: string, searchQuery: string): React.ReactNode[] {
       continue;
     }
 
+    // 7. Inline HTML Highlights (<mark>text</mark>)
+    const markMatch = remaining.match(/^<mark>(.*?)<\/mark>/i);
+    if (markMatch) {
+      tokens.push(
+        <mark key={key++} className="bg-amber-300 dark:bg-amber-500/40 text-inherit px-1 rounded-sm">
+          {renderInline(markMatch[1], searchQuery)}
+        </mark>
+      );
+      remaining = remaining.slice(markMatch[0].length);
+      continue;
+    }
+
     // Plain text chunk before next markdown special token
-    const nextSpecialIndex = remaining.search(/[`*_~\[\$]/);
+    const nextSpecialIndex = remaining.search(/[`*_~\[\$<]/);
     if (nextSpecialIndex === -1) {
       tokens.push(highlightSearch(remaining, searchQuery, key++));
       break;

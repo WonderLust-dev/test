@@ -4,7 +4,7 @@ import { StudyNote, NoteFilters } from '../types';
 import { getNotes, saveNote, saveNotesBatch, updateNote, deleteNote, togglePinNote, downloadNote } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
-import { convertNotionHtmlToMarkdown } from '../utils/notionParser';
+import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
 import {
   FileText,
   Upload,
@@ -96,6 +96,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const [editorTab, setEditorTab] = useState<'write' | 'split' | 'preview'>('write');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pasteNotification, setPasteNotification] = useState<string | null>(null);
+  const [pasteMode, setPasteMode] = useState<'smart' | 'raw'>('smart');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load notes
@@ -291,12 +292,19 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     }
   }, [activeNote?.id]);
 
-  // Smart paste: transforms Notion / rich text HTML from clipboard into clean Markdown
+  // Smart paste: transforms Notion / rich text HTML into clean Markdown without data loss
   const handleSmartPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const html = e.clipboardData.getData('text/html');
-    if (!html) return;
+    if (pasteMode === 'raw') {
+      // User explicitly chose raw paste: allow standard browser text paste
+      return;
+    }
 
-    const markdown = convertNotionHtmlToMarkdown(html);
+    const html = e.clipboardData.getData('text/html');
+    const plainText = e.clipboardData.getData('text/plain');
+    if (!html && !plainText) return;
+
+    // Use smart converter with plain text safeguard so zero data is lost
+    const { markdown, wasConverted, preservedWords } = smartNotionConvertWithFallback(html, plainText);
     if (!markdown || !markdown.trim()) return;
 
     e.preventDefault();
@@ -306,8 +314,12 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     const currentContent = editingNote?.content || '';
     const newContent = currentContent.slice(0, start) + markdown + currentContent.slice(end);
 
-    setEditingNote(prev => prev ? { ...prev, content: newContent } : null);
-    setPasteNotification('✨ Formatted from Notion / Rich Text');
+    setEditingNote(prev => (prev ? { ...prev, content: newContent } : null));
+    setPasteNotification(
+      wasConverted
+        ? `✨ Formatted from Notion / Rich Text (${preservedWords} words preserved)`
+        : `📋 Pasted clean text (${preservedWords} words preserved)`
+    );
     setTimeout(() => setPasteNotification(null), 3500);
 
     setTimeout(() => {
@@ -1225,9 +1237,25 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     </button>
                   </div>
 
-                  <span className="hidden lg:inline text-[10px] text-[var(--text-muted)] italic shrink-0">
-                    Paste from Notion to auto-convert
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0 text-[10px]">
+                    <span className="text-[var(--text-muted)]">Paste mode:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPasteMode(pasteMode === 'smart' ? 'raw' : 'smart')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-all border cursor-pointer ${
+                        pasteMode === 'smart'
+                          ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-color)] text-[var(--text-muted)]'
+                      }`}
+                      title={
+                        pasteMode === 'smart'
+                          ? 'Smart Notion Mode: Formats rich text & Notion blocks into Markdown with full data preservation'
+                          : 'Raw Text Mode: Standard clipboard paste without any parsing'
+                      }
+                    >
+                      {pasteMode === 'smart' ? '✨ Smart Notion' : '📋 Raw Text'}
+                    </button>
+                  </div>
                 </div>
               )}
 
