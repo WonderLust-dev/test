@@ -313,7 +313,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
 
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased overflow-hidden selection:bg-indigo-500/20">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-[var(--bg-app)] font-sans text-[var(--text-main)] antialiased overflow-hidden selection:bg-indigo-500/20">
       {/* Top Navigation Bar */}
       <header className="shrink-0 z-30 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)] shadow-xs">
         <div className="max-w-[1600px] w-full mx-auto px-2.5 sm:px-4 py-2 sm:py-2.5">
@@ -532,7 +532,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             {/* 2. Scrollable Question Content (Question text, passage, image, options, instant solutions) */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar space-y-3 sm:space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pr-1 sm:pr-2 custom-scrollbar space-y-3 sm:space-y-4 pb-20 sm:pb-4">
               {/* Passage (if any) */}
               {q.passage && (
                 <div className="p-3 sm:p-3.5 bg-[var(--bg-subcard)] rounded-xl border-l-4 border-indigo-500 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
@@ -718,51 +718,119 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             {/* 3. Docked Bottom Action Bar (Fixed / shrink-0 at bottom of question card) */}
-            <div className="shrink-0 pt-2.5 sm:pt-3 border-t border-[var(--border-color)] mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+            <div className="shrink-0 pt-2 sm:pt-3 border-t border-[var(--border-color)] mt-1 z-20 bg-[var(--bg-surface)]">
+              {/* Mobile Single-Row Ergonomic Action Bar */}
+              <div className="flex sm:hidden items-center justify-between gap-1.5 w-full pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
                 <button
                   onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
                   disabled={currentQ === 0}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 sm:px-4 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-xs"
+                  className="flex items-center justify-center gap-1 px-2.5 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-25 disabled:cursor-not-allowed transition-all text-xs shadow-xs shrink-0 active:scale-95"
+                  title="Previous Question"
                 >
-                  <ChevronLeft size={16} /> Previous
+                  <ChevronLeft size={16} />
+                  <span>Prev</span>
                 </button>
-                <button
-                  onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
-                  disabled={currentQ === questions.length - 1}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3.5 sm:px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs sm:text-sm shadow-md active:scale-95"
-                >
-                  Next <ChevronRight size={16} />
-                </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={toggleReview}
+                    className={`flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 ${
+                      marked[currentQ]
+                        ? 'bg-purple-500/15 border border-purple-500/40 text-purple-400'
+                        : 'bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                    }`}
+                    title={marked[currentQ] ? 'Unmark Review' : 'Mark for Review'}
+                  >
+                    {marked[currentQ] ? <FlagOff size={14} /> : <Flag size={14} />}
+                    <span className="text-[11px] font-semibold">{marked[currentQ] ? 'Marked' : 'Review'}</span>
+                  </button>
+
+                  <button
+                    onClick={clearAnswer}
+                    disabled={answers[currentQ] === undefined || answers[currentQ] === null}
+                    className="flex items-center justify-center gap-1 px-2.5 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-xs font-semibold shadow-xs disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                    title="Clear Answer"
+                  >
+                    <Eraser size={14} />
+                    <span className="text-[11px]">Clear</span>
+                  </button>
+                </div>
+
+                {currentQ < questions.length - 1 ? (
+                  <button
+                    onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
+                    className="flex-1 max-w-[130px] flex items-center justify-center gap-1 px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all text-xs shadow-md active:scale-95 shrink-0"
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={16} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowSubmit(true)}
+                    className="flex-1 max-w-[130px] flex items-center justify-center gap-1 px-3.5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-xs shadow-md active:scale-95 shrink-0"
+                  >
+                    <Send size={14} />
+                    <span>Submit</span>
+                  </button>
+                )}
               </div>
 
-              {/* Center keyboard hints - visible on desktop/tablets */}
-              <div className="hidden xl:flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
-                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">1-4</kbd> Ans</span>
-                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">N/P</kbd> Nav</span>
-                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">B</kbd> Bookmark</span>
-                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">R</kbd> Review</span>
-                <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">C</kbd> Clear</span>
-              </div>
+              {/* Desktop / Tablet Multi-column Action Bar */}
+              <div className="hidden sm:flex sm:items-center justify-between gap-2 w-full">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentQ(prev => Math.max(0, prev - 1))}
+                    disabled={currentQ === 0}
+                    className="flex items-center justify-center gap-1 px-4 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl hover:bg-[var(--bg-subcard-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-all text-sm shadow-xs"
+                  >
+                    <ChevronLeft size={16} /> Previous
+                  </button>
+                  {currentQ < questions.length - 1 ? (
+                    <button
+                      onClick={() => setCurrentQ(prev => Math.min(questions.length - 1, prev + 1))}
+                      className="flex items-center justify-center gap-1 px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all text-sm shadow-md active:scale-95"
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowSubmit(true)}
+                      className="flex items-center justify-center gap-1 px-5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm shadow-md active:scale-95"
+                    >
+                      <Send size={15} /> Submit Test
+                    </button>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleReview}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs ${
-                    marked[currentQ]
-                      ? 'bg-purple-500/15 border border-purple-500/40 text-purple-400 font-bold'
-                      : 'bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)]'
-                  }`}
-                >
-                  {marked[currentQ] ? <FlagOff size={14} /> : <Flag size={14} />}
-                  <span className="truncate">{marked[currentQ] ? 'Unmark Review' : 'Mark Review'}</span>
-                </button>
-                <button
-                  onClick={clearAnswer}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-xs sm:text-sm font-semibold shadow-xs"
-                >
-                  <Eraser size={14} /> Clear
-                </button>
+                {/* Center keyboard hints - visible on desktop/tablets */}
+                <div className="hidden xl:flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
+                  <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">1-4</kbd> Ans</span>
+                  <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">N/P</kbd> Nav</span>
+                  <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">B</kbd> Bookmark</span>
+                  <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">R</kbd> Review</span>
+                  <span><kbd className="px-1 py-0.2 bg-[var(--bg-subcard)] rounded font-mono text-[10px] text-[var(--text-main)] border border-[var(--border-color)]">C</kbd> Clear</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleReview}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all shadow-xs ${
+                      marked[currentQ]
+                        ? 'bg-purple-500/15 border border-purple-500/40 text-purple-400 font-bold'
+                        : 'bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-subcard-hover)]'
+                    }`}
+                  >
+                    {marked[currentQ] ? <FlagOff size={15} /> : <Flag size={15} />}
+                    <span>{marked[currentQ] ? 'Unmark Review' : 'Mark Review'}</span>
+                  </button>
+                  <button
+                    onClick={clearAnswer}
+                    disabled={answers[currentQ] === undefined || answers[currentQ] === null}
+                    className="flex items-center justify-center gap-1 px-3 py-2 bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-rose-400 hover:border-rose-500/30 rounded-xl transition-all text-sm font-semibold shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Eraser size={15} /> Clear
+                  </button>
+                </div>
               </div>
             </div>
           </div>

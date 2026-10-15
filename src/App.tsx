@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPaperById, savePaper, getPapers, getAttempts } from './services/database';
+import { getPaperById, savePaper, getPapers, getAttempts, saveCustomPaper } from './services/database';
 import { DEMO_PAPER } from './utils/demoData';
 import { Paper, QuestionJSON } from './types';
 import AuthGate, { useAuthModal } from './components/AuthGate';
@@ -127,6 +127,7 @@ function AppContent() {
   };
 
   const handleStartCustomPractice = (customPaper: Paper) => {
+    saveCustomPaper(customPaper);
     setActivePaper(customPaper);
     setExamMode('practice');
     setView('exam');
@@ -174,6 +175,7 @@ function AppContent() {
           updated_at: new Date().toISOString(),
           visibility: 'private',
         };
+        saveCustomPaper(customPaper);
         handleStartCustomPractice(customPaper);
       } else {
         alert(`No questions found matching topic "${topic || subject}". Try another topic or import more papers.`);
@@ -480,6 +482,7 @@ function AppContent() {
           {view === 'results' && (
             <ResultsPage
               attemptId={lastAttemptId}
+              paper={activePaper}
               userId={effectiveUserId}
               onRetake={handleRetake}
               onBack={handleBackToDashboard}

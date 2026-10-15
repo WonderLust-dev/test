@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
-import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility } from '../services/database';
+import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility, saveCustomPaper } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
 import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check } from 'lucide-react';
 
@@ -164,6 +164,7 @@ export default function Dashboard({
       updated_at: new Date().toISOString(),
       visibility: 'private',
     };
+    saveCustomPaper(customPaper);
     onStartCustomPractice(customPaper);
   };
 
@@ -1212,6 +1213,7 @@ function PracticeTab({
       updated_at: new Date().toISOString(),
       visibility: 'private',
     };
+    saveCustomPaper(customPaper);
     onStartCustomPractice(customPaper);
   };
 

@@ -183,6 +183,18 @@ export async function getPaperById(paperId: string): Promise<Paper | null> {
   });
 }
 
+export function saveCustomPaper(paper: Paper): void {
+  const papers = lsGet<Paper>(LS_KEYS.papers);
+  const existingIdx = papers.findIndex(p => p.id === paper.id);
+  if (existingIdx >= 0) {
+    papers[existingIdx] = { ...paper, updated_at: new Date().toISOString() };
+  } else {
+    papers.unshift(paper);
+  }
+  lsSet(LS_KEYS.papers, papers);
+  invalidateCache('papers');
+}
+
 export async function savePaper(paper: Omit<Paper, 'id' | 'created_at' | 'updated_at'>): Promise<Paper> {
   invalidateCache('papers');
   const now = new Date().toISOString();
