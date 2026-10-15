@@ -12,7 +12,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X } from 'lucide-react';
+import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
@@ -258,6 +258,7 @@ function AppContent() {
                 { id: 'overview' as const, label: 'Dashboard', icon: LayoutDashboard },
                 { id: 'library' as const, label: 'Exam Library', icon: BookOpen },
                 { id: 'practice' as const, label: 'Practice Hub', icon: Target },
+                { id: 'notes' as const, label: 'Study Notes', icon: FileText },
                 { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle },
                 { id: 'bookmarks' as const, label: 'Bookmarks', icon: Bookmark },
                 { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },

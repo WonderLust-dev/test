@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Paper, Attempt, AttemptQuestion, Bookmark, Mistake, PaperJSON } from '../types';
+import type { Paper, Attempt, AttemptQuestion, Bookmark, Mistake, PaperJSON, StudyNote } from '../types';
+import { DEMO_NOTES } from '../utils/demoNotes';
 
 // ============================================================
 // LocalStorage fallback for when Supabase is not configured
@@ -13,6 +14,7 @@ const LS_KEYS = {
   session: 'sscp_session',
   pendingSyncAttempts: 'sscp_pending_sync_attempts',
   pendingSyncBookmarks: 'sscp_pending_sync_bookmarks',
+  notes: 'sscp_notes',
 };
 
 function lsGet<T>(key: string): T[] {
@@ -732,4 +734,108 @@ export async function syncPendingOfflineData(userId?: string): Promise<{ syncedA
   }
 
   return { syncedAttempts, syncedBookmarks };
+}
+
+// ============================================================
+// Study Notes Service (.md and .txt notes)
+// ============================================================
+
+export async function getNotes(userId?: string): Promise<StudyNote[]> {
+  const localNotes = lsGet<StudyNote>(LS_KEYS.notes);
+
+  // Seed demo revision notes on initial visit if notes store is empty
+  if (localNotes.length === 0) {
+    const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
+      ...n,
+      id: `seed_note_${Date.now()}_${idx}`,
+      user_id: userId || 'guest',
+      created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+      updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
+    }));
+    lsSet(LS_KEYS.notes, seeded);
+    return seeded;
+  }
+
+  return localNotes;
+}
+
+export async function getNoteById(noteId: string): Promise<StudyNote | null> {
+  const notes = await getNotes();
+  return notes.find(n => n.id === noteId) || null;
+}
+
+export async function saveNote(note: Omit<StudyNote, 'id' | 'created_at' | 'updated_at'>): Promise<StudyNote> {
+  const now = new Date().toISOString();
+  const newNote: StudyNote = {
+    ...note,
+    id: generateId(),
+    created_at: now,
+    updated_at: now,
+  };
+
+  const notes = lsGet<StudyNote>(LS_KEYS.notes);
+  notes.unshift(newNote);
+  lsSet(LS_KEYS.notes, notes);
+  return newNote;
+}
+
+export async function saveNotesBatch(notesToSave: Array<Omit<StudyNote, 'id' | 'created_at' | 'updated_at'>>): Promise<StudyNote[]> {
+  const now = new Date().toISOString();
+  const newNotes: StudyNote[] = notesToSave.map((n, idx) => ({
+    ...n,
+    id: `${Date.now()}_note_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const existingNotes = lsGet<StudyNote>(LS_KEYS.notes);
+  const updated = [...newNotes, ...existingNotes];
+  lsSet(LS_KEYS.notes, updated);
+  return newNotes;
+}
+
+export async function updateNote(noteId: string, updates: Partial<StudyNote>): Promise<void> {
+  const notes = lsGet<StudyNote>(LS_KEYS.notes);
+  const idx = notes.findIndex(n => n.id === noteId);
+  if (idx >= 0) {
+    notes[idx] = {
+      ...notes[idx],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    lsSet(LS_KEYS.notes, notes);
+  }
+}
+
+export async function togglePinNote(noteId: string): Promise<boolean> {
+  const notes = lsGet<StudyNote>(LS_KEYS.notes);
+  const idx = notes.findIndex(n => n.id === noteId);
+  if (idx >= 0) {
+    const nextState = !notes[idx].is_pinned;
+    notes[idx].is_pinned = nextState;
+    notes[idx].updated_at = new Date().toISOString();
+    lsSet(LS_KEYS.notes, notes);
+    return nextState;
+  }
+  return false;
+}
+
+export async function deleteNote(noteId: string): Promise<void> {
+  const notes = lsGet<StudyNote>(LS_KEYS.notes).filter(n => n.id !== noteId);
+  lsSet(LS_KEYS.notes, notes);
+}
+
+export function downloadNote(note: StudyNote): void {
+  const ext = note.file_type === 'md' ? '.md' : '.txt';
+  const cleanTitle = note.title.replace(/[/\\?%*:|"<>]/g, '_');
+  const filename = note.file_name || `${cleanTitle}${ext}`;
+  const blob = new Blob([note.content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

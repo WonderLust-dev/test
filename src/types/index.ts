@@ -276,3 +276,28 @@ export interface PracticeConfig {
   timeLimitMinutes?: number;
   paperIds?: string[];
 }
+
+// --- Study Notes Types ---
+export interface StudyNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  file_type: 'md' | 'txt';
+  subject?: string;
+  topic?: string;
+  tags?: string[];
+  file_name?: string;
+  file_size?: number; // in bytes
+  created_at: string;
+  updated_at: string;
+  is_pinned?: boolean;
+}
+
+export interface NoteFilters {
+  subject?: string;
+  file_type?: 'all' | 'md' | 'txt';
+  search?: string;
+  pinnedOnly?: boolean;
+  sortBy?: 'recent' | 'title' | 'size';
+}

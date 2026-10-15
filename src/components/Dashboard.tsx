@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
-import { getPapers, getAttempts, getMistakes, getBookmarks, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility } from '../services/database';
+import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
 import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check } from 'lucide-react';
 
@@ -8,8 +8,9 @@ import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTrian
 // Dashboard (Home)
 // ============================================================
 import ReviewDashboard from './ReviewDashboard';
+import StudyNotes from './StudyNotes';
 
-export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice';
+export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes';
 
 interface DashboardProps {
   userId?: string;
@@ -39,6 +40,7 @@ export default function Dashboard({
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [mistakes, setMistakes] = useState<Mistake[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [notesCount, setNotesCount] = useState(0);
   const [internalTab, setInternalTab] = useState<DashboardTab>('overview');
   const activeTab = propTab || internalTab;
   const setActiveTab = (tab: DashboardTab) => {
@@ -50,16 +52,18 @@ export default function Dashboard({
 
   useEffect(() => {
     async function load() {
-      const [p, a, m, b] = await Promise.all([
+      const [p, a, m, b, n] = await Promise.all([
         getPapers(effectiveUserId),
         getAttempts(effectiveUserId),
         getMistakes(effectiveUserId),
         getBookmarks(effectiveUserId),
+        getNotes(effectiveUserId),
       ]);
       setPapers(p);
       setAttempts(a);
       setMistakes(m);
       setBookmarks(b);
+      setNotesCount(n.length);
     }
     load();
   }, [effectiveUserId, refreshKey]);
@@ -167,6 +171,7 @@ export default function Dashboard({
     { id: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
     { id: 'library' as const, label: 'Exam Library', icon: BookOpen, count: papers.length },
     { id: 'practice' as const, label: 'Practice Hub', icon: Target },
+    { id: 'notes' as const, label: 'Study Notes', icon: FileText, count: notesCount },
     { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle, count: mistakes.length },
     { id: 'bookmarks' as const, label: 'Bookmarks', icon: BookmarkIcon, count: bookmarks.length },
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
@@ -205,6 +210,7 @@ export default function Dashboard({
           papers={papers}
           attempts={attempts}
           mistakes={mistakes}
+          notesCount={notesCount}
           totalQuestions={totalQuestions}
           overallAccuracy={overallAccuracy}
           highestScore={highestScore}
@@ -246,6 +252,9 @@ export default function Dashboard({
           effectiveUserId={effectiveUserId}
         />
       )}
+      {activeTab === 'notes' && (
+        <StudyNotes userId={effectiveUserId} />
+      )}
       {activeTab === 'mistakes' && (
         <MistakesTab
           mistakes={mistakes}
@@ -277,6 +286,7 @@ function OverviewBento({
   papers,
   attempts,
   mistakes,
+  notesCount = 0,
   totalQuestions,
   overallAccuracy,
   highestScore,
@@ -290,6 +300,7 @@ function OverviewBento({
   papers: Paper[];
   attempts: Attempt[];
   mistakes: Mistake[];
+  notesCount?: number;
   totalQuestions: number;
   overallAccuracy: number;
   highestScore: number;
@@ -565,6 +576,31 @@ function OverviewBento({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Third Bento Row: Study & Revision Notes Banner */}
+      <div className="bento-card p-5 sm:p-6 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-indigo-50/40 border border-emerald-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <FileText size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-extrabold text-gray-900">Revision & Study Notes</h3>
+              <span className="badge badge-accent text-[10px]">MD & TXT Support</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Access {notesCount > 0 ? `${notesCount} preloaded notes` : 'revision notes'} (Math formulas, Indian Polity, Vocab) or upload your own .md & .txt files with distraction-free reader mode and 1-click table of contents.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onSelectTab('notes')}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0 self-start sm:self-auto"
+        >
+          <span>Open Notes</span>
+          <ArrowUpRight size={14} />
+        </button>
       </div>
     </div>
   );
