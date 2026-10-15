@@ -601,26 +601,29 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   return (
     <div className="space-y-5 animate-fadeIn max-w-7xl mx-auto">
       {/* Top Banner / Actions Bar */}
-      <div className="bento-card p-5 sm:p-6 bg-gradient-to-br from-indigo-900/10 via-[var(--bg-surface)] to-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl shadow-soft">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bento-card p-4 sm:p-6 bg-gradient-to-br from-indigo-900/10 via-[var(--bg-surface)] to-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl sm:rounded-3xl shadow-soft">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 text-white shadow-xs">
-                <FileText size={18} />
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] tracking-tight">
-                Study & Revision Notes
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
+                  <FileText size={17} />
+                </span>
+                <h2 className="text-lg sm:text-2xl font-black text-[var(--text-main)] tracking-tight truncate">
+                  Study & Revision Notes
+                </h2>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
                 {notes.length} Note{notes.length !== 1 ? 's' : ''}
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)] font-medium">
+            <p className="hidden sm:block text-xs sm:text-sm text-[var(--text-muted)] font-medium">
               Upload <code className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded text-[11px] font-mono font-bold text-indigo-400 border border-[var(--border-color)]">.md</code> and <code className="px-1.5 py-0.5 bg-[var(--bg-subcard)] rounded text-[11px] font-mono font-bold text-amber-400 border border-[var(--border-color)]">.txt</code> notes. Read with beautiful tables, formulas, and speed shortcuts.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Horizontally scrollable actions on mobile, no multi-row wrapping */}
+          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-nowrap shrink-0 py-0.5 -mx-1 px-1">
             {/* Hidden File Input */}
             <input
               type="file"
@@ -634,42 +637,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               className="hidden"
             />
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn btn-outline text-xs py-2 px-3.5 sm:px-4 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold"
-              title="Upload .md or .txt notes from device"
-            >
-              <Upload size={14} className="text-indigo-400" />
-              <span>Upload Notes</span>
-            </button>
-
-            {/* Cloud Sync Status & Manual Sync Button */}
-            {isRemote ? (
-              <button
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all"
-                title={isOnline ? "Force sync with Supabase cloud database" : "Offline mode — changes queued for auto-sync"}
-              >
-                {isOnline ? (
-                  <Cloud size={14} className={isSyncing ? "animate-pulse text-indigo-400" : "text-emerald-400"} />
-                ) : (
-                  <CloudOff size={14} className="text-amber-400" />
-                )}
-                <span className="hidden sm:inline">
-                  {isSyncing ? "Syncing..." : isOnline ? "Cloud Synced" : "Offline"}
-                </span>
-                <RefreshCw size={12} className={`${isSyncing ? "animate-spin" : "opacity-70 hover:opacity-100"}`} />
-              </button>
-            ) : (
-              <div
-                className="px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] flex items-center gap-1.5"
-                title="Notes stored locally in PWA. Sign in to sync across devices."
-              >
-                <span>💾 PWA Local</span>
-              </div>
-            )}
-
+            {/* New Note Button (Primary) */}
             <button
               onClick={() => {
                 setEditingNote({
@@ -681,12 +649,49 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 });
                 setEditorTab('write');
               }}
-              className="btn btn-primary text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-xs font-bold"
+              className="btn btn-primary text-xs py-2 px-3.5 sm:px-4 rounded-xl flex items-center gap-1.5 shadow-xs font-bold whitespace-nowrap shrink-0"
               title="Create a new note"
             >
               <Plus size={15} />
               <span>New Note</span>
             </button>
+
+            {/* Upload Notes Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold whitespace-nowrap shrink-0"
+              title="Upload .md or .txt notes from device"
+            >
+              <Upload size={14} className="text-indigo-400" />
+              <span>Upload Notes</span>
+            </button>
+
+            {/* Cloud Sync Status & Manual Sync Button */}
+            {isRemote ? (
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all whitespace-nowrap shrink-0"
+                title={isOnline ? "Force sync with Supabase cloud database" : "Offline mode — changes queued for auto-sync"}
+              >
+                {isOnline ? (
+                  <Cloud size={14} className={isSyncing ? "animate-pulse text-indigo-400" : "text-emerald-400"} />
+                ) : (
+                  <CloudOff size={14} className="text-amber-400" />
+                )}
+                <span>
+                  {isSyncing ? "Syncing..." : isOnline ? "Synced" : "Offline"}
+                </span>
+                <RefreshCw size={12} className={`${isSyncing ? "animate-spin" : "opacity-70 hover:opacity-100"}`} />
+              </button>
+            ) : (
+              <div
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                title="Notes stored locally in PWA. Sign in to sync across devices."
+              >
+                <span>💾 PWA Local</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -708,13 +713,13 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         </div>
       )}
 
-      {/* Drag & Drop Quick Upload Zone */}
+      {/* Drag & Drop Quick Upload Zone (Desktop Only - hidden on mobile to conserve space) */}
       <div
         onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`p-4 sm:p-5 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex items-center justify-center gap-3 text-center ${
+        className={`hidden md:flex p-4 sm:p-5 rounded-2xl border-2 border-dashed transition-all cursor-pointer items-center justify-center gap-3 text-center ${
           isDragging
             ? 'border-indigo-500 bg-indigo-500/10 scale-[1.01]'
             : 'border-[var(--border-color)] bg-[var(--bg-subcard)]/50 hover:bg-[var(--bg-subcard)] hover:border-indigo-500/40'
@@ -753,7 +758,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-nowrap shrink-0 pb-0.5">
           {/* Format filter */}
           <div className="flex items-center p-1 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs font-bold">
             {(['all', 'md', 'txt'] as const).map(type => (
