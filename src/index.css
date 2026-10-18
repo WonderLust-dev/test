@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -36,7 +36,7 @@
 
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-serif: 'Merriweather', Georgia, Cambria, 'Times New Roman', serif;
+  --font-serif: 'Newsreader', 'Playfair Display', 'Merriweather', Georgia, Cambria, 'Times New Roman', serif;
 
   --color-brand: #111827;
   --color-brand-dark: #030712;
@@ -159,6 +159,65 @@
   --gradient-accent: linear-gradient(135deg, #FACC15 0%, #EAB308 100%);
   --gradient-soft: linear-gradient(135deg, #000000 0%, #080808 100%);
   --gradient-brand: linear-gradient(135deg, #080808 0%, #121212 100%);
+}
+
+/* ============ CHAPTER ONE EDITORIAL THEME (Warm Cream, Terracotta & Literary Serif) ============ */
+[data-theme="editorial"] {
+  color-scheme: light;
+  --font-heading: 'Newsreader', 'Playfair Display', 'Merriweather', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-serif: 'Newsreader', 'Playfair Display', 'Merriweather', Georgia, serif;
+
+  --bg-app: #FAF7F2;
+  --bg-surface: #FFFFFF;
+  --bg-subcard: #F5EFEB;
+  --bg-subcard-hover: #ECE4D8;
+  --border-color: #E8DFD1;
+  --border-soft: #F2EBE0;
+  --border-width: 1px;
+
+  --text-main: #1C2321;
+  --text-muted: #7A7268;
+  --text-subtle: #A39B8F;
+
+  --accent-color: #B85338;
+  --accent-soft: #FBF0EB;
+
+  --btn-primary-bg: #B85338;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #A3452D;
+
+  --btn-outline-bg: #FFFFFF;
+  --btn-outline-border: #E8DFD1;
+  --btn-outline-text: #2C2623;
+  --btn-outline-hover: #F5EFEB;
+
+  --color-surface-soft: #F5EFEB;
+  --color-accent-soft: #FBF0EB;
+  --radius-sm: 0.75rem;
+  --radius-md: 1.25rem;
+  --radius-lg: 1.75rem;
+  --radius-btn: 9999px;
+
+  --gradient-hero: linear-gradient(135deg, #FAF7F2 0%, #F5EFEB 100%);
+  --gradient-accent: linear-gradient(135deg, #B85338 0%, #D46A4C 100%);
+  --gradient-soft: linear-gradient(135deg, #FAF7F2 0%, #F5EFEB 100%);
+  --gradient-brand: linear-gradient(135deg, #B85338 0%, #8E3B24 100%);
+}
+
+.font-editorial {
+  font-family: 'Newsreader', 'Playfair Display', 'Merriweather', Georgia, serif;
+}
+
+[data-theme="editorial"] h1,
+[data-theme="editorial"] h2,
+[data-theme="editorial"] .heading-editorial {
+  font-family: var(--font-heading);
+  letter-spacing: -0.015em;
+}
+
+[data-theme="editorial"] .bento-card {
+  box-shadow: 0 4px 20px -2px rgba(184, 83, 56, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 /* ============ E-READER THEMES (Image 2 Match & Contrast Shielding) ============ */

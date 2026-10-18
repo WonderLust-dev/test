@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type AppTheme = 'bento' | 'dark' | 'high-contrast';
+export type AppTheme = 'bento' | 'dark' | 'high-contrast' | 'editorial';
 
 const THEME_STORAGE_KEY = 'sscp_theme';
 
@@ -9,7 +9,7 @@ export function useTheme() {
     if (typeof window === 'undefined') return 'bento';
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY) as AppTheme | null;
-      if (saved && (saved === 'bento' || saved === 'dark' || saved === 'high-contrast')) {
+      if (saved && (saved === 'bento' || saved === 'dark' || saved === 'high-contrast' || saved === 'editorial')) {
         return saved;
       }
     } catch {

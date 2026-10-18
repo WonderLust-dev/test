@@ -13,12 +13,14 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineIndicator from './components/OfflineIndicator';
 import UpdateAvailable from './components/UpdateAvailable';
 import ThemeSwitcher from './components/ThemeSwitcher';
+import { useTheme } from './hooks/useTheme';
 import { BookOpen, PlusCircle, ArrowLeft, Home, LogIn, UserPlus, LogOut, Sparkles, Brain, CheckCircle2, LayoutDashboard, Target, AlertTriangle, Bookmark, BarChart3, Search, User as UserIcon, X, FileText, Menu, Download } from 'lucide-react';
 import { usePWA } from './hooks/usePWA';
 
 type View = 'dashboard' | 'import' | 'exam' | 'results' | 'review';
 
 function AppContent() {
+  const { theme } = useTheme();
   const { user, openLogin, openSignup, signOut, isGuest, loading } = useAuthModal();
   const effectiveUserId = user?.id || 'guest';
   const {
@@ -265,17 +267,37 @@ function AppContent() {
               onClick={() => { setView('dashboard'); setDashboardTab('overview'); }}
               className="flex items-center gap-3 px-2 py-3 mb-6 w-full text-left group"
             >
-              <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs group-hover:scale-105 transition-transform">
-                <BookOpen size={20} className="text-emerald-400" />
-              </div>
-              <div>
-                <div className="text-sm font-extrabold tracking-tight text-[var(--text-main)] leading-tight">
-                  SSC CGL Prep
-                </div>
-                <div className="text-[11px] font-semibold text-[var(--text-muted)]">
-                  Tier 1 & 2 Platform
-                </div>
-              </div>
+              {theme === 'editorial' ? (
+                <>
+                  <div className="w-10 h-10 rounded-2xl bg-[#B85338] text-white flex items-center justify-center font-black shadow-xs group-hover:scale-105 transition-transform">
+                    <BookOpen size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 font-mono tracking-widest text-xs uppercase font-extrabold text-[var(--text-main)]">
+                      <span>CHAPTER</span>
+                      <span className="text-[#B85338] font-black">/</span>
+                      <span>ONE</span>
+                    </div>
+                    <div className="text-[10px] font-semibold text-[#7A7268] font-serif">
+                      A little more wonder
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs group-hover:scale-105 transition-transform">
+                    <BookOpen size={20} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold tracking-tight text-[var(--text-main)] leading-tight">
+                      SSC CGL Prep
+                    </div>
+                    <div className="text-[11px] font-semibold text-[var(--text-muted)]">
+                      Tier 1 & 2 Platform
+                    </div>
+                  </div>
+                </>
+              )}
             </button>
 
             {/* Nav Items (Matching Image 2 left navigation) */}
@@ -517,18 +539,20 @@ function AppContent() {
             { id: 'practice' as const, label: 'Drills', icon: Target },
           ].map(item => {
             const isActive = view === 'dashboard' && dashboardTab === item.id;
+            const activeColorClass = theme === 'editorial' ? 'text-[#B85338] font-bold' : 'text-[var(--text-main)] font-bold';
+            const dotColorClass = theme === 'editorial' ? 'bg-[#B85338]' : 'bg-[var(--text-main)]';
             return (
               <button
                 key={item.id}
                 onClick={() => { setView('dashboard'); setDashboardTab(item.id); }}
                 className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
-                  isActive ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-subtle)] font-medium'
+                  isActive ? activeColorClass : 'text-[var(--text-subtle)] font-medium'
                 }`}
               >
-                <item.icon size={18} className={isActive ? 'text-[var(--text-main)]' : 'text-[var(--text-subtle)]'} />
+                <item.icon size={18} className={isActive ? (theme === 'editorial' ? 'text-[#B85338]' : 'text-[var(--text-main)]') : 'text-[var(--text-subtle)]'} />
                 <span className="text-[10px] leading-none">{item.label}</span>
                 {isActive && (
-                  <span className="w-1 h-1 rounded-full bg-[var(--text-main)]"></span>
+                  <span className={`w-1 h-1 rounded-full ${dotColorClass}`}></span>
                 )}
               </button>
             );
@@ -571,17 +595,37 @@ function AppContent() {
                   }}
                   className="flex items-center gap-2.5 text-left group"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs">
-                    <BookOpen size={18} className="text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-extrabold tracking-tight text-[var(--text-main)]">
-                      SSC CGL Prep
-                    </div>
-                    <div className="text-[10px] font-semibold text-gray-400">
-                      Tier 1 & 2 Platform
-                    </div>
-                  </div>
+                  {theme === 'editorial' ? (
+                    <>
+                      <div className="w-9 h-9 rounded-xl bg-[#B85338] text-white flex items-center justify-center font-black shadow-xs">
+                        <BookOpen size={18} className="text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 font-mono tracking-widest text-[11px] uppercase font-extrabold text-[var(--text-main)]">
+                          <span>CHAPTER</span>
+                          <span className="text-[#B85338] font-black">/</span>
+                          <span>ONE</span>
+                        </div>
+                        <div className="text-[10px] font-semibold text-[#7A7268] font-serif">
+                          A little more wonder
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black shadow-xs">
+                        <BookOpen size={18} className="text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-extrabold tracking-tight text-[var(--text-main)]">
+                          SSC CGL Prep
+                        </div>
+                        <div className="text-[10px] font-semibold text-gray-400">
+                          Tier 1 & 2 Platform
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => setMobileMenuOpen(false)}

@@ -15,6 +15,8 @@ import {
 } from '../services/database';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
+import ChapterOneView from './ChapterOneView';
+import { useTheme } from '../hooks/useTheme';
 import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
 import {
   FileText,
@@ -87,9 +89,30 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'md' | 'txt'>('all');
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const { theme } = useTheme();
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'editorial'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sscp_notes_viewmode') as 'grid' | 'list' | 'editorial' | null;
+      if (saved && (saved === 'grid' || saved === 'list' || saved === 'editorial')) return saved;
+      const savedTheme = localStorage.getItem('sscp_theme');
+      if (savedTheme === 'editorial') return 'editorial';
+    }
+    return 'grid';
+  });
 
-  // Reader Mode
+  // Automatically adapt viewMode when user selects the editorial theme
+  useEffect(() => {
+    if (theme === 'editorial') {
+      setViewMode('editorial');
+    }
+  }, [theme]);
+
+  // Persist viewMode
+  useEffect(() => {
+    try {
+      localStorage.setItem('sscp_notes_viewmode', viewMode);
+    } catch {}
+  }, [viewMode]);
   const [activeNote, setActiveNote] = useState<StudyNote | null>(null);
   const [readerFontSize, setReaderFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
   const [readerFontStyle, setReaderFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
@@ -261,8 +284,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   };
 
   // Handle Pin Toggle
-  const handleTogglePin = async (e: React.MouseEvent, noteId: string) => {
-    e.stopPropagation();
+  const togglePin = async (noteId: string) => {
     const nextState = await togglePinNote(noteId, effectiveUserId);
     setNotes(prev =>
       prev.map(n => (n.id === noteId ? { ...n, is_pinned: nextState } : n))
@@ -270,6 +292,11 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     if (activeNote && activeNote.id === noteId) {
       setActiveNote(prev => prev ? { ...prev, is_pinned: nextState } : null);
     }
+  };
+
+  const handleTogglePin = async (e: React.MouseEvent, noteId: string) => {
+    e.stopPropagation();
+    await togglePin(noteId);
   };
 
   // Handle Delete
@@ -600,8 +627,27 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   return (
     <div className="space-y-5 animate-fadeIn max-w-7xl mx-auto">
-      {/* Top Banner / Actions Bar */}
-      <div className="bento-card p-4 sm:p-6 bg-gradient-to-br from-indigo-900/10 via-[var(--bg-surface)] to-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl sm:rounded-3xl shadow-soft">
+      {viewMode === 'editorial' ? (
+        <ChapterOneView
+          notes={notes}
+          onOpenNote={note => setActiveNote(note)}
+          onNewNote={() => {
+            setEditingNote({
+              title: '',
+              content: '# Note Title\n\nWrite your revision points here...',
+              file_type: 'md',
+              subject: SUBJECT_OPTIONS[0],
+              tags: [],
+            });
+            setEditorTab('write');
+          }}
+          onTogglePin={togglePin}
+          onExitEditorial={() => setViewMode('grid')}
+        />
+      ) : (
+        <>
+          {/* Top Banner / Actions Bar */}
+          <div className="bento-card p-4 sm:p-6 bg-gradient-to-br from-indigo-900/10 via-[var(--bg-surface)] to-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl sm:rounded-3xl shadow-soft">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div className="space-y-1">
             <div className="flex items-center justify-between sm:justify-start gap-2">
@@ -812,6 +858,14 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               title="List view"
             >
               <List size={15} />
+            </button>
+            <button
+              onClick={() => setViewMode('editorial')}
+              className="p-1.5 px-2 rounded-lg transition-all flex items-center gap-1.5 font-bold text-xs text-[var(--text-muted)] hover:text-[#B85338] hover:bg-[#B85338]/10"
+              title="Chapter One / Editorial Mode (Mockup Match)"
+            >
+              <BookOpen size={14} className="text-[#B85338]" />
+              <span className="hidden sm:inline text-[11px]">Chapter One</span>
             </button>
           </div>
         </div>
@@ -1073,6 +1127,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           })}
         </div>
       )}
+      </>
+    )}
 
       {/* ============================================================ */}
       {/* IMMERSIVE E-READER MODE (MATCHES IMAGE 2 REFERENCE) */}
@@ -1087,7 +1143,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             setIsFullScreen(false);
             setShowToc(false);
           }}
-          onTogglePin={id => handleTogglePin({ stopPropagation: () => {} } as any, id)}
+          onTogglePin={id => togglePin(id)}
           onEditNote={noteToEdit => {
             setActiveNote(null);
             setEditingNote(noteToEdit);

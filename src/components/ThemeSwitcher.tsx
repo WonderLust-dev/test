@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, Contrast, LucideIcon } from 'lucide-react';
+import { Sun, Moon, Contrast, BookOpen, LucideIcon } from 'lucide-react';
 import { useTheme, AppTheme } from '../hooks/useTheme';
 
 interface ThemeSwitcherProps {
@@ -14,6 +14,13 @@ export const THEME_OPTIONS: Array<{
   icon: LucideIcon;
   description: string;
 }> = [
+  {
+    id: 'editorial',
+    label: 'Chapter One (Editorial)',
+    shortLabel: 'Editorial',
+    icon: BookOpen,
+    description: 'Warm cream, terracotta & literary serif typography',
+  },
   {
     id: 'bento',
     label: 'Clean Light',
@@ -77,10 +84,10 @@ export default function ThemeSwitcher({ variant = 'compact', className = '' }: T
       <div className="flex items-center justify-between mb-2 px-1">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">Theme</span>
         <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          {theme === 'bento' ? 'Light' : theme === 'dark' ? 'Dark' : 'High Contrast'}
+          {theme === 'editorial' ? 'Editorial' : theme === 'bento' ? 'Light' : theme === 'dark' ? 'Dark' : 'High Contrast'}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] theme-switcher-subgroup">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] theme-switcher-subgroup">
         {THEME_OPTIONS.map((opt) => {
           const isActive = theme === opt.id;
           const Icon = opt.icon;
