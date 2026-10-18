@@ -43,6 +43,11 @@ export interface PaperJSON {
   difficulty?: Difficulty;
   subjects?: string[];
   questions: QuestionJSON[];
+  institution?: string;
+  paperCode?: string;
+  instructions?: string[];
+  sections?: Array<{ id: string; name: string; questionIds: (number | string)[] }>;
+  passingScore?: number;
 }
 
 // --- Database Models ---

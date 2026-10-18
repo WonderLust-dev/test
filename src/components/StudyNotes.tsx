@@ -642,6 +642,20 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             setEditorTab('write');
           }}
           onTogglePin={togglePin}
+          onEditNote={note => {
+            setEditingNote(note);
+            setEditorTab('write');
+          }}
+          onDeleteNote={async note => {
+            if (confirm(`Delete note "${note.title}"? This cannot be undone.`)) {
+              await deleteNote(note.id, effectiveUserId);
+              setNotes(prev => prev.filter(n => n.id !== note.id));
+              if (activeNote?.id === note.id) {
+                setActiveNote(null);
+              }
+            }
+          }}
+          onDownloadNote={note => downloadNote(note)}
           onExitEditorial={() => setViewMode('grid')}
         />
       ) : (

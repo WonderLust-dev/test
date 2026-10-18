@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Paper, QuestionJSON, ExamSession, AttemptQuestion } from '../types';
 import { saveExamSession, getExamSession, clearExamSession, saveAttempt, addOrUpdateMistake, addBookmark, removeBookmark, getBookmarks } from '../services/database';
 import { gradeQuestions, formatTime } from '../utils/grader';
-import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen, WifiOff } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, FlagOff, Eraser, Send, AlertTriangle, CheckCircle, XCircle, MinusCircle, Bookmark, BookmarkCheck, Menu, X, ArrowLeft, Zap, Lightbulb, Target, BookOpen, WifiOff, FileText, Printer } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 import QuestionPalette from './QuestionPalette';
+import { formatMathText } from '../utils/mathFormatter';
 
 interface ExamInterfaceProps {
   paper: Paper;
@@ -27,6 +28,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
   const [showSubmit, setShowSubmit] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  const [showPaperBookletModal, setShowPaperBookletModal] = useState(false);
   const [showLearning, setShowLearning] = useState<number | null>(null);
   const [instantFeedback, setInstantFeedback] = useState<boolean>(mode === 'practice');
   const [revealedQuestions, setRevealedQuestions] = useState<Record<number, boolean>>({});
@@ -342,7 +344,19 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                 <Menu size={15} />
               </button>
               <div className="min-w-0">
-                <h1 className="text-xs sm:text-base font-extrabold text-[var(--text-main)] truncate tracking-tight max-w-[90px] xs:max-w-[140px] sm:max-w-xs">{paper.title}</h1>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {paper.raw_json.institution && (
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-500 font-mono text-[10px] font-bold uppercase truncate max-w-[130px] sm:max-w-[180px]">
+                      {paper.raw_json.institution}
+                    </span>
+                  )}
+                  {paper.raw_json.paperCode && (
+                    <span className="px-1.5 py-0.5 rounded-md bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] font-mono text-[10px] font-bold hidden md:inline-block">
+                      {paper.raw_json.paperCode}
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-xs sm:text-base font-extrabold text-[var(--text-main)] truncate tracking-tight max-w-[110px] xs:max-w-[170px] sm:max-w-xs">{paper.title}</h1>
                 <p className="text-[11px] font-medium text-[var(--text-muted)] hidden sm:block truncate">
                   Question {currentQ + 1} of {questions.length} • {q.subject} {q.topic ? `• ${q.topic}` : ''}
                 </p>
@@ -350,6 +364,16 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* Paper View Booklet Button */}
+              <button
+                onClick={() => setShowPaperBookletModal(true)}
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold border border-[var(--border-color)] bg-[var(--bg-subcard)] hover:bg-[var(--bg-subcard-hover)] text-[var(--text-main)] transition-all cursor-pointer shadow-xs"
+                title="View full authentic school examination paper booklet"
+              >
+                <FileText size={13} className="text-indigo-400" />
+                <span className="hidden md:inline">Paper View</span>
+              </button>
+
               {/* Instant Check Toggle Button */}
               <button
                 onClick={() => {
@@ -543,14 +567,14 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               {/* Passage (if any) */}
               {q.passage && (
                 <div className="p-3 sm:p-3.5 bg-[var(--bg-subcard)] rounded-xl border-l-4 border-indigo-500 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
-                  {q.passage}
+                  {formatMathText(q.passage)}
                 </div>
               )}
 
               {/* Question Text */}
-              <p className="text-sm sm:text-base font-bold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
-                {q.question}
-              </p>
+              <div className="text-sm sm:text-base font-bold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
+                {formatMathText(q.question)}
+              </div>
 
               {/* Image */}
               {q.image && (
@@ -562,7 +586,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               {/* Formula */}
               {q.formula && (
                 <div className="p-2.5 bg-amber-500/10 rounded-xl text-xs sm:text-sm font-mono text-amber-400 border border-amber-500/20">
-                  📐 {q.formula}
+                  📐 {formatMathText(q.formula)}
                 </div>
               )}
 
@@ -608,7 +632,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                         {String.fromCharCode(65 + idx)}
                       </span>
                       <span className="text-xs sm:text-sm leading-relaxed flex-1">
-                        {opt}
+                        {formatMathText(opt)}
                       </span>
                       {hasAnswered && isRevealed && isCorrect && (
                         <span className="flex items-center gap-1 text-[11px] font-extrabold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
@@ -691,7 +715,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           <p className="font-extrabold text-[11px] uppercase tracking-wider text-emerald-400 mb-1 flex items-center gap-1.5">
                             <BookOpen size={13} className="text-emerald-400" /> Step-by-Step Solution
                           </p>
-                          <p className="text-[var(--text-main)] whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-medium">{q.solution}</p>
+                          <div className="text-[var(--text-main)] whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-medium">{formatMathText(q.solution)}</div>
                         </div>
                       )}
                       {q.hint && (
@@ -699,7 +723,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           <p className="font-extrabold text-[11px] uppercase tracking-wider text-blue-400 mb-0.5 flex items-center gap-1.5">
                             <Lightbulb size={12} /> Key Hint
                           </p>
-                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.hint}</p>
+                          <div className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{formatMathText(q.hint)}</div>
                         </div>
                       )}
                       {q.shortcut && (
@@ -707,7 +731,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           <p className="font-extrabold text-[11px] uppercase tracking-wider text-purple-400 mb-0.5 flex items-center gap-1.5">
                             <Zap size={12} className="text-purple-400" /> Exam Speed Shortcut
                           </p>
-                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.shortcut}</p>
+                          <div className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{formatMathText(q.shortcut)}</div>
                         </div>
                       )}
                       {q.learningSuggestion && (
@@ -715,7 +739,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           <p className="font-extrabold text-[11px] uppercase tracking-wider text-amber-400 mb-0.5 flex items-center gap-1.5">
                             <Target size={12} /> Concept Takeaway
                           </p>
-                          <p className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{q.learningSuggestion}</p>
+                          <div className="text-[var(--text-main)] text-xs sm:text-sm font-medium">{formatMathText(q.learningSuggestion)}</div>
                         </div>
                       )}
                     </div>
@@ -926,6 +950,164 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               >
                 Confirm Submit
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Official School Examination Paper Booklet Modal */}
+      {showPaperBookletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-[var(--bg-surface)] text-[var(--text-main)] rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-[var(--border-color)] overflow-hidden">
+            {/* Modal Top Bar */}
+            <div className="p-3.5 sm:p-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-subcard)]">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
+                  <FileText size={16} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-extrabold text-[var(--text-main)] truncate">
+                    Official Question Paper Booklet
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate">
+                    Click any question to jump to it directly
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subcard-hover)] text-xs font-bold flex items-center gap-1.5 text-[var(--text-main)] transition-colors cursor-pointer"
+                  title="Print paper booklet"
+                >
+                  <Printer size={13} />
+                  <span className="hidden sm:inline">Print Paper</span>
+                </button>
+                <button
+                  onClick={() => setShowPaperBookletModal(false)}
+                  className="p-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subcard-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                  title="Close booklet"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Authentic Printable Sheet */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar bg-white text-gray-900 font-serif">
+              {/* Header with School Branding */}
+              <div className="text-center border-b-2 border-gray-900 pb-4 space-y-1">
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] font-extrabold text-gray-600">
+                  OFFICIAL EXAMINATION PAPER
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-gray-950 font-serif uppercase">
+                  {paper.raw_json.institution || paper.exam || 'Examination Authority'}
+                </h1>
+                <div className="text-sm font-bold text-gray-800">
+                  {paper.title}
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-bold text-gray-700 pt-1 font-mono">
+                  {paper.raw_json.paperCode && <span>Code: {paper.raw_json.paperCode}</span>}
+                  <span>Subject: {paper.subjects?.join(', ') || 'All Subjects'}</span>
+                  <span>Duration: {paper.duration_minutes} Mins</span>
+                  <span>Questions: {questions.length}</span>
+                </div>
+              </div>
+
+              {/* Candidate Info Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-2.5 border-b border-gray-400 text-xs font-mono font-bold">
+                <div>
+                  Time Left: <span className="font-extrabold">{formatTime(timeLeft)}</span>
+                </div>
+                <div className="text-center hidden sm:block">
+                  Attempted: <span className="font-extrabold">{counts.answered}/{questions.length}</span>
+                </div>
+                <div className="text-right">
+                  Status: <span className="font-extrabold text-emerald-700">Exam In Progress</span>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              {paper.raw_json.instructions && paper.raw_json.instructions.length > 0 && (
+                <div className="my-3 p-3 bg-gray-50 border border-gray-300 rounded-xl text-[11px] leading-relaxed text-gray-800 space-y-1 font-sans">
+                  <div className="font-bold uppercase tracking-wider text-gray-900 font-mono text-[10px]">
+                    Instructions to Candidates:
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-0.5">
+                    {paper.raw_json.instructions.map((inst, i) => (
+                      <li key={i}>{inst}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {/* Questions Stream (2-column layout on larger screens) */}
+              <div className="mt-4 sm:columns-2 gap-6 space-y-4">
+                {questions.map((item, idx) => {
+                  const isAnswered = answers[idx] !== undefined && answers[idx] !== null;
+                  const isMarked = marked[idx];
+                  const chosenOpt = isAnswered ? answers[idx] : null;
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        navigateTo(idx);
+                        setShowPaperBookletModal(false);
+                      }}
+                      className="break-inside-avoid p-3 rounded-xl border border-gray-200 hover:border-indigo-600 hover:shadow-md transition-all cursor-pointer bg-white group space-y-2 relative"
+                    >
+                      {/* Question Index & Marks */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-xs sm:text-sm font-bold text-gray-950 font-serif leading-relaxed">
+                          <span className="font-black font-mono mr-1.5 text-indigo-700">Q.{idx + 1}.</span>
+                          {formatMathText(item.question)}
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-gray-500 shrink-0">
+                          [{item.marks || 1}M]
+                        </span>
+                      </div>
+
+                      {/* Options */}
+                      <div className="grid grid-cols-1 gap-1 pl-2 text-xs font-sans">
+                        {item.options.map((opt, oIdx) => (
+                          <div
+                            key={oIdx}
+                            className={`flex items-start gap-1.5 p-1 rounded-md transition-colors ${
+                              chosenOpt === oIdx
+                                ? 'bg-indigo-50 text-indigo-900 font-bold'
+                                : 'text-gray-800'
+                            }`}
+                          >
+                            <span className="font-bold font-mono">
+                              ({String.fromCharCode(65 + oIdx)})
+                            </span>
+                            <span>{formatMathText(opt)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Status indicator pill */}
+                      <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[10px] font-mono">
+                        <span className="text-gray-400 group-hover:text-indigo-600 transition-colors">
+                          Click to attempt &rarr;
+                        </span>
+                        {isAnswered ? (
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                            Selected: ({String.fromCharCode(65 + chosenOpt!)})
+                          </span>
+                        ) : isMarked ? (
+                          <span className="px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-bold">
+                            Marked
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Not Attempted</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

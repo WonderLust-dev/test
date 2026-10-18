@@ -24,6 +24,11 @@ import {
   Check,
   Sparkles,
   SlidersHorizontal,
+  Trash2,
+  Edit3,
+  Download,
+  Pin,
+  Copy,
 } from 'lucide-react';
 
 export type ChapterOneTab = 'home' | 'library' | 'notes' | 'more';
@@ -33,11 +38,13 @@ interface ChapterOneViewProps {
   onOpenNote: (note: StudyNote) => void;
   onNewNote: () => void;
   onTogglePin?: (noteId: string) => void;
+  onEditNote?: (note: StudyNote) => void;
+  onDeleteNote?: (note: StudyNote) => void;
+  onDownloadNote?: (note: StudyNote) => void;
   onExitEditorial?: () => void;
 }
 
-// Curated Literary & Revision sample notes matching the mockup
-const CURATED_EDITORIAL_BOOKS: Array<{
+export interface EditorialBook {
   id: string;
   title: string;
   author: string;
@@ -53,7 +60,11 @@ const CURATED_EDITORIAL_BOOKS: Array<{
   reflectionSnippet?: string;
   reflectionDate?: string;
   content: string;
-}> = [
+  rawNote?: StudyNote;
+}
+
+// Curated Literary & Revision sample notes matching the mockup
+const CURATED_EDITORIAL_BOOKS: EditorialBook[] = [
   {
     id: 'curated-quiet-sea',
     title: 'The Quiet Sea',
@@ -164,10 +175,14 @@ export default function ChapterOneView({
   onOpenNote,
   onNewNote,
   onTogglePin,
+  onEditNote,
+  onDeleteNote,
+  onDownloadNote,
   onExitEditorial,
 }: ChapterOneViewProps) {
   const [activeTab, setActiveTab] = useState<ChapterOneTab>('home');
   const [libraryFilter, setLibraryFilter] = useState<'all' | 'reading' | 'to_read' | 'finished'>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [notesFilter, setNotesFilter] = useState<'all' | 'highlights' | 'reflections' | 'quotes'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -175,32 +190,45 @@ export default function ChapterOneView({
     'curated-quiet-sea': true,
   });
 
+  // Unique subjects across notes
+  const availableSubjects = useMemo(() => {
+    const subs = new Set<string>();
+    notes.forEach(n => {
+      if (n.subject) subs.add(n.subject);
+    });
+    return Array.from(subs);
+  }, [notes]);
+
   // Toggle quote bookmark
   const toggleBookmark = (id: string) => {
     setBookmarkedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   // Combine curated books with user notes so user's actual notes appear as books!
-  const allBooks = useMemo(() => {
-    // Convert user's study notes into book format
-    const userBooks = notes.map((n, idx) => ({
-      id: n.id,
-      title: n.title,
-      author: n.subject || 'Study Note',
-      chapter: `Section 1 of 1`,
-      progress: n.is_pinned ? 100 : 50,
-      status: n.is_pinned ? ('reading' as const) : ('to_read' as const),
-      timeLeft: 'Ready to read',
-      coverType: (['quiet_sea', 'brighter_day', 'last_horizon', 'small_departures'] as const)[idx % 4],
-      quote: n.content.split('\n').find(l => l.startsWith('>'))?.replace(/^>\s*/, '') || undefined,
-      quoteChapter: `${n.title} · Notes`,
-      quoteDate: new Date(n.updated_at || n.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      reflectionTitle: n.title,
-      reflectionSnippet: n.content.replace(/^#+.*$/gm, '').trim().slice(0, 120) + '...',
-      reflectionDate: new Date(n.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      content: n.content,
-      rawNote: n,
-    }));
+  const allBooks: EditorialBook[] = useMemo(() => {
+    // Convert user's study notes into book format with real word counts
+    const userBooks = notes.map((n, idx) => {
+      const words = n.content.trim().split(/\s+/).filter(Boolean).length;
+      const mins = Math.max(1, Math.ceil(words / 200));
+      return {
+        id: n.id,
+        title: n.title,
+        author: n.subject || 'Study Note',
+        chapter: `${words} words · ${mins} min read`,
+        progress: n.is_pinned ? 100 : 50,
+        status: n.is_pinned ? ('reading' as const) : ('to_read' as const),
+        timeLeft: `${mins} min read`,
+        coverType: (['quiet_sea', 'brighter_day', 'last_horizon', 'small_departures'] as const)[idx % 4],
+        quote: n.content.split('\n').find(l => l.startsWith('>'))?.replace(/^>\s*/, '') || undefined,
+        quoteChapter: `${n.title} · Notes`,
+        quoteDate: new Date(n.updated_at || n.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        reflectionTitle: n.title,
+        reflectionSnippet: n.content.replace(/^#+.*$/gm, '').trim().slice(0, 120) + '...',
+        reflectionDate: new Date(n.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        content: n.content,
+        rawNote: n,
+      };
+    });
 
     // Deduplicate against curated items
     return [...CURATED_EDITORIAL_BOOKS, ...userBooks];
@@ -215,12 +243,15 @@ export default function ChapterOneView({
       if (searchQuery && !b.title.toLowerCase().includes(searchQuery.toLowerCase()) && !b.author.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
+      if (selectedSubject !== 'all' && b.author !== selectedSubject) {
+        return false;
+      }
       if (libraryFilter === 'reading') return b.status === 'reading';
       if (libraryFilter === 'to_read') return b.status === 'to_read';
       if (libraryFilter === 'finished') return b.status === 'finished';
       return true;
     });
-  }, [allBooks, libraryFilter, searchQuery]);
+  }, [allBooks, libraryFilter, selectedSubject, searchQuery]);
 
   // Handle opening a book (converts curated or user note to StudyNote for EReaderView)
   const handleOpenBook = (book: typeof allBooks[0]) => {
@@ -513,6 +544,38 @@ export default function ChapterOneView({
                 })}
               </div>
 
+              {/* Subject Filter Row (when notes have subjects) */}
+              {availableSubjects.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-1 text-[11px]">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#7A7268] font-bold mr-1 shrink-0">
+                    Subject:
+                  </span>
+                  <button
+                    onClick={() => setSelectedSubject('all')}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      selectedSubject === 'all'
+                        ? 'bg-[#1C2321] text-white shadow-2xs'
+                        : 'bg-[#F5EFEB] text-[#7A7268] hover:text-[#1C2321]'
+                    }`}
+                  >
+                    All Subjects
+                  </button>
+                  {availableSubjects.map(sub => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedSubject(sub)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        selectedSubject === sub
+                          ? 'bg-[#1C2321] text-white shadow-2xs'
+                          : 'bg-[#F5EFEB] text-[#7A7268] hover:text-[#1C2321]'
+                      }`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Books List Items (Clean stacked rows with thumbnail, serif title, status & chevron) */}
               <div className="space-y-2 divide-y divide-[#FAF5EE]">
                 {filteredLibrary.map((book, idx) => (
@@ -532,13 +595,18 @@ export default function ChapterOneView({
                         {book.title}
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-[#7A7268]">
-                        <span>
+                        <span className="truncate">
                           {book.status === 'reading'
                             ? `Reading · ${book.progress}%`
                             : book.status === 'finished'
                             ? 'Finished'
                             : 'To Read'}
                         </span>
+                        {book.author && book.author !== 'Study Note' && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#FAF5EE] border border-[#E8DFD1] text-[#7A7268] shrink-0 font-medium truncate max-w-[100px]">
+                            {book.author}
+                          </span>
+                        )}
                       </div>
                       {book.status === 'reading' && (
                         <div className="w-24 h-1 bg-[#E8DFD1] rounded-full overflow-hidden">
@@ -550,11 +618,61 @@ export default function ChapterOneView({
                       )}
                     </div>
 
-                    {/* Right Chevron */}
-                    <ChevronRight
-                      size={16}
-                      className="text-[#A39B8F] group-hover:text-[#B85338] group-hover:translate-x-0.5 transition-all shrink-0"
-                    />
+                    {/* Action Controls for User Notes */}
+                    {book.rawNote ? (
+                      <div
+                        className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {onTogglePin && (
+                          <button
+                            onClick={() => onTogglePin(book.rawNote!.id)}
+                            className={`p-1.5 rounded-lg hover:bg-[#E8DFD1] transition-colors cursor-pointer ${
+                              book.rawNote.is_pinned ? 'text-[#B85338]' : 'text-[#7A7268]'
+                            }`}
+                            title={book.rawNote.is_pinned ? 'Unpin' : 'Pin to top'}
+                          >
+                            <Pin size={13} className={book.rawNote.is_pinned ? 'fill-[#B85338]' : ''} />
+                          </button>
+                        )}
+                        {onEditNote && (
+                          <button
+                            onClick={() => onEditNote(book.rawNote!)}
+                            className="p-1.5 rounded-lg hover:bg-[#E8DFD1] text-[#7A7268] hover:text-[#1C2321] transition-colors cursor-pointer"
+                            title="Edit Note"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                        )}
+                        {onDownloadNote && (
+                          <button
+                            onClick={() => onDownloadNote(book.rawNote!)}
+                            className="p-1.5 rounded-lg hover:bg-[#E8DFD1] text-[#7A7268] hover:text-[#1C2321] transition-colors cursor-pointer"
+                            title="Download Note"
+                          >
+                            <Download size={13} />
+                          </button>
+                        )}
+                        {onDeleteNote && (
+                          <button
+                            onClick={() => onDeleteNote(book.rawNote!)}
+                            className="p-1.5 rounded-lg hover:bg-rose-100 text-[#7A7268] hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete Note"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        <ChevronRight
+                          size={15}
+                          className="text-[#A39B8F] group-hover:text-[#B85338] group-hover:translate-x-0.5 transition-all ml-0.5"
+                        />
+                      </div>
+                    ) : (
+                      <ChevronRight
+                        size={16}
+                        className="text-[#A39B8F] group-hover:text-[#B85338] group-hover:translate-x-0.5 transition-all shrink-0"
+                      />
+                    )}
                   </div>
                 ))}
 

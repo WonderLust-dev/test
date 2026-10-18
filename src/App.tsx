@@ -6,6 +6,7 @@ import { Paper, QuestionJSON } from './types';
 import AuthGate, { useAuthModal } from './components/AuthGate';
 import Dashboard, { DashboardTab } from './components/Dashboard';
 import JsonImporter from './components/JsonImporter';
+import AdminTestStudio from './components/AdminTestStudio';
 import ExamInterface from './components/ExamInterface';
 import ResultsPage from './components/ResultsPage';
 import ReviewSession from './components/ReviewSession';
@@ -495,9 +496,13 @@ function AppContent() {
             />
           )}
           {view === 'import' && (
-            <JsonImporter
+            <AdminTestStudio
               userId={effectiveUserId}
-              onImported={() => { setView('dashboard'); setRefreshKey(k => k + 1); }}
+              onPaperCreated={() => {
+                setView('dashboard');
+                setRefreshKey(k => k + 1);
+              }}
+              onCancel={handleBackToDashboard}
             />
           )}
           {view === 'exam' && activePaper && (

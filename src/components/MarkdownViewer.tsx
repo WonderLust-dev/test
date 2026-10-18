@@ -991,6 +991,26 @@ function renderInline(text: string, searchQuery: string): React.ReactNode[] {
       continue;
     }
 
+    // 0. Inline Math (\( formula \) or $ formula $)
+    const mathMatch = remaining.match(/^(\\\((.*?)\\\)|\$([^$]+)\$)/);
+    if (mathMatch) {
+      const formula = (mathMatch[2] || mathMatch[3] || '').trim();
+      if (formula.length > 0) {
+        tokens.push(
+          <span
+            key={key++}
+            className="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-500 dark:text-amber-300 font-mono text-xs font-semibold mx-1 shadow-2xs align-middle"
+            title="Formula"
+          >
+            <span className="opacity-75 mr-1 text-[11px]">📐</span>
+            {formula}
+          </span>
+        );
+        remaining = remaining.slice(mathMatch[0].length);
+        continue;
+      }
+    }
+
     // 1. Inline code (`code`)
     const codeMatch = remaining.match(/^`([^`]+)`/);
     if (codeMatch) {
@@ -1061,22 +1081,7 @@ function renderInline(text: string, searchQuery: string): React.ReactNode[] {
       continue;
     }
 
-    // 6. LaTeX Math tokens ($...$)
-    const mathMatch = remaining.match(/^\$([^$]+)\$/);
-    if (mathMatch) {
-      tokens.push(
-        <span
-          key={key++}
-          className="font-mono text-xs sm:text-sm font-bold text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 mx-0.5"
-        >
-          {mathMatch[1]}
-        </span>
-      );
-      remaining = remaining.slice(mathMatch[0].length);
-      continue;
-    }
-
-    // 7. Inline HTML Highlights (<mark>text</mark>)
+    // 6. Inline HTML Highlights (<mark>text</mark>)
     const markMatch = remaining.match(/^<mark>(.*?)<\/mark>/i);
     if (markMatch) {
       tokens.push(
