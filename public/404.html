@@ -4,8 +4,14 @@
     <meta charset="utf-8">
     <title>SSC CGL Exam Platform</title>
     <script type="text/javascript">
-      // Redirect all paths to index.html for SPA routing
-      var pathSegmentsToKeep = 0;
+      // Single Page Apps for GitHub Pages
+      // MIT License
+      // https://github.com/rafgraph/spa-github-pages
+      var segment = window.location.pathname.split('/')[1];
+      var knownRoutes = ['notes', 'library', 'practice', 'mistakes', 'bookmarks', 'analytics', 'studio', 'import', 'exam', 'results', 'review', 'dashboard'];
+      var isRepoSubpath = segment && !knownRoutes.includes(segment);
+      var pathSegmentsToKeep = isRepoSubpath ? 1 : 0;
+
       var l = window.location;
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
@@ -20,3 +26,4 @@
     <p>Redirecting...</p>
   </body>
 </html>
+
