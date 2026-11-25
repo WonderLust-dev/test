@@ -1141,10 +1141,11 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
 }
 
 export function downloadNote(note: StudyNote): void {
-  const ext = note.file_type === 'md' ? '.md' : note.file_type === 'html' ? '.html' : '.txt';
+  const ext = note.file_type === 'md' ? '.md' : note.file_type === 'html' ? '.html' : note.file_type === 'whiteboard' ? '.excalidraw' : '.txt';
   const cleanTitle = note.title.replace(/[/\\?%*:|"<>]/g, '_');
   const filename = note.file_name || `${cleanTitle}${ext}`;
-  const blob = new Blob([note.content], { type: 'text/plain;charset=utf-8' });
+  const mimeType = note.file_type === 'whiteboard' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8';
+  const blob = new Blob([note.content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

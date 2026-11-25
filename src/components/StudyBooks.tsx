@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, FileCode2, FileText, Pencil, P
 import type { StudyNote } from '../types';
 import { deleteNote, getNotes, saveNote, updateNote } from '../services/database';
 import MarkdownViewer from './MarkdownViewer';
+import { importStudyDocument } from '../utils/studyDocumentImporter';
 
 interface StudyBooksProps {
   userId: string;
@@ -18,6 +19,11 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [showBookForm, setShowBookForm] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
+  const [bookSubject, setBookSubject] = useState('');
+  const [studyLevel, setStudyLevel] = useState('School');
+  const [curriculum, setCurriculum] = useState('');
+  const [bookSearch, setBookSearch] = useState('');
+  const [bookLevelFilter, setBookLevelFilter] = useState('all');
   const [isEditingChapter, setIsEditingChapter] = useState(false);
   const [chapterTitle, setChapterTitle] = useState('');
   const [chapterContent, setChapterContent] = useState('');
@@ -45,6 +51,11 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
     () => materials.filter(item => item.file_type === 'book').sort((a, b) => a.title.localeCompare(b.title)),
     [materials],
   );
+  const filteredBooks = useMemo(() => books.filter(book => {
+    const matchesLevel = bookLevelFilter === 'all' || (book.study_level || 'Other') === bookLevelFilter;
+    const searchableText = `${book.title} ${book.subject || ''} ${book.curriculum || ''}`.toLowerCase();
+    return matchesLevel && searchableText.includes(bookSearch.trim().toLowerCase());
+  }), [books, bookLevelFilter, bookSearch]);
   const activeBook = books.find(book => book.id === activeBookId) || null;
   const chapters = useMemo(
     () => materials
@@ -56,7 +67,7 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
 
   const createBook = async (event: React.FormEvent) => {
     event.preventDefault();
-    const title = bookTitle.trim();
+    const title = bookTitle.trim() || bookSubject.trim();
     if (!title) return;
     try {
       const book = await saveNote({
@@ -64,12 +75,17 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
         title,
         content: '',
         file_type: 'book',
-        subject: 'General Studies',
+        subject: bookSubject.trim() || title,
+        study_level: studyLevel,
+        curriculum: curriculum.trim(),
         tags: [],
         is_pinned: false,
         emoji: '📚',
       });
       setBookTitle('');
+      setBookSubject('');
+      setStudyLevel('School');
+      setCurriculum('');
       setShowBookForm(false);
       setActiveBookId(book.id);
       setActiveChapterId(null);
@@ -170,24 +186,19 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !activeBook) return;
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    const fileType = extension === 'txt' ? 'txt' : extension === 'md' || extension === 'markdown' ? 'md' : null;
-    if (!fileType) {
-      setError('Choose a Markdown (.md) or text (.txt) file.');
-      return;
-    }
     try {
-      const content = await file.text();
+      const imported = await importStudyDocument(file);
       const chapter = await saveNote({
         user_id: userId,
-        title: file.name.replace(/\.(md|markdown|txt)$/i, '').replace(/[-_]/g, ' '),
-        content,
-        file_type: fileType,
+        title: file.name.replace(/\.(md|markdown|txt|pdf|docx)$/i, '').replace(/[-_]/g, ' '),
+        content: imported.content,
+        file_type: imported.fileType,
         parent_id: activeBook.id,
         sort_order: chapters.length,
         subject: activeBook.subject || 'General Studies',
         tags: [],
-        file_name: file.name,
+        file_name: imported.fileName,
+        source_file_name: imported.sourceFileName,
         file_size: file.size,
         is_pinned: false,
       });
@@ -197,7 +208,7 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
       setError(null);
     } catch (uploadError) {
       console.error('Failed to upload note chapter:', uploadError);
-      setError('Could not upload this note chapter. Please try again.');
+      setError(uploadError instanceof Error ? uploadError.message : 'Could not upload this note chapter. Please try again.');
     }
   };
 
@@ -261,46 +272,85 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
         <>
           <div className={`${cardClass} flex flex-wrap items-center justify-between gap-4 p-5`}>
             <div>
-              <h2 className="flex items-center gap-2 text-xl font-black text-[var(--text-main)]"><BookOpen size={22} className="text-indigo-400" /> Your study books</h2>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Organize written chapters and interactive HTML lessons together.</p>
+              <h2 className="flex items-center gap-2 text-xl font-black text-[var(--text-main)]"><BookOpen size={22} className="text-indigo-400" /> Your study library</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Keep subjects, chapters, and interactive lessons organized for each course or exam.</p>
             </div>
-            <button type="button" onClick={() => { setBookTitle(''); setShowBookForm(true); }} className="btn btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold">
-              <Plus size={16} /> New book
+            <button type="button" onClick={() => { setBookTitle(''); setBookSubject(''); setStudyLevel('School'); setCurriculum(''); setShowBookForm(true); }} className="btn btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold">
+              <Plus size={16} /> Add subject
             </button>
           </div>
           {showBookForm && (
-            <form onSubmit={createBook} className={`${cardClass} flex flex-col gap-3 p-4 sm:flex-row`}>
-              <input autoFocus value={bookTitle} onChange={event => setBookTitle(event.target.value)} placeholder="Book title" aria-label="Book title" className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <button type="submit" className="btn btn-primary rounded-xl px-4 py-2 text-sm font-bold">Create book</button>
-              <button type="button" onClick={() => setShowBookForm(false)} className="btn btn-outline rounded-xl px-4 py-2 text-sm font-semibold">Cancel</button>
+            <form onSubmit={createBook} className={`${cardClass} grid gap-3 p-4 sm:grid-cols-2`}>
+              <label className="text-xs font-bold text-[var(--text-main)]">
+                Subject space name
+                <input autoFocus value={bookTitle} onChange={event => setBookTitle(event.target.value)} placeholder="e.g. Mathematics" aria-label="Subject space name" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <label className="text-xs font-bold text-[var(--text-main)]">
+                Subject
+                <input value={bookSubject} onChange={event => setBookSubject(event.target.value)} placeholder="e.g. Physics, History, English" aria-label="Subject" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <label className="text-xs font-bold text-[var(--text-main)]">
+                Study path
+                <select value={studyLevel} onChange={event => setStudyLevel(event.target.value)} aria-label="Study path" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option>School</option>
+                  <option>College / University</option>
+                  <option>Competitive exam</option>
+                  <option>Self study</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold text-[var(--text-main)]">
+                Grade, course, or exam <span className="font-normal text-[var(--text-muted)]">(optional)</span>
+                <input value={curriculum} onChange={event => setCurriculum(event.target.value)} placeholder="e.g. Grade 8 · CBSE, SSC CGL 2026" aria-label="Grade, course, or exam" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <div className="flex justify-end gap-2 sm:col-span-2">
+                <button type="button" onClick={() => setShowBookForm(false)} className="btn btn-outline rounded-xl px-4 py-2 text-sm font-semibold">Cancel</button>
+                <button type="submit" className="btn btn-primary rounded-xl px-4 py-2 text-sm font-bold">Create subject space</button>
+              </div>
             </form>
           )}
           {books.length === 0 ? (
             <div className={`${cardClass} p-10 text-center`}>
               <BookOpen size={34} className="mx-auto text-indigo-400" />
-              <h3 className="mt-3 font-bold text-[var(--text-main)]">No books yet</h3>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Create a book to collect chapters, notes, and interactive HTML lessons.</p>
+              <h3 className="mt-3 font-bold text-[var(--text-main)]">No subjects yet</h3>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Create a subject space to collect chapters, imported documents, and interactive HTML lessons.</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {books.map(book => {
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input value={bookSearch} onChange={event => setBookSearch(event.target.value)} placeholder="Search subjects, courses, or exams" aria-label="Search study subjects" className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-sm text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <select value={bookLevelFilter} onChange={event => setBookLevelFilter(event.target.value)} aria-label="Filter by study path" className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-sm text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="all">All study paths</option>
+                  <option>School</option>
+                  <option>College / University</option>
+                  <option>Competitive exam</option>
+                  <option>Self study</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              {filteredBooks.length === 0 ? (
+                <div className={`${cardClass} p-8 text-center text-sm text-[var(--text-muted)]`}>No subjects match this search. Try another subject or study path.</div>
+              ) : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredBooks.map(book => {
                 const chapterCount = materials.filter(item => item.parent_id === book.id).length;
                 return (
                   <button key={book.id} type="button" onClick={() => { setActiveBookId(book.id); setActiveChapterId(null); setIsEditingChapter(false); }} className={`${cardClass} group p-5 text-left transition hover:border-indigo-500/50 hover:shadow-lg`}>
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400"><BookOpen size={21} /></span>
                     <span className="mt-4 block truncate text-lg font-extrabold text-[var(--text-main)]">{book.title}</span>
+                    <span className="mt-1 block truncate text-xs font-semibold text-indigo-400">{book.subject || 'General Studies'}</span>
+                    <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">{[book.study_level, book.curriculum].filter(Boolean).join(' · ') || 'Study path not set'}</span>
                     <span className="mt-1 block text-sm text-[var(--text-muted)]">{chapterCount} chapter{chapterCount === 1 ? '' : 's'}</span>
                   </button>
                 );
               })}
-            </div>
+              </div>}
+            </>
           )}
         </>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.8fr)]">
           <aside className={`${cardClass} p-4`}>
             <button type="button" onClick={() => { setActiveBookId(null); setActiveChapterId(null); setIsEditingChapter(false); }} className="mb-4 flex items-center gap-2 text-sm font-bold text-indigo-400 hover:text-indigo-300">
-              <ArrowLeft size={16} /> All books
+            <ArrowLeft size={16} /> All subjects
             </button>
             <div className="mb-4 flex items-start justify-between gap-2">
               <h2 className="min-w-0 text-xl font-black text-[var(--text-main)]">{activeBook.title}</h2>
@@ -308,9 +358,9 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
             </div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button type="button" onClick={startNewChapter} className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-500/20"><Plus size={14} /> Note chapter</button>
-              <button type="button" onClick={() => markdownInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-500/20"><Upload size={14} /> Upload .md/.txt</button>
+              <button type="button" onClick={() => markdownInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-500/20"><Upload size={14} /> Import notes / docs</button>
               <button type="button" onClick={() => htmlInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20"><Upload size={14} /> HTML chapter</button>
-              <input ref={markdownInputRef} type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" className="hidden" onChange={uploadNoteChapter} />
+              <input ref={markdownInputRef} type="file" accept=".md,.markdown,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={uploadNoteChapter} />
               <input ref={htmlInputRef} type="file" accept=".html,.htm,text/html" className="hidden" onChange={uploadHtmlChapter} />
             </div>
             <ol className="space-y-1">
@@ -345,7 +395,10 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
               <>
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-color)] pb-4">
                   <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{activeChapter.file_type === 'html' ? 'Interactive HTML' : 'Note chapter'}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {activeChapter.file_type === 'html' ? 'Interactive HTML' : 'Note chapter'}
+                      {activeChapter.source_file_name ? ` · Imported from ${activeChapter.source_file_name}` : ''}
+                    </span>
                     <h3 className="mt-1 text-xl font-black text-[var(--text-main)]">{activeChapter.title}</h3>
                   </div>
                   <div className="flex items-center gap-2">

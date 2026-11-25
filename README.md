@@ -69,7 +69,7 @@ Execute the SQL schema in your Supabase SQL Editor:
 - File: `supabase/schema.sql`
 - This creates all necessary tables, indexes, and RLS policies
 
-For an existing deployment, also run `supabase/migrations/add_book_chapters.sql` to enable book modules, ordered chapters, and HTML lessons.
+For an existing deployment, run `supabase/migrations/add_book_chapters.sql`, `supabase/migrations/add_whiteboard_notes.sql`, and `supabase/migrations/add_study_path_metadata.sql` to enable book modules, ordered chapters, HTML lessons, editable whiteboards, and optional study-path metadata. Subject spaces can be labeled for school, college, competitive exams, or self-study. Markdown, text, PDF, and DOCX uploads can be organized as notes or chapters; PDF and DOCX files are converted to editable text in the browser, and scanned PDFs require OCR before import. Whiteboards save strokes, shapes, and text as JSON in the notes table; PNG is only an optional export.
 
 ## 📦 GitHub Pages Deployment
 

@@ -288,13 +288,16 @@ export interface StudyNote {
   user_id: string;
   title: string;
   content: string;
-  file_type: 'md' | 'txt' | 'html' | 'book';
+  file_type: 'md' | 'txt' | 'html' | 'book' | 'whiteboard';
   parent_id?: string | null;
   sort_order?: number;
   subject?: string;
   topic?: string;
+  study_level?: string;
+  curriculum?: string;
   tags?: string[];
   file_name?: string;
+  source_file_name?: string;
   file_size?: number; // in bytes
   created_at: string;
   updated_at: string;

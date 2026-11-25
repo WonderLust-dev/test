@@ -45,6 +45,17 @@
   --color-bg-soft: #EFEFEF;
 }
 
+/* Runtime-aware Tailwind utilities map to the app-wide theme tokens below. */
+@theme inline {
+  --color-canvas: var(--bg-app);
+  --color-panel: var(--bg-surface);
+  --color-panel-muted: var(--bg-subcard);
+  --color-content: var(--text-main);
+  --color-content-muted: var(--text-muted);
+  --color-outline: var(--border-color);
+  --color-action: var(--btn-primary-bg);
+}
+
 /* ============ MULTI-THEME TOKEN DEFINITIONS ============ */
 :root,
 [data-theme="bento"] {
@@ -82,6 +93,15 @@
   --radius-md: 1.25rem;
   --radius-lg: 1.75rem;
   --radius-btn: 9999px;
+  --radius-control: 0.75rem;
+  --radius-card: 1.5rem;
+  --radius-panel: 1.25rem;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+  --motion-fast: 140ms;
+  --motion-standard: 200ms;
+  --content-max: 80rem;
 
   --gradient-hero: linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%);
   --gradient-accent: linear-gradient(135deg, #111827 0%, #1F2937 100%);
@@ -123,6 +143,8 @@
   --gradient-accent: linear-gradient(135deg, #10B981 0%, #059669 100%);
   --gradient-soft: linear-gradient(135deg, #0A0D14 0%, #101622 100%);
   --gradient-brand: linear-gradient(135deg, #161F2E 0%, #0D131F 100%);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.22);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.32);
 }
 
 /* WCAG AAA High Contrast Theme (Pure Pitch Black + Vivid High Contrast Gold/Amber) */
@@ -159,6 +181,8 @@
   --gradient-accent: linear-gradient(135deg, #FACC15 0%, #EAB308 100%);
   --gradient-soft: linear-gradient(135deg, #000000 0%, #080808 100%);
   --gradient-brand: linear-gradient(135deg, #080808 0%, #121212 100%);
+  --shadow-card: 0 0 0 1px #FACC15;
+  --shadow-card-hover: 0 0 0 2px #FACC15;
 }
 
 /* ============ CHAPTER ONE EDITORIAL THEME (Warm Cream, Terracotta & Literary Serif) ============ */
@@ -198,6 +222,11 @@
   --radius-md: 1.25rem;
   --radius-lg: 1.75rem;
   --radius-btn: 9999px;
+  --radius-control: 0.75rem;
+  --radius-card: 1.5rem;
+  --radius-panel: 1.25rem;
+  --shadow-card: 0 4px 20px -2px rgba(184, 83, 56, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 10px 28px -4px rgba(184, 83, 56, 0.12);
 
   --gradient-hero: linear-gradient(135deg, #FAF7F2 0%, #F5EFEB 100%);
   --gradient-accent: linear-gradient(135deg, #B85338 0%, #D46A4C 100%);
@@ -470,18 +499,18 @@
 .bento-card {
   background: var(--bg-surface);
   border: var(--border-width) solid var(--border-color);
-  border-radius: 1.5rem;
-  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.03);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--radius-card, 1.5rem);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--motion-standard, 200ms) cubic-bezier(0.16, 1, 0.3, 1), border-color var(--motion-standard, 200ms) ease;
 }
 .bento-card:hover {
-  box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .bento-subcard {
   background: var(--bg-subcard);
   border: var(--border-width) solid var(--border-color);
-  border-radius: 1.25rem;
+  border-radius: var(--radius-panel, 1.25rem);
   padding: 1.25rem;
 }
 
@@ -495,7 +524,7 @@
 .glass-input {
   background: var(--bg-surface);
   border: var(--border-width) solid var(--border-color);
-  border-radius: 9999px;
+  border-radius: var(--radius-control, 0.75rem);
   color: var(--text-main);
   outline: none;
   transition: all 0.2s ease;
@@ -522,7 +551,7 @@
   border: none;
   outline: none;
   text-decoration: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-control, 0.75rem);
   padding: 0.625rem 1.25rem;
   line-height: 1.2;
   white-space: nowrap;

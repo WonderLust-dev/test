@@ -17,8 +17,10 @@ import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
 import ChapterOneView from './ChapterOneView';
 import StudyBooks from './StudyBooks';
+import StudyWhiteboards from './StudyWhiteboards';
 import { useTheme } from '../hooks/useTheme';
 import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
+import { importStudyDocument } from '../utils/studyDocumentImporter';
 import {
   FileText,
   Upload,
@@ -66,6 +68,17 @@ interface StudyNotesProps {
 }
 
 const SUBJECT_OPTIONS = [
+  'Mathematics',
+  'Science',
+  'English',
+  'Social Studies',
+  'History',
+  'Geography',
+  'Biology',
+  'Physics',
+  'Chemistry',
+  'Computer Science',
+  'Economics',
   'Quantitative Aptitude',
   'General Awareness',
   'English Comprehension',
@@ -82,7 +95,7 @@ const NOTION_EMOJIS = [
 
 export default function StudyNotes({ userId }: StudyNotesProps) {
   const effectiveUserId = userId || 'guest';
-  const [activeSection, setActiveSection] = useState<'notes' | 'books'>('notes');
+  const [activeSection, setActiveSection] = useState<'notes' | 'books' | 'whiteboards'>('notes');
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -127,7 +140,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   // Upload Modal & Duplicate Header Detection
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadSubject, setUploadSubject] = useState(SUBJECT_OPTIONS[0]);
-  const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; content: string; size: number; type: 'md' | 'txt' }>>([]);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; content: string; size: number; type: 'md' | 'txt'; sourceFileName?: string }>>([]);
   const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -331,8 +344,9 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   // File Upload Handlers
   const processUploadedFiles = async (files: FileList | File[]) => {
-    const validExtensions = ['.md', '.markdown', '.txt'];
+    const validExtensions = ['.md', '.markdown', '.txt', '.pdf', '.docx'];
     const parsedFiles: typeof pendingFiles = [];
+    const failedFiles: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -341,25 +355,30 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
       if (validExtensions.includes(ext)) {
         try {
-          const text = await file.text();
-          const type: 'md' | 'txt' = ext === '.txt' ? 'txt' : 'md';
+          const imported = await importStudyDocument(file);
           parsedFiles.push({
             name,
-            content: text,
+            content: imported.content,
             size: file.size,
-            type,
+            type: imported.fileType,
+            sourceFileName: imported.sourceFileName,
           });
-        } catch (err) {
-          console.error('Failed to read file:', name, err);
+        } catch (error) {
+          console.error('Failed to import study document:', name, error);
+          failedFiles.push(error instanceof Error ? error.message : `Could not read ${name}.`);
         }
+      } else {
+        failedFiles.push(`Unsupported file type: ${name}. Choose Markdown, text, PDF, or DOCX.`);
       }
     }
 
     if (parsedFiles.length > 0) {
       setPendingFiles(prev => [...prev, ...parsedFiles]);
       setShowUploadModal(true);
-    } else {
-      alert('Please upload valid markdown (.md) or text (.txt) files.');
+    }
+    if (failedFiles.length > 0) alert(failedFiles.join('\n'));
+    if (parsedFiles.length === 0 && failedFiles.length === 0) {
+      alert('Choose Markdown, text, PDF, or DOCX files to import.');
     }
   };
 
@@ -389,7 +408,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         await updateNote(existing.id, {
           content: f.content,
           file_size: f.size,
-          file_name: f.name,
+          file_name: f.sourceFileName ? `${f.name.replace(/\.[^/.]+$/, '')}.md` : f.name,
+          source_file_name: f.sourceFileName,
           file_type: f.type,
           subject: uploadSubject,
           updated_at: new Date().toISOString(),
@@ -399,7 +419,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           ...n,
           content: f.content,
           file_size: f.size,
-          file_name: f.name,
+          file_name: f.sourceFileName ? `${f.name.replace(/\.[^/.]+$/, '')}.md` : f.name,
+          source_file_name: f.sourceFileName,
           file_type: f.type,
           subject: uploadSubject,
           updated_at: new Date().toISOString(),
@@ -412,11 +433,12 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           user_id: effectiveUserId,
           title,
           content: f.content,
-          file_name: f.name,
+          file_name: f.sourceFileName ? `${f.name.replace(/\.[^/.]+$/, '')}.md` : f.name,
+          source_file_name: f.sourceFileName,
           file_type: f.type,
           file_size: f.size,
           subject: uploadSubject,
-          tags: [uploadSubject, f.type.toUpperCase()],
+          tags: [uploadSubject, f.sourceFileName ? `Imported ${f.sourceFileName.split('.').pop()?.toUpperCase()}` : f.type.toUpperCase()],
           is_pinned: false,
         });
       }
@@ -647,10 +669,21 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           onClick={() => setActiveSection('books')}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeSection === 'books' ? 'bg-indigo-600 text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
         >
-          Books &amp; Chapters
+          Subjects &amp; Chapters
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'whiteboards'}
+          onClick={() => setActiveSection('whiteboards')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeSection === 'whiteboards' ? 'bg-indigo-600 text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
+        >
+          Whiteboards
         </button>
       </div>
-      {activeSection === 'books' ? (
+      {activeSection === 'whiteboards' ? (
+        <StudyWhiteboards userId={effectiveUserId} />
+      ) : activeSection === 'books' ? (
         <StudyBooks userId={effectiveUserId} />
       ) : viewMode === 'editorial' ? (
         <ChapterOneView
@@ -718,7 +751,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 e.target.value = '';
               }}
               multiple
-              accept=".md,.markdown,.txt"
+              accept=".md,.markdown,.txt,.pdf,.docx"
               className="hidden"
             />
 
@@ -957,7 +990,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
             {search || selectedSubject !== 'all' || selectedType !== 'all' || pinnedOnly
               ? 'No notes match your current filter settings. Try adjusting your search query.'
-              : 'You haven’t added any notes yet. Upload a .md or .txt file to start studying!'}
+              : 'You haven’t added any notes yet. Upload a Markdown, text, PDF, or DOCX file to start studying!'}
           </p>
           {(search || selectedSubject !== 'all' || selectedType !== 'all' || pinnedOnly) && (
             <button
@@ -1009,6 +1042,11 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                       >
                         {note.file_type}
                       </span>
+                      {note.source_file_name && (
+                        <span title={`Imported from ${note.source_file_name}`} className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          {note.source_file_name.split('.').pop()?.toUpperCase()} import
+                        </span>
+                      )}
                       {note.subject && (
                         <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] truncate max-w-[130px]">
                           {note.subject}
@@ -1130,6 +1168,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                       <span>{getReadTime(note.content)}</span>
                       <span>•</span>
                       <span>{formatFileSize(note.file_size)}</span>
+                      {note.source_file_name && <span className="hidden md:inline truncate max-w-36" title={`Imported from ${note.source_file_name}`}>· {note.source_file_name}</span>}
                     </div>
                   </div>
                 </div>
@@ -1237,6 +1276,10 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               </button>
             </div>
 
+            <p className="text-xs text-[var(--text-muted)]">
+              PDF and DOCX files are converted to editable text. Scanned PDFs need OCR before import.
+            </p>
+
             {/* Subject Selector for uploaded notes */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-[var(--text-main)]">
@@ -1262,7 +1305,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="uppercase text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-600 text-white shrink-0">
-                      {f.type}
+                      {f.sourceFileName ? f.sourceFileName.split('.').pop() : f.type}
                     </span>
                     <span className="truncate text-[var(--text-main)] font-bold">{f.name}</span>
                   </div>
