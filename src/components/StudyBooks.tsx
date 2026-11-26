@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, FileCode2, FileText, Pencil, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import type { StudyNote } from '../types';
 import { deleteNote, getNotes, saveNote, updateNote } from '../services/database';
@@ -12,6 +13,9 @@ interface StudyBooksProps {
 const cardClass = 'bento-card border border-[var(--border-color)] rounded-2xl bg-[var(--bg-surface)]';
 
 export default function StudyBooks({ userId }: StudyBooksProps) {
+  const [searchParams] = useSearchParams();
+  const requestedChapterId = searchParams.get('chapter');
+  const openedQueryChapter = useRef<string | null>(null);
   const [materials, setMaterials] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +50,19 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
   useEffect(() => {
     void refresh();
   }, [userId]);
+
+  useEffect(() => {
+    if (!requestedChapterId || materials.length === 0 || openedQueryChapter.current === requestedChapterId) return;
+    const chapter = materials.find(item => (
+      item.id === requestedChapterId
+      && !!item.parent_id
+      && (item.file_type === 'md' || item.file_type === 'txt' || item.file_type === 'html')
+    ));
+    if (!chapter?.parent_id) return;
+    openedQueryChapter.current = requestedChapterId;
+    setActiveBookId(chapter.parent_id);
+    setActiveChapterId(chapter.id);
+  }, [materials, requestedChapterId]);
 
   const books = useMemo(
     () => materials.filter(item => item.file_type === 'book').sort((a, b) => a.title.localeCompare(b.title)),

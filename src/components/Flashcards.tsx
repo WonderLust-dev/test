@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   BookOpen,
   Brain,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { FlashcardContent, FlashcardRating, StudyNote } from '../types';
 import { deleteNote, getNotes, saveNote, updateNote } from '../services/database';
 import { parseFlashcardContent, scheduleFlashcardReview } from '../services/flashcards';
@@ -50,6 +52,7 @@ function dueLabel(content: FlashcardContent): string {
 
 export default function Flashcards({ userId }: { userId?: string }) {
   const effectiveUserId = userId || 'guest';
+  const navigate = useNavigate();
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,11 +124,24 @@ export default function Flashcards({ userId }: { userId?: string }) {
     })
     .sort((a, b) => Date.parse(a.data.dueAt) - Date.parse(b.data.dueAt)), [filter, parsedCards]);
 
+  const getLinkedChapter = (card: StoredFlashcard) => notes.find(note => (
+    note.id === card.note.parent_id
+    && (note.file_type === 'md' || note.file_type === 'txt' || note.file_type === 'html')
+  ));
+
   const getChapterLabel = (card: StoredFlashcard) => {
-    const chapter = notes.find(note => note.id === card.note.parent_id);
+    const chapter = getLinkedChapter(card);
     if (!chapter) return 'Unlinked';
     const book = notes.find(note => note.id === chapter.parent_id);
     return book ? `${book.title} · ${chapter.title}` : chapter.title;
+  };
+
+  const openStudyNotes = (card?: StoredFlashcard) => {
+    const chapter = card ? getLinkedChapter(card) : undefined;
+    const destination = chapter
+      ? `/notes?section=books&chapter=${encodeURIComponent(chapter.id)}`
+      : '/notes?section=books';
+    navigate(destination);
   };
 
   const resetForm = () => {
@@ -306,12 +322,25 @@ export default function Flashcards({ userId }: { userId?: string }) {
     return (
       <section className="mx-auto max-w-3xl space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={finishSession} className="btn btn-ghost">
-            <ArrowLeft size={15} /> Exit review
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={finishSession} className="btn btn-ghost">
+              <ArrowLeft size={15} /> Exit review
+            </button>
+            {getLinkedChapter(currentSessionCard) && (
+              <button type="button" onClick={() => openStudyNotes(currentSessionCard)} className="btn btn-outline">
+                <BookOpen size={15} /> Open chapter
+              </button>
+            )}
+          </div>
           <span className="text-sm font-semibold text-[var(--text-muted)]">
             Card {sessionIndex + 1} of {sessionIds.length}
           </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-subtle)]" aria-label="Review progress">
+          <div
+            className="h-full rounded-full bg-indigo-600 transition-all"
+            style={{ width: `${((sessionIndex + 1) / sessionIds.length) * 100}%` }}
+          />
         </div>
         <div className={`${cardClass} min-h-72 p-6 sm:p-10`}>
           <div className="mb-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -377,6 +406,9 @@ export default function Flashcards({ userId }: { userId?: string }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => openStudyNotes()} className="btn btn-outline">
+            <BookOpen size={15} /> Notes &amp; subjects
+          </button>
           <button type="button" onClick={startReview} disabled={dueCards.length === 0} className="btn btn-primary">
             <RotateCcw size={15} /> Review due ({dueCards.length})
           </button>
@@ -451,22 +483,31 @@ export default function Flashcards({ userId }: { userId?: string }) {
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-[var(--text-main)]">Link to a chapter (optional)</span>
+            <span className="mb-1.5 block text-sm font-semibold text-[var(--text-main)]">Subject &amp; chapter (optional)</span>
             <select value={chapterId} onChange={event => setChapterId(event.target.value)} className="input w-full">
-              <option value="">No chapter</option>
-              {chapters.map(chapter => {
-                const book = books.find(item => item.id === chapter.parent_id);
+              <option value="">No chapter linked</option>
+              {books.map(book => {
+                const bookChapters = chapters.filter(chapter => chapter.parent_id === book.id);
+                if (bookChapters.length === 0) return null;
+                const groupLabel = book.subject && book.subject !== book.title
+                  ? `${book.subject} · ${book.title}`
+                  : book.title;
                 return (
-                  <option key={chapter.id} value={chapter.id}>
-                    {book ? `${book.title} · ` : ''}{chapter.title}
-                  </option>
+                  <optgroup key={book.id} label={groupLabel}>
+                    {bookChapters.map(chapter => (
+                      <option key={chapter.id} value={chapter.id}>{chapter.title}</option>
+                    ))}
+                  </optgroup>
                 );
               })}
             </select>
             {chapters.length === 0 && (
-              <span className="mt-1 block text-xs text-[var(--text-muted)]">
-                Add chapters in Study Notes to link cards to a subject.
-              </span>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
+                <span>Create a subject and chapter first to link this card.</span>
+                <button type="button" onClick={() => openStudyNotes()} className="font-semibold text-indigo-600 hover:underline">
+                  Open Study Notes
+                </button>
+              </div>
             )}
           </label>
           <div className="flex flex-wrap justify-end gap-2">
@@ -527,6 +568,17 @@ export default function Flashcards({ userId }: { userId?: string }) {
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-1">
+                  {getLinkedChapter(card) && (
+                    <button
+                      type="button"
+                      onClick={() => openStudyNotes(card)}
+                      className="btn btn-ghost px-3 text-indigo-600"
+                      aria-label={`Open chapter for ${card.data.front}`}
+                      title="Open linked chapter"
+                    >
+                      <ArrowUpRight size={15} />
+                    </button>
+                  )}
                   <button type="button" onClick={() => openEditForm(card)} className="btn btn-ghost px-3" aria-label={`Edit ${card.data.front}`}>
                     <Pencil size={15} />
                   </button>

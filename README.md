@@ -4,7 +4,7 @@ A flexible study workspace for school subjects, university courses, certificatio
 
 ## Project documentation
 
-The maintained module guides and database setup instructions are collected in [`docs/README.md`](./docs/README.md). The Supabase SQL catalog is in [`supabase/migrations/README.md`](./supabase/migrations/README.md).
+The maintained module guides and database setup instructions are collected in [`documents/README.md`](./documents/README.md). The Supabase SQL catalog is in [`supabase/migrations/README.md`](./supabase/migrations/README.md).
 
 ## 🚀 Quick Start
 

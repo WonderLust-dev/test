@@ -68,26 +68,6 @@ interface StudyNotesProps {
   onSelectSubject?: (subject: string) => void;
 }
 
-const SUBJECT_OPTIONS = [
-  'Mathematics',
-  'Science',
-  'English',
-  'Social Studies',
-  'History',
-  'Geography',
-  'Biology',
-  'Physics',
-  'Chemistry',
-  'Computer Science',
-  'Economics',
-  'Quantitative Aptitude',
-  'General Awareness',
-  'English Comprehension',
-  'General Intelligence & Reasoning',
-  'Computer Knowledge',
-  'General Studies',
-];
-
 const NOTION_EMOJIS = [
   '📐', '🏛️', '📖', '💡', '⚡', '🎯', '🧠', '📝',
   '📊', '🔍', '🏆', '🌟', '⏱️', '📌', '🔬', '🧮',
@@ -101,6 +81,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     searchParams.get('section') === 'books' ? 'books' : 'notes'
   );
   const [notes, setNotes] = useState<StudyNote[]>([]);
+  const [allMaterials, setAllMaterials] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters & Views
@@ -143,7 +124,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   // Upload Modal & Duplicate Header Detection
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadSubject, setUploadSubject] = useState(SUBJECT_OPTIONS[0]);
+  const [uploadSubject, setUploadSubject] = useState('');
   const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; content: string; size: number; type: 'md' | 'txt'; sourceFileName?: string }>>([]);
   const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -188,6 +169,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setLoading(true);
     try {
       const data = await getNotes(effectiveUserId);
+      setAllMaterials(data);
       setNotes(data.filter(n => !n.parent_id && (n.file_type === 'md' || n.file_type === 'txt')));
     } catch (e) {
       console.error('Failed to load notes:', e);
@@ -230,6 +212,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       const res = await syncNotesWithCloud(effectiveUserId);
       if (res.success) {
         const freshNotes = await getNotes(effectiveUserId);
+        setAllMaterials(freshNotes);
         const regularNotes = freshNotes.filter(n => !n.parent_id && (n.file_type === 'md' || n.file_type === 'txt'));
         setNotes(regularNotes);
         setSyncNotification(`☁️ Synced with Supabase database (${regularNotes.length} notes up to date)`);
@@ -283,10 +266,19 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const availableSubjects = useMemo(() => {
     const set = new Set<string>();
     notes.forEach(n => {
-      if (n.subject) set.add(n.subject);
+      const subject = n.subject?.trim();
+      if (subject) set.add(subject);
     });
-    return Array.from(set);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [notes]);
+  const subjectSuggestions = useMemo(() => {
+    const subjects = new Set<string>();
+    [...notes, ...allMaterials.filter(note => note.file_type === 'book')].forEach(note => {
+      const subject = note.subject?.trim();
+      if (subject) subjects.add(subject);
+    });
+    return Array.from(subjects).sort((a, b) => a.localeCompare(b));
+  }, [allMaterials, notes]);
 
   // Estimated reading time helper (200 wpm)
   const getReadTime = (content: string): string => {
@@ -415,7 +407,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           file_name: f.sourceFileName ? `${f.name.replace(/\.[^/.]+$/, '')}.md` : f.name,
           source_file_name: f.sourceFileName,
           file_type: f.type,
-          subject: uploadSubject,
+          subject: uploadSubject.trim(),
           updated_at: new Date().toISOString(),
         }, effectiveUserId);
 
@@ -426,7 +418,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           file_name: f.sourceFileName ? `${f.name.replace(/\.[^/.]+$/, '')}.md` : f.name,
           source_file_name: f.sourceFileName,
           file_type: f.type,
-          subject: uploadSubject,
+          subject: uploadSubject.trim(),
           updated_at: new Date().toISOString(),
         } : n);
       } else {
@@ -441,8 +433,11 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           source_file_name: f.sourceFileName,
           file_type: f.type,
           file_size: f.size,
-          subject: uploadSubject,
-          tags: [uploadSubject, f.sourceFileName ? `Imported ${f.sourceFileName.split('.').pop()?.toUpperCase()}` : f.type.toUpperCase()],
+          subject: uploadSubject.trim(),
+          tags: [
+            ...(uploadSubject.trim() ? [uploadSubject.trim()] : []),
+            f.sourceFileName ? `Imported ${f.sourceFileName.split('.').pop()?.toUpperCase()}` : f.type.toUpperCase(),
+          ],
           is_pinned: false,
         });
       }
@@ -459,7 +454,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setOverwriteDuplicates(false);
 
     // Reset filters and focus uploaded subject so uploaded notes are immediately visible
-    setSelectedSubject(uploadSubject);
+    setSelectedSubject(uploadSubject.trim() || 'all');
     setSelectedType('all');
     setSearch('');
     setPinnedOnly(false);
@@ -584,7 +579,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       await updateNote(editingNote.id, {
         title: editingNote.title.trim(),
         content: editingNote.content,
-        subject: editingNote.subject || 'General Studies',
+        subject: editingNote.subject?.trim() || '',
         file_type: editingNote.file_type || 'md',
         tags: editingNote.tags || [],
         emoji: editingNote.emoji || '📝',
@@ -624,8 +619,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         title: editingNote.title.trim(),
         content: editingNote.content,
         file_type: editingNote.file_type || 'md',
-        subject: editingNote.subject || 'General Studies',
-        tags: editingNote.tags || [editingNote.subject || 'General Studies'],
+        subject: editingNote.subject?.trim() || '',
+        tags: editingNote.tags || (editingNote.subject?.trim() ? [editingNote.subject.trim()] : []),
         file_name: `${editingNote.title.trim().replace(/\s+/g, '_')}.${editingNote.file_type || 'md'}`,
         file_size: new Blob([editingNote.content]).size,
         is_pinned: false,
@@ -698,7 +693,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               title: '',
               content: '# Note Title\n\nWrite your revision points here...',
               file_type: 'md',
-              subject: SUBJECT_OPTIONS[0],
+              subject: '',
               tags: [],
             });
             setEditorTab('write');
@@ -766,7 +761,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                   title: '',
                   content: '# Note Title\n\nWrite your revision points here...',
                   file_type: 'md',
-                  subject: SUBJECT_OPTIONS[0],
+                  subject: '',
                   tags: [],
                 });
                 setEditorTab('write');
@@ -959,9 +954,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
         >
           All Subjects ({notes.length})
         </button>
-        {Array.from(new Set([...SUBJECT_OPTIONS, ...availableSubjects])).map(subj => {
+        {availableSubjects.map(subj => {
           const count = notes.filter(n => n.subject === subj).length;
-          if (count === 0 && !SUBJECT_OPTIONS.includes(subj)) return null;
           return (
             <button
               key={subj}
@@ -1289,15 +1283,16 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               <label className="text-xs font-bold text-[var(--text-main)]">
                 Assign Subject Category:
               </label>
-              <select
+              <input
+                list="upload-subject-options"
                 value={uploadSubject}
                 onChange={e => setUploadSubject(e.target.value)}
+                placeholder="Type a subject or choose one you've used"
                 className="w-full px-3.5 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                {SUBJECT_OPTIONS.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              />
+              <datalist id="upload-subject-options">
+                {subjectSuggestions.map(subject => <option key={subject} value={subject} />)}
+              </datalist>
             </div>
 
             {/* File List preview */}
@@ -1485,15 +1480,16 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                 <label className="text-xs font-bold text-[var(--text-main)] block mb-1">
                   Subject
                 </label>
-                <select
-                  value={editingNote.subject || SUBJECT_OPTIONS[0]}
+                <input
+                  list="note-subject-options"
+                  value={editingNote.subject || ''}
                   onChange={e => setEditingNote({ ...editingNote, subject: e.target.value })}
+                  placeholder="Type a subject or choose one you've used"
                   className="w-full px-3 py-2.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-xl text-xs sm:text-sm text-[var(--text-main)] font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {SUBJECT_OPTIONS.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                />
+                <datalist id="note-subject-options">
+                  {subjectSuggestions.map(subject => <option key={subject} value={subject} />)}
+                </datalist>
               </div>
 
               <div className="sm:col-span-3">

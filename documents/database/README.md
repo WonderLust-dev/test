@@ -18,8 +18,9 @@ Do not rerun the full schema blindly on a database that already contains app dat
 1. `add_visibility_column.sql` and `add_spaced_repetition.sql` extend the existing paper and mistake tables.
 2. `add_notes_table.sql` creates the notes table when it is missing.
 3. `add_book_chapters.sql` adds parent/ordering support for books and chapters.
-4. `add_study_path_metadata.sql` adds optional learning-path fields.
-5. `add_whiteboard_notes.sql`, `add_study_planner.sql`, and `add_flashcards.sql` allow those note file types.
+4. `add_dynamic_note_subjects.sql` removes the fixed default subject for future notes.
+5. `add_study_path_metadata.sql` adds optional learning-path fields.
+6. `add_whiteboard_notes.sql`, `add_study_planner.sql`, and `add_flashcards.sql` allow those note file types.
 
 The SQL scripts are in [`supabase/migrations/`](../../supabase/migrations/), with a module-by-module description in its [catalog](../../supabase/migrations/README.md).
 

@@ -441,7 +441,7 @@ CREATE TABLE IF NOT EXISTS notes (
   file_type TEXT NOT NULL DEFAULT 'md' CHECK (file_type IN ('md', 'txt', 'html', 'book', 'whiteboard', 'study_plan', 'flashcard')),
   parent_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  subject TEXT DEFAULT 'General Studies',
+  subject TEXT DEFAULT '',
   topic TEXT DEFAULT '',
   study_level TEXT NOT NULL DEFAULT '',
   curriculum TEXT NOT NULL DEFAULT '',
