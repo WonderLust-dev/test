@@ -146,7 +146,7 @@ export default function QuestionPalette({
   };
 
   return (
-    <div className={`flex flex-col h-full min-h-0 overflow-hidden space-y-2 ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 overflow-hidden space-y-1.5 ${className}`}>
       {/* Header Info + Jump To Box */}
       <div className="shrink-0 pb-2 border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between gap-1.5">
@@ -268,7 +268,7 @@ export default function QuestionPalette({
       {/* Subject Tabs (if multi-subject) */}
       {hasMultipleSubjects && (
         <div className="shrink-0 space-y-1 pb-1 border-b border-[var(--border-color)]">
-          <div className="flex gap-1 overflow-x-auto pb-0.5 custom-scrollbar">
+          <div className="flex gap-1 overflow-x-auto pb-0.5 hide-scrollbar">
             <button
               onClick={() => { setSelectedSubject('all'); setActiveChunk(0); }}
               className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${
@@ -335,7 +335,7 @@ export default function QuestionPalette({
       )}
 
       {/* Questions Grid */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar py-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 custom-scrollbar py-0.5">
         {displayIndices.length === 0 ? (
           <div className="py-6 px-3 text-center text-xs text-[var(--text-muted)] space-y-2">
             <p className="font-semibold text-xs">
@@ -355,7 +355,7 @@ export default function QuestionPalette({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-5 gap-1">
             {displayIndices.map(idx => {
               const status = getQStatus(idx);
               const isCurrent = idx === currentQ;
@@ -377,9 +377,9 @@ export default function QuestionPalette({
                 <button
                   key={idx}
                   onClick={() => onSelectQuestion(idx)}
-                  className={`relative w-full aspect-square max-w-[36px] sm:max-w-[38px] mx-auto rounded-xl text-xs flex items-center justify-center transition-all ${bgClasses} ${
+                  className={`relative w-full aspect-square max-w-[32px] sm:max-w-[34px] mx-auto rounded-lg text-[11px] flex items-center justify-center transition-all ${bgClasses} ${
                     isCurrent
-                      ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-[var(--bg-surface)] scale-105 font-black shadow-md z-10'
+                      ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-[var(--bg-surface)] font-black shadow-md z-10'
                       : ''
                   }`}
                   title={`Question ${idx + 1}: ${status.replace('_', ' ')}`}

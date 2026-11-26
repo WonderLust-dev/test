@@ -4,4 +4,4 @@ ALTER TABLE notes
 
 ALTER TABLE notes
   ADD CONSTRAINT notes_file_type_check
-  CHECK (file_type IN ('md', 'txt', 'html', 'book', 'whiteboard'));
+  CHECK (file_type IN ('md', 'txt', 'html', 'book', 'whiteboard', 'study_plan'));

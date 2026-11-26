@@ -10,7 +10,6 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { getPaperById, savePaper, getPapers, getAttempts, saveCustomPaper } from './services/database';
-import { DEMO_PAPER } from './utils/demoData';
 import { Paper, QuestionJSON } from './types';
 import AuthGate, { useAuthModal } from './components/AuthGate';
 import Dashboard, { DashboardTab } from './components/Dashboard';
@@ -34,6 +33,7 @@ import {
   AlertTriangle,
   Bookmark,
   BarChart3,
+  CalendarDays,
   X,
   FileText,
   Menu,
@@ -47,6 +47,7 @@ const NAV_ITEMS = [
   { path: '/library', label: 'Exam Library', icon: BookOpen },
   { path: '/practice', label: 'Practice Hub', icon: Target },
   { path: '/notes', label: 'Study Notes', icon: FileText, badge: 'New' },
+  { path: '/planner', label: 'Study Planner', icon: CalendarDays },
   { path: '/mistakes', label: 'Mistakes', icon: AlertTriangle },
   { path: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -313,7 +314,6 @@ function AppContent() {
 
   const [activePaper, setActivePaper] = useState<Paper | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [demoLoaded, setDemoLoaded] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -337,6 +337,7 @@ function AppContent() {
     if (p.startsWith('/library')) return 'Exam Library';
     if (p.startsWith('/practice')) return 'Practice Hub';
     if (p.startsWith('/notes')) return 'Study Notes';
+    if (p.startsWith('/planner')) return 'Study Planner';
     if (p.startsWith('/mistakes')) return 'Mistakes Notebook';
     if (p.startsWith('/bookmarks')) return 'Saved Bookmarks';
     if (p.startsWith('/analytics')) return 'Analytics & Trends';
@@ -346,38 +347,6 @@ function AppContent() {
     if (p.startsWith('/exam')) return 'Examination';
     return 'Dashboard';
   };
-
-  // Load demo paper on first visit if library is empty (only after auth has resolved)
-  useEffect(() => {
-    async function loadDemo() {
-      if (loading || demoLoaded) return;
-      try {
-        const papers = await getPapers(effectiveUserId);
-        if (papers.length === 0) {
-          await savePaper({
-            user_id: effectiveUserId,
-            exam: DEMO_PAPER.exam,
-            title: DEMO_PAPER.paperTitle,
-            description: DEMO_PAPER.description || '',
-            difficulty: DEMO_PAPER.difficulty || 'medium',
-            duration_minutes: DEMO_PAPER.durationMinutes,
-            total_marks: DEMO_PAPER.totalMarks,
-            negative_marking: DEMO_PAPER.negativeMarking || 0,
-            question_count: DEMO_PAPER.questions.length,
-            subjects: DEMO_PAPER.subjects || [],
-            raw_json: DEMO_PAPER,
-            is_demo: true,
-            visibility: 'private',
-          });
-          setRefreshKey((k) => k + 1);
-        }
-      } catch (e) {
-        console.error('Failed to load demo:', e);
-      }
-      setDemoLoaded(true);
-    }
-    loadDemo();
-  }, [loading, demoLoaded, effectiveUserId]);
 
   // Backward compatibility: redirect legacy deep-links (?exam=<id> or ?paper=<id>) to /exam/:paperId
   useEffect(() => {
@@ -438,7 +407,7 @@ function AppContent() {
         const customPaper: Paper = {
           id: `custom_topic_${Date.now()}`,
           user_id: effectiveUserId,
-          exam: 'SSC CGL',
+          exam: 'Practice',
           title: `${topic || subject} — Targeted Drill`,
           description: `Focused practice session covering ${topic || subject} (${matchedQuestions.length} questions)`,
           difficulty: 'medium',
@@ -448,7 +417,7 @@ function AppContent() {
           question_count: matchedQuestions.length,
           subjects: subject ? [subject] : Array.from(new Set(matchedQuestions.map((q) => q.subject))),
           raw_json: {
-            exam: 'SSC CGL',
+            exam: 'Practice',
             paperTitle: `${topic || subject} — Targeted Drill`,
             durationMinutes: Math.max(5, Math.ceil(matchedQuestions.length * 1.5)),
             totalMarks: matchedQuestions.length * 2,
@@ -525,7 +494,7 @@ function AppContent() {
             <BookOpen size={22} className="text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900">SSC CGL Prep</h2>
+            <h2 className="text-base font-bold text-gray-900">Study Hub</h2>
             <p className="text-xs text-gray-500 mt-1">Preparing your workspace...</p>
           </div>
         </div>
@@ -567,10 +536,10 @@ function AppContent() {
                   </div>
                   <div>
                     <div className="text-sm font-extrabold tracking-tight text-[var(--text-main)] leading-tight">
-                      SSC CGL Prep
+                      Study Hub
                     </div>
                     <div className="text-[11px] font-semibold text-[var(--text-muted)]">
-                      Tier 1 & 2 Platform
+                      Notes, tests & revision
                     </div>
                   </div>
                 </>
@@ -636,7 +605,7 @@ function AppContent() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-[var(--text-main)] truncate">
-                      {user.user_metadata?.display_name || 'SSC Aspirant'}
+                      {user.user_metadata?.display_name || 'Student'}
                     </div>
                     <div className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
@@ -675,7 +644,7 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Header Bar */}
         {!hideChrome && (
-          <header className="shrink-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
+          <header className="shrink-0 z-20 bg-[var(--bg-app)]/90 backdrop-blur-md px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-4 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               {/* Mobile Hamburger Drawer Trigger */}
               <button
@@ -688,11 +657,11 @@ function AppContent() {
               </button>
 
               <div className="min-w-0">
-                <h1 className="text-sm sm:text-lg md:text-2xl font-bold tracking-tight text-[var(--text-main)] truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none leading-tight">
+                <h1 className="text-sm sm:text-lg md:text-xl font-bold tracking-tight text-[var(--text-main)] truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none leading-tight">
                   {getHeaderTitle()}
                 </h1>
                 <div className="text-[10px] sm:text-xs font-semibold text-[var(--text-muted)] truncate hidden xs:block">
-                  SSC CGL Tier 1 & 2 Platform
+                  Study and exam preparation workspace
                 </div>
               </div>
             </div>
@@ -769,6 +738,7 @@ function AppContent() {
             <Route path="/library" element={renderDashboard('library')} />
             <Route path="/practice" element={renderDashboard('practice')} />
             <Route path="/notes" element={renderDashboard('notes')} />
+            <Route path="/planner" element={renderDashboard('planner')} />
             <Route path="/mistakes" element={renderDashboard('mistakes')} />
             <Route path="/bookmarks" element={renderDashboard('bookmarks')} />
             <Route path="/analytics" element={renderDashboard('analytics')} />
@@ -940,10 +910,10 @@ function AppContent() {
                       </div>
                       <div>
                         <div className="text-xs font-extrabold tracking-tight text-[var(--text-main)]">
-                          SSC CGL Prep
+                          Study Hub
                         </div>
                         <div className="text-[10px] font-semibold text-gray-400">
-                          Tier 1 & 2 Platform
+                          Notes, tests & revision
                         </div>
                       </div>
                     </>
@@ -1037,7 +1007,7 @@ function AppContent() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-[var(--text-main)] truncate">
-                        {user.user_metadata?.display_name || 'SSC Aspirant'}
+                        {user.user_metadata?.display_name || 'Student'}
                       </div>
                       <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced
@@ -1086,7 +1056,7 @@ function AppContent() {
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-[var(--text-main)]">
-                      {user ? user.user_metadata?.display_name || 'SSC Aspirant' : 'Guest User'}
+                      {user ? user.user_metadata?.display_name || 'Student' : 'Guest User'}
                     </h3>
                     <div className="text-[11px] font-semibold text-[var(--text-muted)] truncate max-w-[180px]">
                       {user ? user.email : 'Local Storage Mode'}

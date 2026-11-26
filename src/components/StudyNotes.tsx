@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { StudyNote, NoteFilters } from '../types';
 import {
   getNotes,
@@ -95,7 +96,10 @@ const NOTION_EMOJIS = [
 
 export default function StudyNotes({ userId }: StudyNotesProps) {
   const effectiveUserId = userId || 'guest';
-  const [activeSection, setActiveSection] = useState<'notes' | 'books' | 'whiteboards'>('notes');
+  const [searchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<'notes' | 'books' | 'whiteboards'>(
+    searchParams.get('section') === 'books' ? 'books' : 'notes'
+  );
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
 

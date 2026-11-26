@@ -300,7 +300,7 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
               </label>
               <label className="text-xs font-bold text-[var(--text-main)]">
                 Grade, course, or exam <span className="font-normal text-[var(--text-muted)]">(optional)</span>
-                <input value={curriculum} onChange={event => setCurriculum(event.target.value)} placeholder="e.g. Grade 8 · CBSE, SSC CGL 2026" aria-label="Grade, course, or exam" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input value={curriculum} onChange={event => setCurriculum(event.target.value)} placeholder="e.g. Grade 8 Biology, AP Calculus, or SAT 2026" aria-label="Grade, course, or exam" className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </label>
               <div className="flex justify-end gap-2 sm:col-span-2">
                 <button type="button" onClick={() => setShowBookForm(false)} className="btn btn-outline rounded-xl px-4 py-2 text-sm font-semibold">Cancel</button>

@@ -36,7 +36,7 @@ export default function PWAInstallPrompt({
             </div>
             <div>
               <h3 className="text-base font-extrabold text-[var(--text-main)] leading-tight">
-                Install SSC CGL Prep
+                Install Study Hub
               </h3>
               <p className="text-xs text-gray-400 font-medium">
                 PWA • Works 100% Offline
@@ -119,7 +119,7 @@ export default function PWAInstallPrompt({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-extrabold text-[var(--text-main)] text-xs mb-0.5">
-              Install SSC CGL Prep App
+              Install Study Hub
             </h3>
             <p className="text-[11px] text-gray-500 leading-relaxed mb-3">
               Practice mock tests offline with zero lag. Installs directly onto your device.

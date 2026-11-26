@@ -43,7 +43,7 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
   const [duplicateWarning, setDuplicateWarning] = useState('');
   const [showSchema, setShowSchema] = useState(false);
   const [showPromptGen, setShowPromptGen] = useState(false);
-  const [activePromptExamId, setActivePromptExamId] = useState<string>('ssc_cgl');
+  const [activePromptExamId, setActivePromptExamId] = useState<string>('custom_exam');
   const [formatSuccess, setFormatSuccess] = useState(false);
   const [formatError, setFormatError] = useState<string | null>(null);
 
@@ -179,7 +179,7 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
         const p = it.paper!;
         return {
           user_id: userId || 'guest',
-          exam: p.exam || 'SSC CGL',
+          exam: p.exam?.trim() || 'General',
           title: p.paperTitle,
           description: p.description || '',
           difficulty: p.difficulty || 'medium',
@@ -231,7 +231,7 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
     try {
       await savePaper({
         user_id: userId || 'guest',
-        exam: parsedPaper.exam || 'SSC CGL',
+        exam: parsedPaper.exam?.trim() || 'General',
         title: parsedPaper.paperTitle,
         description: parsedPaper.description || '',
         difficulty: parsedPaper.difficulty || 'medium',
@@ -262,7 +262,7 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
     try {
       await savePaper({
         user_id: userId || 'guest',
-        exam: parsedPaper.exam || 'SSC CGL',
+        exam: parsedPaper.exam?.trim() || 'General',
         title: parsedPaper.paperTitle + ' (Copy)',
         description: parsedPaper.description || '',
         difficulty: parsedPaper.difficulty || 'medium',
@@ -298,7 +298,7 @@ export default function JsonImporter({ userId, onImported }: JsonImporterProps) 
           Import Question Paper
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-          Paste AI-generated JSON, validate schema conformity, and import into your exam library across SSC, Railways, Banking, UPSC, State PSCs, and Teaching exams.
+          Import question papers for any exam, course, or subject. Keep the exam or course name in your JSON, or edit it before importing.
         </p>
       </div>
 

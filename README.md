@@ -1,6 +1,6 @@
-# SSC CGL Exam Preparation Platform
+# Study Hub — Notes, Tests & Mock Exams
 
-A professional, full-fledged SSC CGL exam preparation web application. Import AI-generated question papers as JSON, take exams with a real examination interface, analyze performance, learn from mistakes, and improve.
+A flexible study workspace for school subjects, university courses, certifications, and competitive exams. Create study notes and books, import or build question papers, take mock exams, review results, and practice mistakes. Exam and course names are user-defined; built-in exam templates are optional starting points.
 
 ## 🚀 Quick Start
 
@@ -69,7 +69,7 @@ Execute the SQL schema in your Supabase SQL Editor:
 - File: `supabase/schema.sql`
 - This creates all necessary tables, indexes, and RLS policies
 
-For an existing deployment, run `supabase/migrations/add_book_chapters.sql`, `supabase/migrations/add_whiteboard_notes.sql`, and `supabase/migrations/add_study_path_metadata.sql` to enable book modules, ordered chapters, HTML lessons, editable whiteboards, and optional study-path metadata. Subject spaces can be labeled for school, college, competitive exams, or self-study. Markdown, text, PDF, and DOCX uploads can be organized as notes or chapters; PDF and DOCX files are converted to editable text in the browser, and scanned PDFs require OCR before import. Whiteboards save strokes, shapes, and text as JSON in the notes table; PNG is only an optional export.
+For an existing deployment, run `supabase/migrations/add_book_chapters.sql`, `supabase/migrations/add_whiteboard_notes.sql`, `supabase/migrations/add_study_path_metadata.sql`, and `supabase/migrations/add_study_planner.sql` to enable books, chapters, HTML lessons, editable whiteboards, study-path metadata, and synced study plans. Subject spaces can be labeled for school, college, competitive exams, or self-study. Markdown, text, PDF, and DOCX uploads can be organized as notes or chapters; PDF and DOCX files are converted to editable text in the browser, and scanned PDFs require OCR before import. Whiteboards save strokes, shapes, and text as JSON in the notes table; PNG is only an optional export.
 
 ## 📦 GitHub Pages Deployment
 
@@ -105,14 +105,14 @@ AI Model → Generate JSON → Copy JSON → Paste in App → Validate → Impor
 
 ```json
 {
-  "exam": "SSC CGL",
+  "exam": "Grade 10 Biology",
   "paperTitle": "Practice Set 01",
   "description": "Mixed difficulty practice paper",
   "durationMinutes": 60,
   "totalMarks": 100,
   "negativeMarking": 0.5,
   "difficulty": "medium",
-  "subjects": ["Quantitative Aptitude", "General Intelligence & Reasoning", "English Comprehension", "General Awareness"],
+  "subjects": ["Biology", "Chemistry"],
   "questions": [
     {
       "id": 1,

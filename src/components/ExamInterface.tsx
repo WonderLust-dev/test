@@ -440,8 +440,8 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
       {/* Main Container - Strict 1-Screen CBT Layout */}
       <main className="flex-1 min-h-0 overflow-hidden max-w-[1600px] w-full mx-auto p-2 sm:p-3 flex flex-col lg:flex-row gap-2.5 sm:gap-3.5">
         {/* Left Column: Question Palette (Desktop Fixed Container & Mobile Drawer) */}
-        <div className="hidden lg:flex lg:w-76 xl:w-80 h-full flex-col shrink-0 min-h-0">
-          <div className="bento-card p-3 sm:p-3.5 h-full flex flex-col overflow-hidden shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)] rounded-2xl">
+        <div className="hidden lg:flex lg:w-64 xl:w-72 h-full flex-col shrink-0 min-h-0">
+          <div className="bento-card p-2.5 sm:p-3 h-full flex flex-col overflow-hidden shadow-soft border border-[var(--border-color)] bg-[var(--bg-surface)] rounded-2xl">
             <QuestionPalette
               questions={questions}
               currentQ={currentQ}
@@ -563,7 +563,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
             </div>
 
             {/* 2. Scrollable Question Content (Question text, passage, image, options, instant solutions) */}
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pr-1 sm:pr-2 custom-scrollbar space-y-3 sm:space-y-4 pb-20 sm:pb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pr-1 sm:pr-2 custom-scrollbar space-y-3 pb-20 sm:pb-4">
               {/* Passage (if any) */}
               {q.passage && (
                 <div className="p-3 sm:p-3.5 bg-[var(--bg-subcard)] rounded-xl border-l-4 border-indigo-500 text-xs sm:text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border border-[var(--border-color)]">
@@ -572,7 +572,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               )}
 
               {/* Question Text */}
-              <div className="text-sm sm:text-base font-bold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm sm:text-[15px] font-bold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
                 {formatMathText(q.question)}
               </div>
 
@@ -591,7 +591,7 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
               )}
 
               {/* Options */}
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className="space-y-1.5 sm:space-y-2">
                 {q.options.map((opt, idx) => {
                   const isSelected = answers[currentQ] === idx;
                   const hasAnswered = answers[currentQ] !== undefined && answers[currentQ] !== null;
@@ -626,12 +626,12 @@ export default function ExamInterface({ paper, userId, mode = 'exam', onComplete
                           setRevealedQuestions(prev => ({ ...prev, [currentQ]: true }));
                         }
                       }}
-                      className={`w-full text-left p-2.5 sm:p-3 rounded-xl transition-all shadow-xs group flex items-center gap-2.5 sm:gap-3 ${optionStyle}`}
+                      className={`w-full text-left p-2 sm:p-2.5 rounded-xl transition-all shadow-xs group flex items-center gap-2 ${optionStyle}`}
                     >
-                      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs flex items-center justify-center shrink-0 transition-colors ${badgeStyle}`}>
+                      <span className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-[11px] flex items-center justify-center shrink-0 transition-colors ${badgeStyle}`}>
                         {String.fromCharCode(65 + idx)}
                       </span>
-                      <span className="text-xs sm:text-sm leading-relaxed flex-1">
+                      <span className="text-xs sm:text-[13px] leading-relaxed flex-1">
                         {formatMathText(opt)}
                       </span>
                       {hasAnswered && isRevealed && isCorrect && (

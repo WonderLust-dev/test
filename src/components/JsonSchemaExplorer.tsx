@@ -36,7 +36,7 @@ export default function JsonSchemaExplorer({
   const [requiredFilter, setRequiredFilter] = useState<'all' | 'required' | 'optional'>('all');
 
   // Active Preset for Live Template
-  const [selectedTemplateExamId, setSelectedTemplateExamId] = useState<string>('ssc_cgl');
+  const [selectedTemplateExamId, setSelectedTemplateExamId] = useState<string>('custom_exam');
 
   // Feedback states
   const [copiedExampleKey, setCopiedExampleKey] = useState<string | null>(null);
@@ -69,7 +69,9 @@ export default function JsonSchemaExplorer({
 
   // Active Template Exam Preset
   const activeTemplatePreset = useMemo(() => {
-    return EXAM_PRESETS.find((p) => p.id === selectedTemplateExamId) || EXAM_PRESETS[0];
+    return EXAM_PRESETS.find((p) => p.id === selectedTemplateExamId)
+      || EXAM_PRESETS.find((p) => p.id === 'custom_exam')
+      || EXAM_PRESETS[0];
   }, [selectedTemplateExamId]);
 
   // Generated JSON Template

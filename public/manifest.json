@@ -1,7 +1,7 @@
 {
-  "name": "SSC CGL Exam Prep",
-  "short_name": "SSC CGL Prep",
-  "description": "AI-powered SSC CGL exam preparation platform. Import question papers, take exams, analyze performance, and learn from mistakes.",
+  "name": "Study Hub — Notes & Mock Tests",
+  "short_name": "Study Hub",
+  "description": "A flexible study workspace for notes, courses, practice tests, mock exams, and progress tracking.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

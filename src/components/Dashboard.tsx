@@ -2,15 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
 import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility, saveCustomPaper } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
-import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check, Loader2 } from 'lucide-react';
+import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, CalendarDays, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check, Loader2 } from 'lucide-react';
 
 // ============================================================
 // Dashboard (Home)
 // ============================================================
 import ReviewDashboard from './ReviewDashboard';
 import StudyNotes from './StudyNotes';
+import StudyPlanner from './StudyPlanner';
 
-export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes';
+export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes' | 'planner';
 
 interface DashboardProps {
   userId?: string;
@@ -119,10 +120,13 @@ export default function Dashboard({
   }, [papers]);
 
   // Stats
-  const totalAttempts = attempts.length;
-  const totalQuestions = attempts.reduce((s, a) => s + a.attempted_count, 0);
-  const overallAccuracy = totalAttempts > 0 ? Math.round(attempts.reduce((s, a) => s + a.accuracy, 0) / totalAttempts) : 0;
-  const highestScore = totalAttempts > 0 ? Math.max(...attempts.map(a => Math.round((a.score / a.total_marks) * 100))) : 0;
+  const completedAttempts = useMemo(() => attempts.filter(attempt => attempt.is_complete), [attempts]);
+  const totalAttempts = completedAttempts.length;
+  const totalQuestions = completedAttempts.reduce((s, a) => s + a.attempted_count, 0);
+  const overallAccuracy = totalAttempts > 0 ? Math.round(completedAttempts.reduce((s, a) => s + a.accuracy, 0) / totalAttempts) : 0;
+  const highestScore = totalAttempts > 0
+    ? Math.max(...completedAttempts.map(a => a.total_marks > 0 ? Math.round((a.score / a.total_marks) * 100) : a.accuracy))
+    : 0;
 
   // Weak areas calculated from mistake notebook
   const weakTopics = useMemo(() => {
@@ -144,7 +148,7 @@ export default function Dashboard({
     const customPaper: Paper = {
       id: `custom_drill_${Date.now()}`,
       user_id: effectiveUserId,
-      exam: 'SSC CGL',
+      exam: 'Practice',
       title: `${topicName} — Focused Drill`,
       description: `Targeted revision drill for ${topicName} (${questionsToUse.length} questions)`,
       difficulty: 'medium',
@@ -154,7 +158,7 @@ export default function Dashboard({
       question_count: questionsToUse.length,
       subjects: Array.from(new Set(questionsToUse.map(q => q.subject))),
       raw_json: {
-        exam: 'SSC CGL',
+        exam: 'Practice',
         paperTitle: `${topicName} — Focused Drill`,
         durationMinutes: Math.max(5, Math.ceil(questionsToUse.length * 1.5)),
         totalMarks: questionsToUse.length * 2,
@@ -175,13 +179,14 @@ export default function Dashboard({
     { id: 'library' as const, label: 'Exam Library', icon: BookOpen, count: papers.length },
     { id: 'practice' as const, label: 'Practice Hub', icon: Target },
     { id: 'notes' as const, label: 'Study Notes', icon: FileText, count: notesCount },
+    { id: 'planner' as const, label: 'Study Planner', icon: CalendarDays },
     { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle, count: mistakes.length },
     { id: 'bookmarks' as const, label: 'Bookmarks', icon: BookmarkIcon, count: bookmarks.length },
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto animate-fadeIn space-y-6">
+    <div className="max-w-7xl mx-auto animate-fadeIn space-y-4">
       {/* Top Bento Navigation Tabs */}
       <div className="flex items-center gap-1.5 p-1.5 bg-[var(--bg-subcard)] border border-[var(--border-color)] rounded-2xl overflow-x-auto hide-scrollbar w-fit max-w-full shadow-2xs">
         {tabs.map(tab => (
@@ -213,7 +218,7 @@ export default function Dashboard({
       {activeTab === 'overview' && (
         <OverviewBento
           papers={papers}
-          attempts={attempts}
+          attempts={completedAttempts}
           mistakes={mistakes}
           notesCount={notesCount}
           totalQuestions={totalQuestions}
@@ -221,7 +226,6 @@ export default function Dashboard({
           highestScore={highestScore}
           weakTopics={weakTopics}
           onStartExam={onStartExam}
-          onPractice={onPractice}
           onStartReview={onStartReview}
           onViewResults={onViewResults}
           onSelectTab={setActiveTab}
@@ -262,6 +266,9 @@ export default function Dashboard({
       {activeTab === 'notes' && (
         <StudyNotes userId={effectiveUserId} />
       )}
+      {activeTab === 'planner' && (
+        <StudyPlanner userId={effectiveUserId} />
+      )}
       {activeTab === 'mistakes' && (
         <MistakesTab
           mistakes={mistakes}
@@ -299,7 +306,6 @@ function OverviewBento({
   highestScore,
   weakTopics,
   onStartExam,
-  onPractice,
   onStartReview,
   onViewResults,
   onSelectTab,
@@ -314,50 +320,55 @@ function OverviewBento({
   highestScore: number;
   weakTopics: { topic: string; count: number }[];
   onStartExam: (paperId: string) => void;
-  onPractice: (paperId: string) => void;
   onStartReview: () => void;
   onViewResults?: (attemptId: string, paper?: Paper) => void;
   onSelectTab: (tab: DashboardTab) => void;
   onPracticeTopicClick: (topic: string) => void;
 }) {
   const barData = useMemo(() => {
-    if (attempts.length >= 7) {
-      return attempts.slice(-7).map(a => Math.round((a.score / (a.total_marks || 100)) * 100));
-    }
-    return [45, 68, 55, 84, 62, 92, 78];
+    return [...attempts]
+      .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+      .slice(-7)
+      .map(attempt => ({
+        id: attempt.id,
+        accuracy: Math.max(0, Math.min(100, Math.round(attempt.accuracy))),
+        label: new Date(attempt.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        title: attempt.paper_title,
+      }));
   }, [attempts]);
+  const recentPapers = useMemo(
+    () => [...papers]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 4),
+    [papers],
+  );
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       {/* Top Bento Row: Overview (2 cols) + Popular Mock Tests (1 col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         {/* Left: Overview Card */}
-        <div className="lg:col-span-2 bento-card p-6 sm:p-7 flex flex-col justify-between">
+        <div className="lg:col-span-2 bento-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-gray-900 tracking-tight">Overview</h2>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1 shadow-xs">
-                <span>Target: SSC CGL 2026</span>
-                <ChevronRight size={12} className="text-gray-400 rotate-90" />
-              </div>
+              <h2 className="text-base font-bold text-gray-900 tracking-tight">Overview</h2>
             </div>
 
             {/* 2 Big Stat Cards inside (matching Image 2) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div className="bento-subcard">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold">
                     <Users size={15} />
-                    <span>Questions</span>
+                    <span>Questions attempted</span>
                   </div>
-                  <span className="badge badge-accent">↑ 36.8%</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
-                  {totalQuestions > 0 ? totalQuestions.toLocaleString() : '1,293'}
+                <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                  {totalQuestions.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-400 mt-1 font-medium">
-                  vs last month
+                  Across your completed attempts
                 </div>
               </div>
 
@@ -365,15 +376,14 @@ function OverviewBento({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold">
                     <Target size={15} />
-                    <span>Accuracy</span>
+                    <span>Average accuracy</span>
                   </div>
-                  <span className="badge badge-accent">↑ 36.8%</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
-                  {overallAccuracy > 0 ? `${overallAccuracy}%` : '85%'}
+                <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                  {attempts.length > 0 ? `${overallAccuracy}%` : '—'}
                 </div>
                 <div className="text-xs text-gray-400 mt-1 font-medium">
-                  vs target cutoff
+                  {attempts.length > 0 ? `From ${attempts.length} completed attempt${attempts.length === 1 ? '' : 's'}` : 'Complete a test to start tracking'}
                 </div>
               </div>
             </div>
@@ -407,42 +417,44 @@ function OverviewBento({
             )}
           </div>
 
-          {/* Bottom Exam Readiness Row */}
+          {/* Real progress summary */}
           <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 border border-emerald-100">
-                <Flame size={20} />
+                <BarChart3 size={18} />
               </div>
               <div>
                 <div className="text-xs font-bold text-gray-900">
-                  Target: SSC CGL Tier 1 & 2
+                  Your study progress
                 </div>
                 <div className="text-xs text-gray-400 mt-0.5">
-                  Consistent practice builds speed, accuracy, and negative-marking discipline.
+                  {attempts.length > 0
+                    ? `${attempts.length} completed attempt${attempts.length === 1 ? '' : 's'} across ${papers.length} available paper${papers.length === 1 ? '' : 's'}.`
+                    : 'Complete a paper to see your real accuracy and progress here.'}
                 </div>
               </div>
             </div>
             
             <button
-              onClick={() => onSelectTab('practice')}
+              onClick={() => onSelectTab('library')}
               className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0 self-start sm:self-auto"
             >
-              <span>Practice Drills</span>
+              <span>Open exam library</span>
               <ArrowUpRight size={14} />
             </button>
           </div>
         </div>
 
-        {/* Right: Popular Mock Tests Card (matching Image 2) */}
-        <div className="bento-card p-6 sm:p-7 flex flex-col justify-between">
+        {/* Right: Recent papers from the user's library */}
+        <div className="bento-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Popular Tests</h2>
-              <span className="text-xs font-semibold text-gray-400">{papers.length} Papers</span>
+              <h2 className="text-base font-bold text-gray-900">Recent papers</h2>
+              <span className="text-xs font-semibold text-gray-400">{papers.length} available</span>
             </div>
 
-            <div className="space-y-3">
-              {papers.slice(0, 4).map((paper, idx) => {
+            <div className="space-y-2">
+              {recentPapers.map((paper, idx) => {
                 const gradients = [
                   'bg-gradient-to-br from-indigo-500 to-purple-600',
                   'bg-gradient-to-br from-amber-400 to-orange-500',
@@ -457,8 +469,8 @@ function OverviewBento({
                     onClick={() => onStartExam(paper.id)}
                     className="flex items-center gap-3 p-2 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group"
                   >
-                    <div className={`w-11 h-11 rounded-2xl ${grad} text-white flex items-center justify-center shrink-0 font-bold shadow-xs`}>
-                      <BookOpen size={18} />
+                    <div className={`w-9 h-9 rounded-xl ${grad} text-white flex items-center justify-center shrink-0 font-bold shadow-xs`}>
+                      <BookOpen size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-gray-900 truncate group-hover:text-black">
@@ -470,99 +482,97 @@ function OverviewBento({
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-xs font-bold text-gray-900">
-                        {paper.total_marks > 0 ? `${paper.total_marks} M` : '200 M'}
+                        {paper.total_marks > 0 ? `${paper.total_marks} M` : '—'}
                       </div>
-                      <span className="badge badge-accent mt-0.5">
-                        Active
+                      <span className="badge badge-muted mt-0.5">
+                        {paper.is_demo ? 'Demo' : paper.visibility === 'public' ? 'Public' : 'Private'}
                       </span>
                     </div>
                   </div>
                 );
               })}
+              {papers.length === 0 && (
+                <p className="rounded-xl bg-gray-50 px-3 py-5 text-center text-xs text-gray-500">
+                  No papers yet. Import one to see it here.
+                </p>
+              )}
             </div>
           </div>
 
           <button
             onClick={() => onSelectTab('library')}
-            className="w-full mt-4 py-2.5 border border-gray-200 hover:border-gray-900 rounded-full text-xs font-bold text-gray-700 hover:text-black transition-all text-center bg-white"
+            className="w-full mt-3 py-2 border border-gray-200 hover:border-gray-900 rounded-full text-xs font-bold text-gray-700 hover:text-black transition-all text-center bg-white"
           >
-            All mock tests
+            Open exam library
           </button>
         </div>
       </div>
 
       {/* Second Bento Row: Product View / Bar Chart (2 cols) + Spaced Repetition SRS (1 col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
-        {/* Performance Bar Chart (matching Image 2) */}
-        <div className="lg:col-span-2 bento-card p-6 sm:p-7 flex flex-col justify-between">
+        {/* Performance from completed attempts */}
+        <div className="lg:col-span-2 bento-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Performance view</h2>
+                <h2 className="text-base font-bold text-gray-900">Performance</h2>
                 <p className="text-xs text-gray-400 mt-0.5">Recent accuracy trend</p>
               </div>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1 shadow-xs">
-                <span>Last 7 sessions</span>
-                <ChevronRight size={12} className="text-gray-400 rotate-90" />
+                <span>{barData.length ? `Last ${barData.length} attempts` : 'No attempts'}</span>
               </div>
             </div>
 
-            {/* Stylized Bar Chart */}
-            <div className="h-44 flex items-end justify-between gap-3 sm:gap-6 pt-10 px-2 sm:px-6">
-              {barData.map((val, i) => {
-                const isHighlight = i === barData.length - 2 || (i === 5);
-                const heightPercent = Math.max(25, Math.min(val, 95));
-
+            <div className="h-36 flex items-end justify-between gap-2 sm:gap-4 pt-6 px-1 sm:px-3">
+              {barData.length ? barData.map((item, index) => {
+                const isLatest = index === barData.length - 1;
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative">
-                    {/* Tooltip on Highlight Bar (matching 2.2m tooltip in Image 2) */}
-                    {isHighlight && (
-                      <div className="absolute -top-7 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap flex items-center gap-1 animate-bounce">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        {val}% Acc
-                      </div>
-                    )}
+                  <div key={item.id} className="group relative flex h-full flex-1 flex-col items-center justify-end gap-1.5" title={`${item.title}: ${item.accuracy}% on ${item.label}`}>
                     <div
-                      style={{ height: `${heightPercent}%` }}
-                      className={`w-full max-w-[42px] rounded-2xl transition-all duration-300 ${
-                        isHighlight
-                          ? 'bg-emerald-500 shadow-sm'
-                          : 'bg-gray-100 group-hover:bg-gray-200'
-                      }`}
-                    ></div>
-                    <span className="text-[10px] font-medium text-gray-400">
-                      {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
-                    </span>
+                      style={{ height: `${item.accuracy}%` }}
+                      className={`w-full max-w-9 rounded-t-lg transition-colors ${isLatest ? 'bg-emerald-500' : 'bg-gray-200 group-hover:bg-gray-300'}`}
+                    />
+                    <span className="text-[9px] font-medium text-gray-400">{item.label}</span>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="flex h-full w-full items-center justify-center rounded-xl bg-gray-50 px-4 text-center text-xs text-gray-500">
+                  Complete a test to see your accuracy trend.
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-            <div className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
-              {highestScore > 0 ? `${highestScore}%` : '88.4%'}
+          <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                {attempts.length ? `${highestScore}%` : '—'}
+              </div>
+              <div className="text-[10px] font-semibold text-gray-400">Best score</div>
             </div>
-            <div className="text-xs text-gray-400 text-right">
-              Cutoff probability: <span className="font-bold text-emerald-600">High (Tier 1 Ready)</span>
+            <div className="text-xs text-gray-500 text-right">
+              {attempts.length
+                ? `${attempts.length} completed attempt${attempts.length === 1 ? '' : 's'}`
+                : 'No completed attempts yet'}
             </div>
           </div>
         </div>
 
-        {/* Spaced Repetition Quick Review Card */}
-        <div className="bento-card p-6 sm:p-7 flex flex-col justify-between">
+        {/* Mistake review summary */}
+        <div className="bento-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <Brain size={18} className="text-indigo-600" />
-                Spaced Recall
+                Review mistakes
               </h2>
-              <span className="badge badge-accent">SM-2 Active</span>
             </div>
 
             <p className="text-xs text-gray-500 leading-relaxed mb-4">
-              Review missed questions right when your memory curve drops.
+              {mistakes.length
+                ? 'Revisit questions you missed and focus on the topics that need more practice.'
+                : 'Missed questions from completed attempts will appear here.'}
             </p>
 
             {/* Quick Stat Pill */}
@@ -601,9 +611,10 @@ function OverviewBento({
           <div className="mt-5 space-y-2">
             <button
               onClick={onStartReview}
-              className="btn btn-primary w-full text-xs py-2.5 rounded-full"
+              disabled={mistakes.length === 0}
+              className="btn btn-primary w-full text-xs py-2.5 rounded-full disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Start Spaced Review
+              {mistakes.length ? 'Start review' : 'No review items yet'}
             </button>
             <button
               onClick={() => onSelectTab('mistakes')}
@@ -616,18 +627,20 @@ function OverviewBento({
       </div>
 
       {/* Third Bento Row: Study & Revision Notes Banner */}
-      <div className="bento-card p-5 sm:p-6 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-indigo-50/40 border border-emerald-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <FileText size={22} />
+      <div className="bento-card p-4 sm:p-5 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-indigo-50/40 border border-emerald-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <FileText size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-extrabold text-gray-900">Revision & Study Notes</h3>
-              <span className="badge badge-accent text-[10px]">MD & TXT Support</span>
+              <span className="badge badge-accent text-[10px]">Study materials</span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              Access {notesCount > 0 ? `${notesCount} preloaded notes` : 'revision notes'} (Math formulas, Indian Polity, Vocab) or upload your own .md & .txt files with distraction-free reader mode and 1-click table of contents.
+              {notesCount > 0
+                ? `${notesCount} saved note${notesCount === 1 ? '' : 's'} in your library. Import Markdown, text, PDF, or DOCX files and keep your study materials organized.`
+                : 'Create a note or import Markdown, text, PDF, or DOCX files to build your study library.'}
             </p>
           </div>
         </div>
@@ -922,7 +935,7 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
         <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
         <h3 className="text-lg font-bold text-gray-900 mb-2">No question papers yet</h3>
         <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-          Import your first AI-generated question set or load our demo exam to get started.
+          Import a question paper to start practicing and tracking your progress.
         </p>
         <button onClick={onImport} className="btn btn-primary text-xs py-3 px-6 rounded-full inline-flex items-center gap-2 shadow-xs">
           <PlusCircle size={16} /> Import Paper
@@ -1459,7 +1472,7 @@ function PracticeTab({
     const customPaper: Paper = {
       id: `practice_${Date.now()}`,
       user_id: effectiveUserId,
-      exam: 'SSC CGL',
+      exam: 'Practice',
       title,
       description: desc,
       difficulty: 'medium',
@@ -1469,7 +1482,7 @@ function PracticeTab({
       question_count: questions.length,
       subjects: Array.from(new Set(questions.map(q => q.subject))),
       raw_json: {
-        exam: 'SSC CGL',
+        exam: 'Practice',
         paperTitle: title,
         durationMinutes: durationMins,
         totalMarks: questions.length * 2,
@@ -1748,7 +1761,7 @@ function MistakesTab({
     const customPaper: Paper = {
       id: `mistakes_practice_${Date.now()}`,
       user_id: effectiveUserId,
-      exam: 'SSC CGL',
+      exam: 'Practice',
       title: 'Mistake Notebook Retest',
       description: `Targeted revision test for ${mistakes.length} past incorrect questions.`,
       difficulty: 'medium',
@@ -1758,7 +1771,7 @@ function MistakesTab({
       question_count: questions.length,
       subjects: Array.from(new Set(questions.map(q => q.subject))),
       raw_json: {
-        exam: 'SSC CGL',
+        exam: 'Practice',
         paperTitle: 'Mistake Notebook Retest',
         durationMinutes: Math.max(5, Math.ceil(questions.length * 1.5)),
         totalMarks: questions.length * 2,
@@ -1872,7 +1885,7 @@ function BookmarksTab({
     const customPaper: Paper = {
       id: `bookmarks_practice_${Date.now()}`,
       user_id: effectiveUserId,
-      exam: 'SSC CGL',
+      exam: 'Practice',
       title: 'Bookmarked Questions Revision',
       description: `Revision practice for ${bookmarks.length} saved questions`,
       difficulty: 'medium',
@@ -1882,7 +1895,7 @@ function BookmarksTab({
       question_count: questions.length,
       subjects: Array.from(new Set(questions.map(q => q.subject))),
       raw_json: {
-        exam: 'SSC CGL',
+        exam: 'Practice',
         paperTitle: 'Bookmarked Questions Revision',
         durationMinutes: Math.max(5, Math.ceil(questions.length * 1.5)),
         totalMarks: questions.length * 2,

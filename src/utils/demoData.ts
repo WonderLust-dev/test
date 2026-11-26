@@ -1,9 +1,9 @@
 import { PaperJSON } from '../types';
 
 export const DEMO_PAPER: PaperJSON = {
-  exam: 'SSC CGL',
-  paperTitle: 'SSC CGL Demo Practice Set',
-  description: 'A demo paper covering all four subjects of SSC CGL — Quantitative Aptitude, Reasoning, English, and General Awareness. Import this to explore the platform.',
+  exam: 'General Practice',
+  paperTitle: 'Sample Practice Set',
+  description: 'A sample multiple-choice paper to explore question practice, grading, and review features.',
   durationMinutes: 15,
   totalMarks: 24,
   negativeMarking: 0.5,
@@ -72,7 +72,7 @@ export const DEMO_PAPER: PaperJSON = {
       hint: 'Look at the differences between consecutive terms.',
       solution: 'Differences: 4, 6, 8, 10, 12\nSo next term = 30 + 12 = 42.\nAlternatively: n(n+1) pattern → 1×2, 2×3, 3×4, 4×5, 5×6, 6×7 = 42.',
       shortcut: 'The pattern is n×(n+1): 1×2=2, 2×3=6, 3×4=12, 4×5=20, 5×6=30, 6×7=42.',
-      learningSuggestion: 'Recognize n(n+1) series quickly — very common in SSC exams.',
+      learningSuggestion: 'Recognize the n(n+1) pattern to solve related number series efficiently.',
     },
     {
       id: 5,
@@ -179,7 +179,7 @@ export const DEMO_PAPER: PaperJSON = {
       hint: 'It makes up about 78% of the atmosphere.',
       solution: 'Nitrogen (N₂) constitutes approximately 78% of Earth\'s atmosphere, followed by Oxygen (21%), Argon (0.93%), and Carbon Dioxide (0.04%).',
       shortcut: 'Remember: Nitrogen 78%, Oxygen 21% — "N comes first, O comes second".',
-      learningSuggestion: 'Learn the composition of atmosphere — a very frequently asked question in SSC.',
+      learningSuggestion: 'Review the composition of the atmosphere as part of general science study.',
     },
     {
       id: 12,

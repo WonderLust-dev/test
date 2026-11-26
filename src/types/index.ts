@@ -1,10 +1,10 @@
 // ============================================================
-// SSC CGL Exam Platform — Complete Type Definitions
+// Study workspace types
 // ============================================================
 
 // --- Exam & Paper Types ---
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type ExamType = 'SSC CGL' | 'SSC CHSL' | 'SSC MTS' | 'SSC CPO' | 'SSC GD';
+export type ExamType = string;
 export type BookmarkCategory = 'important' | 'difficult' | 'revise_later' | 'shortcut' | 'formula' | 'doubt';
 
 export interface QuestionJSON {
@@ -34,7 +34,7 @@ export interface QuestionJSON {
 }
 
 export interface PaperJSON {
-  exam: ExamType | string;
+  exam: ExamType;
   paperTitle: string;
   description?: string;
   durationMinutes: number;
@@ -288,7 +288,7 @@ export interface StudyNote {
   user_id: string;
   title: string;
   content: string;
-  file_type: 'md' | 'txt' | 'html' | 'book' | 'whiteboard';
+  file_type: 'md' | 'txt' | 'html' | 'book' | 'whiteboard' | 'study_plan';
   parent_id?: string | null;
   sort_order?: number;
   subject?: string;

@@ -580,7 +580,7 @@ export default function EReaderView({
               {/* Subject & Category Pills */}
               <div className="flex flex-wrap items-center gap-2 mb-3 relative z-10">
                 <span className="px-3 py-1 rounded-full text-xs font-bold border border-[#E0564C]/30 bg-[#E0564C]/15 text-[#E0564C]">
-                  {note.subject || 'SSC CGL Revision'}
+                  {note.subject || 'Study Notes'}
                 </span>
                 {note.topic && (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-[var(--reader-border,#DFD7CF)] opacity-70">
@@ -599,7 +599,7 @@ export default function EReaderView({
 
               {/* Subtitle / Excerpt */}
               <p className="text-xs sm:text-sm opacity-70 font-medium leading-relaxed max-w-xl relative z-10">
-                SSC Examination High-Yield Notes & Speed Revision Guide. Formatted for distraction-free comprehension.
+                Your study material, formatted for distraction-free reading.
               </p>
             </div>
 

@@ -19,7 +19,7 @@ export default function UpdateAvailable({ onUpdate }: UpdateAvailableProps) {
               Update Available
             </h3>
             <p className="text-xs text-slate-600 mb-3">
-              A new version of SSC CGL Prep is available. Update now for the latest features and improvements.
+              A new version of Study Hub is available. Update now for the latest features and improvements.
             </p>
             <div className="flex gap-2">
               <button

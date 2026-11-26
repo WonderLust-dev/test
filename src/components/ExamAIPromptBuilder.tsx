@@ -40,11 +40,13 @@ const CATEGORIES: Array<ExamPreset['category'] | 'All'> = [
 export default function ExamAIPromptBuilder({ onLoadSample, initialExamId }: ExamAIPromptBuilderProps) {
   // Category & Preset Selection
   const [selectedCategory, setSelectedCategory] = useState<ExamPreset['category'] | 'All'>('All');
-  const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId || 'ssc_cgl');
+  const [selectedExamId, setSelectedExamId] = useState<string>(initialExamId || 'custom_exam');
 
   // Find active preset
   const currentPreset = useMemo(() => {
-    return EXAM_PRESETS.find((p) => p.id === selectedExamId) || EXAM_PRESETS[0];
+    return EXAM_PRESETS.find((p) => p.id === selectedExamId)
+      || EXAM_PRESETS.find((p) => p.id === 'custom_exam')
+      || EXAM_PRESETS[0];
   }, [selectedExamId]);
 
   // Filtered Presets by Category
@@ -134,7 +136,9 @@ export default function ExamAIPromptBuilder({ onLoadSample, initialExamId }: Exa
     if (currentPreset.id === 'custom_exam' && customExamName.trim()) {
       return customExamName.trim();
     }
-    return currentPreset.name.split(' (')[0] || currentPreset.name;
+    return currentPreset.id === 'custom_exam'
+      ? 'General'
+      : currentPreset.name.split(' (')[0] || currentPreset.name;
   }, [currentPreset, customExamName]);
 
   // Construct config & generated prompt
@@ -202,7 +206,7 @@ export default function ExamAIPromptBuilder({ onLoadSample, initialExamId }: Exa
 
   // Handle Load Sample into Editor
   const handleLoadSampleToEditor = () => {
-    const sample = generateSamplePaperJSON(currentPreset, selectedSubjects[0]);
+    const sample = generateSamplePaperJSON(currentPreset, selectedSubjects[0], effectiveExamName);
     onLoadSample(sample);
     setSampleLoaded(true);
     setTimeout(() => setSampleLoaded(false), 2500);
@@ -305,7 +309,9 @@ export default function ExamAIPromptBuilder({ onLoadSample, initialExamId }: Exa
               key={cat}
               onClick={() => {
                 setSelectedCategory(cat);
-                const first = cat === 'All' ? EXAM_PRESETS[0] : EXAM_PRESETS.find((p) => p.category === cat);
+                const first = cat === 'All'
+                  ? EXAM_PRESETS.find((p) => p.id === 'custom_exam')
+                  : EXAM_PRESETS.find((p) => p.category === cat);
                 if (first && first.id !== selectedExamId) {
                   handleSelectExam(first.id);
                 }
@@ -367,7 +373,7 @@ export default function ExamAIPromptBuilder({ onLoadSample, initialExamId }: Exa
               type="text"
               value={customExamName}
               onChange={(e) => setCustomExamName(e.target.value)}
-              placeholder="e.g., Delhi Police Sub-Inspector, GATE CS, or Company Assessment"
+              placeholder="e.g., Class 10 Biology, a university course, SAT, or a certification"
               className="w-full px-3.5 py-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl text-xs font-medium text-[var(--text-main)] placeholder-[var(--text-subtle)] focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>

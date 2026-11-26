@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Paper, PaperJSON, QuestionJSON, Difficulty, ExamType } from '../types';
+import { Paper, PaperJSON, QuestionJSON, Difficulty } from '../types';
 import { savePaper, checkDuplicatePaper } from '../services/database';
 import JsonImporter from './JsonImporter';
 import {
@@ -38,23 +38,16 @@ interface AdminTestStudioProps {
   onCancel?: () => void;
 }
 
-const SCHOOL_PRESETS = [
-  'Delhi Public School',
-  'Kendriya Vidyalaya Sangathan',
-  'National Testing Agency (NTA)',
-  'Central Board of Secondary Education',
-  'St. Xavier\'s Collegiate School',
-  'Staff Selection Commission',
-  'Apex Career Academy',
+const INSTITUTION_PRESETS = [
+  'Personal Study',
+  'School / College',
+  'Coaching / Training Center',
 ];
 
 const DEFAULT_INSTRUCTIONS = [
-  'All questions are compulsory unless stated otherwise.',
-  'Read each question carefully before attempting your answer.',
-  'Each question carries specified positive marks for the correct option.',
-  'Negative marks will be deducted for each incorrect attempt as configured.',
-  'Use of calculators, log tables, or digital devices is strictly prohibited.',
-  'Rough work must be done in the designated space provided.',
+  'Follow the instructions provided for each section.',
+  'Review each question before submitting your answers.',
+  'Marks and any penalties are shown for each question.',
 ];
 
 const INITIAL_QUESTION: QuestionJSON = {
@@ -66,8 +59,8 @@ const INITIAL_QUESTION: QuestionJSON = {
   options: ['23', '25', '27', '21'],
   correctAnswer: '23',
   answerIndex: 0,
-  marks: 2,
-  negativeMarks: 0.5,
+  marks: 1,
+  negativeMarks: 0,
   solution: 'We know that \\((x + 1/x)^2 = x^2 + 1/x^2 + 2\\). Therefore, \\(x^2 + 1/x^2 = 5^2 - 2 = 25 - 2 = 23\\).',
   hint: 'Square both sides of the given algebraic equation.',
 };
@@ -77,16 +70,16 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
   const [activeStudioTab, setActiveStudioTab] = useState<'builder' | 'paper_preview' | 'json_import'>('builder');
 
   // School & Paper Configuration
-  const [institution, setInstitution] = useState('Delhi Public School');
-  const [paperTitle, setPaperTitle] = useState('Annual Examination — Class X Mathematics & Reasoning');
-  const [paperCode, setPaperCode] = useState('DPS-EXAM-2026-X');
-  const [examType, setExamType] = useState('SSC CGL');
-  const [subjectName, setSubjectName] = useState('Mathematics');
-  const [classGrade, setClassGrade] = useState('Class X');
-  const [academicSession, setAcademicSession] = useState('2025 – 2026');
+  const [institution, setInstitution] = useState('');
+  const [paperTitle, setPaperTitle] = useState('New Practice Test');
+  const [paperCode, setPaperCode] = useState('');
+  const [examType, setExamType] = useState('General');
+  const [subjectName, setSubjectName] = useState('');
+  const [classGrade, setClassGrade] = useState('');
+  const [academicSession, setAcademicSession] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(60);
-  const [defaultMarks, setDefaultMarks] = useState(2);
-  const [defaultNegativeMarks, setDefaultNegativeMarks] = useState(0.5);
+  const [defaultMarks, setDefaultMarks] = useState(1);
+  const [defaultNegativeMarks, setDefaultNegativeMarks] = useState(0);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [instructions, setInstructions] = useState<string[]>(DEFAULT_INSTRUCTIONS);
   const [newInstructionText, setNewInstructionText] = useState('');
@@ -103,8 +96,8 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
       options: ['95', '111', '127', '128'],
       correctAnswer: '127',
       answerIndex: 2,
-      marks: 2,
-      negativeMarks: 0.5,
+      marks: 1,
+      negativeMarks: 0,
       solution: 'Pattern is \\(n \\times 2 + 1\\): \\(3\\times 2 + 1 = 7\\), \\(7\\times 2 + 1 = 15\\), ..., \\(63 \\times 2 + 1 = 127\\).',
     },
     {
@@ -116,8 +109,8 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
       options: ['Careless', 'Painstaking', 'Hasty', 'Superficial'],
       correctAnswer: 'Painstaking',
       answerIndex: 1,
-      marks: 2,
-      negativeMarks: 0.5,
+      marks: 1,
+      negativeMarks: 0,
       solution: '"Meticulous" means showing great attention to detail; very careful and precise. "Painstaking" is the closest synonym.',
     },
   ]);
@@ -271,6 +264,10 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
       setErrorMessage('Please specify an Examination Paper Title.');
       return;
     }
+    if (!examType.trim()) {
+      setErrorMessage('Please specify an exam, course, or study category.');
+      return;
+    }
     if (questions.length === 0) {
       setErrorMessage('Please add at least one question to the paper.');
       return;
@@ -281,10 +278,16 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
     setSaveSuccess(null);
 
     try {
+      const paperDescription = [
+        institution.trim(),
+        classGrade.trim(),
+        subjectName.trim(),
+        academicSession.trim(),
+      ].filter(Boolean).join(' · ');
       const paperJSON: PaperJSON = {
-        exam: examType,
+        exam: examType.trim(),
         paperTitle: paperTitle.trim(),
-        description: `${institution} — ${classGrade} ${subjectName} Examination Paper. Academic Year ${academicSession}.`,
+        description: paperDescription || `${examType.trim()} practice paper.`,
         durationMinutes: Number(durationMinutes) || 60,
         totalMarks: totalCalculatedMarks,
         negativeMarking: defaultNegativeMarks,
@@ -298,7 +301,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
 
       const saved = await savePaper({
         user_id: effectiveUserId,
-        exam: examType,
+        exam: examType.trim(),
         title: paperTitle.trim(),
         description: paperJSON.description || '',
         difficulty,
@@ -409,7 +412,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
       {/* ============================================================ */}
       {activeStudioTab === 'builder' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Section 1: Official Examination Header & School Branding Settings */}
+          {/* Section 1: Exam, Course & Paper Details */}
           <div className="bento-card p-5 sm:p-6 rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm space-y-5">
             <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
               <div className="flex items-center gap-2">
@@ -417,7 +420,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
                   1
                 </span>
                 <h3 className="text-base font-extrabold text-[var(--text-main)]">
-                  School & Paper Header Configuration
+                  Exam, Course & Paper Details
                 </h3>
               </div>
               <span className="text-xs text-[var(--text-muted)] font-mono">
@@ -425,13 +428,37 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
               </span>
             </div>
 
-            {/* School / Institution Preset Pills */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Select Institution Preset:
+                Exam, Course, or Study Category
+              </label>
+              <input
+                type="text"
+                list="study-category-suggestions"
+                value={examType}
+                onChange={e => setExamType(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                placeholder="e.g. Class 10 Biology, SAT, university course, or your own category"
+              />
+              <datalist id="study-category-suggestions">
+                <option value="General" />
+                <option value="School Assessment" />
+                <option value="University Course" />
+                <option value="Competitive Exam" />
+                <option value="Professional Certification" />
+              </datalist>
+              <p className="text-[11px] text-[var(--text-subtle)]">
+                Type any name to create a category; saved categories become available in your library filters.
+              </p>
+            </div>
+
+            {/* Institution suggestions */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Optional Institution
               </label>
               <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-1">
-                {SCHOOL_PRESETS.map(school => (
+                {INSTITUTION_PRESETS.map(school => (
                   <button
                     key={school}
                     onClick={() => setInstitution(school)}
@@ -458,7 +485,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
                   value={institution}
                   onChange={e => setInstitution(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="e.g. Delhi Public School"
+                  placeholder="e.g. your school, college, or organization"
                 />
               </div>
 
@@ -497,7 +524,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
                   value={classGrade}
                   onChange={e => setClassGrade(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="e.g. Class X"
+                  placeholder="e.g. Grade 10, Year 2, or beginner level"
                 />
               </div>
 
@@ -523,7 +550,7 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
                   value={academicSession}
                   onChange={e => setAcademicSession(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="e.g. 2025 – 2026"
+                  placeholder="e.g. 2026 or Fall 2026"
                 />
               </div>
 
@@ -940,22 +967,27 @@ export default function AdminTestStudio({ userId, onPaperCreated, onCancel }: Ad
 
           {/* Authentic Printed Examination Sheet (Exact real school layout) */}
           <div className="p-6 sm:p-10 rounded-3xl bg-white text-gray-900 shadow-xl border border-gray-300 font-serif max-w-4xl mx-auto printable-sheet">
-            {/* Top Official School Seal & Header */}
+            {/* Print header */}
             <div className="text-center border-b-2 border-gray-900 pb-4 space-y-1">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] font-extrabold text-gray-600">
-                OFFICIAL EXAMINATION PAPER · {academicSession}
+                {academicSession ? `ASSESSMENT · ${academicSession}` : 'PRACTICE ASSESSMENT'}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-950 font-serif uppercase">
-                {institution}
-              </h1>
+              {institution && (
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-950 font-serif uppercase">
+                  {institution}
+                </h1>
+              )}
+              <div className="text-xs font-bold text-gray-600">{examType}</div>
               <div className="text-sm font-bold text-gray-800">
                 {paperTitle}
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-bold text-gray-700 pt-1 font-mono">
-                <span>Class: {classGrade}</span>
-                <span>Subject: {subjectName}</span>
-                <span>Code: {paperCode}</span>
-              </div>
+              {(classGrade || subjectName || paperCode) && (
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-bold text-gray-700 pt-1 font-mono">
+                  {classGrade && <span>Level: {classGrade}</span>}
+                  {subjectName && <span>Subject: {subjectName}</span>}
+                  {paperCode && <span>Code: {paperCode}</span>}
+                </div>
+              )}
             </div>
 
             {/* Time, Marks & Candidate Roll No Box */}

@@ -554,24 +554,19 @@ export const EXAM_PRESETS: ExamPreset[] = [
   // --- Custom / User-Defined Category ---
   {
     id: 'custom_exam',
-    name: 'Custom / Other Competitive Examination',
+    name: 'Any Exam or Course',
     category: 'Custom',
     badge: 'Custom',
     defaultDuration: 60,
-    defaultMarks: 2,
-    defaultNegative: 0.5,
+    defaultMarks: 1,
+    defaultNegative: 0,
     defaultQuestions: 20,
-    subjects: [
-      'General Subject 1',
-      'General Subject 2',
-      'Logical Aptitude',
-    ],
+    subjects: ['General'],
     popularTopics: {
-      'General Subject 1': ['Core Fundamentals', 'Advanced Concepts', 'Applied Questions'],
-      'General Subject 2': ['Theory', 'Problem Solving'],
+      General: ['Core Concepts', 'Practice Questions', 'Revision'],
     },
-    description: 'Create tailored question sets for any private certification, entrance, or institute exam.',
-    markingRule: 'Customizable marks & penalties',
+    description: 'Create question sets for school subjects, university courses, certifications, entrance tests, and more.',
+    markingRule: 'Choose your own marks and penalties',
   },
 ];
 
@@ -813,16 +808,18 @@ export function buildCustomAIPrompt(config: PromptBuilderConfig): string {
 // Generate Sample Paper JSON based on Exam Preset
 // ============================================================
 
-export function generateSamplePaperJSON(preset: ExamPreset, subject?: string): string {
+export function generateSamplePaperJSON(preset: ExamPreset, subject?: string, examName?: string): string {
   const chosenSubject = subject && preset.subjects.includes(subject) ? subject : preset.subjects[0];
   const topics = preset.popularTopics[chosenSubject] || ['Fundamentals', 'Standard Applications'];
   const topic1 = topics[0] || 'Core Concepts';
   const topic2 = topics[1] || 'Problem Solving';
+  const resolvedExamName = examName?.trim()
+    || (preset.id === 'custom_exam' ? 'General' : preset.name.split(' (')[0] || preset.name);
 
   const sample = {
-    exam: preset.name.split(' (')[0] || preset.name,
-    paperTitle: `${preset.name.split(' (')[0]} — Sample Practice Test`,
-    description: `Official schema template and practice questions for ${preset.name}.`,
+    exam: resolvedExamName,
+    paperTitle: `${resolvedExamName} — Sample Practice Test`,
+    description: `Example schema template and practice questions for ${resolvedExamName}.`,
     durationMinutes: preset.defaultDuration,
     totalMarks: preset.defaultMarks * 2,
     negativeMarking: preset.defaultNegative,
@@ -903,7 +900,7 @@ export const SCHEMA_DOCS: SchemaFieldDoc[] = [
     required: true,
     level: 'paper',
     description: 'The title or name of the question paper displayed on cards, headers, and reports.',
-    example: '"SSC CGL 2024 Tier 1 — All India Mock 04"',
+    example: '"Grade 10 Biology — Cell Structure Practice"',
   },
   {
     name: 'durationMinutes',
@@ -926,8 +923,8 @@ export const SCHEMA_DOCS: SchemaFieldDoc[] = [
     type: 'string',
     required: false,
     level: 'paper',
-    description: 'Target competitive examination (e.g. "SSC CGL", "RRB NTPC", "IBPS PO", "UPSC").',
-    example: '"SSC CGL"',
+    description: 'Name the exam, course, or study category this paper belongs to.',
+    example: '"Grade 10 Biology"',
   },
   {
     name: 'totalMarks',
@@ -1121,6 +1118,6 @@ export const SCHEMA_DOCS: SchemaFieldDoc[] = [
     required: false,
     level: 'question',
     description: 'Search tags or previous year paper identifiers.',
-    example: '["ssc-cgl-2023", "tier-1", "algebra"]',
+    example: '["biology-unit-1", "chapter-3", "practice"]',
   },
 ];

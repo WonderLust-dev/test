@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Paper, Attempt, AttemptQuestion, Bookmark, Mistake, PaperJSON, StudyNote } from '../types';
-import { DEMO_NOTES } from '../utils/demoNotes';
 
 // ============================================================
 // LocalStorage fallback for when Supabase is not configured
@@ -857,17 +856,6 @@ export async function getNotes(userId?: string): Promise<StudyNote[]> {
 
   if (!isRemoteUser(userId)) {
     // Guest or offline-only mode
-    if (localNotes.length === 0) {
-      const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
-        ...n,
-        id: `seed_note_${Date.now()}_${idx}`,
-        user_id: userId || 'guest',
-        created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-        updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-      }));
-      lsSet(LS_KEYS.notes, seeded);
-      return seeded;
-    }
     return localNotes;
   }
 
@@ -896,22 +884,6 @@ export async function getNotes(userId?: string): Promise<StudyNote[]> {
         });
         lsSet(LS_KEYS.notes, notesToUpload);
         return notesToUpload;
-      }
-
-      if (remoteData.length === 0 && localNotes.length === 0) {
-        // Fresh user: seed default demo notes
-        const seeded: StudyNote[] = DEMO_NOTES.map((n, idx) => ({
-          ...n,
-          id: `seed_note_${Date.now()}_${idx}`,
-          user_id: userId!,
-          created_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-          updated_at: new Date(Date.now() - (idx * 3600000)).toISOString(),
-        }));
-        await sb(async () => {
-          await supabase!.from('notes').upsert(seeded);
-        });
-        lsSet(LS_KEYS.notes, seeded);
-        return seeded;
       }
 
       // Check if any local notes were created while offline that aren't on Supabase
@@ -1061,8 +1033,9 @@ export async function updateNote(noteId: string, updates: Partial<StudyNote>, us
 
   // Cloud Sync
   if (isRemoteUser(effectiveUserId)) {
+    let synced = false;
     if (navigator.onLine) {
-      await sb(async () => {
+      synced = await sb(async () => {
         const { error } = await supabase!
           .from('notes')
           .update({
@@ -1071,8 +1044,10 @@ export async function updateNote(noteId: string, updates: Partial<StudyNote>, us
           })
           .eq('id', noteId);
         if (error) throw error;
-      });
-    } else {
+        return true;
+      }) === true;
+    }
+    if (!synced) {
       const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
       const pIdx = pending.findIndex(n => n.id === noteId);
       if (pIdx >= 0) {

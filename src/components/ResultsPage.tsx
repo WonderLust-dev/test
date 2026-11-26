@@ -597,7 +597,7 @@ ${q.learningSuggestion ? `### 🎯 Concept Takeaway & Key Rule\n${q.learningSugg
           <ArrowLeft size={15} /> Back to Library
         </button>
         <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full">
-          SSC CGL Grader 2.0
+          Exam Results
         </span>
       </div>
 
