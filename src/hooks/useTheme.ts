@@ -1,15 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type AppTheme = 'bento' | 'dark' | 'high-contrast' | 'editorial';
+export type AppTheme = 'bento' | 'dark' | 'editorial' | 'ocean';
 
 const THEME_STORAGE_KEY = 'sscp_theme';
+
+function isAppTheme(value: string): value is AppTheme {
+  return value === 'bento' || value === 'dark' || value === 'editorial' || value === 'ocean';
+}
 
 export function useTheme() {
   const [theme, setThemeState] = useState<AppTheme>(() => {
     if (typeof window === 'undefined') return 'bento';
     try {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY) as AppTheme | null;
-      if (saved && (saved === 'bento' || saved === 'dark' || saved === 'high-contrast' || saved === 'editorial')) {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'high-contrast') {
+        localStorage.setItem(THEME_STORAGE_KEY, 'bento');
+        return 'bento';
+      }
+      if (saved && isAppTheme(saved)) {
         return saved;
       }
     } catch {
@@ -36,7 +44,7 @@ export function useTheme() {
 
     const handleExternalChange = (e: Event) => {
       const customEvent = e as CustomEvent<AppTheme>;
-      if (customEvent.detail && customEvent.detail !== theme) {
+      if (customEvent.detail && isAppTheme(customEvent.detail) && customEvent.detail !== theme) {
         setThemeState(customEvent.detail);
       }
     };

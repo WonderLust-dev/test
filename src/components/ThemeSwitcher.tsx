@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, Contrast, BookOpen, LucideIcon } from 'lucide-react';
+import { Sun, Moon, BookOpen, Droplet, LucideIcon } from 'lucide-react';
 import { useTheme, AppTheme } from '../hooks/useTheme';
 
 interface ThemeSwitcherProps {
@@ -36,11 +36,11 @@ export const THEME_OPTIONS: Array<{
     description: 'Pro dark mode for eye comfort',
   },
   {
-    id: 'high-contrast',
-    label: 'High Contrast',
-    shortLabel: 'Contrast',
-    icon: Contrast,
-    description: 'WCAG AAA maximum readability & bold outlines',
+    id: 'ocean',
+    label: 'Ocean Blue',
+    shortLabel: 'Ocean',
+    icon: Droplet,
+    description: 'Calm blue surfaces for focused study',
   },
 ];
 
@@ -71,7 +71,9 @@ export default function ThemeSwitcher({ variant = 'compact', className = '' }: T
               aria-pressed={isActive}
             >
               <Icon size={13} className={isActive ? 'text-amber-400' : 'text-[var(--text-subtle)]'} />
-              <span className="hidden sm:inline text-[11px] font-bold">{opt.shortLabel}</span>
+              <span className={`${isActive ? 'inline' : 'hidden sm:inline'} text-[10px] sm:text-[11px] font-bold`}>
+                {opt.shortLabel}
+              </span>
             </button>
           );
         })}
@@ -84,7 +86,7 @@ export default function ThemeSwitcher({ variant = 'compact', className = '' }: T
       <div className="flex items-center justify-between mb-2 px-1">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">Theme</span>
         <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          {theme === 'editorial' ? 'Editorial' : theme === 'bento' ? 'Light' : theme === 'dark' ? 'Dark' : 'High Contrast'}
+          {theme === 'editorial' ? 'Editorial' : theme === 'dark' ? 'Dark' : theme === 'ocean' ? 'Ocean' : 'Light'}
         </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)] theme-switcher-subgroup">

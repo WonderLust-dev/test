@@ -4,6 +4,8 @@
 
 Incorrect exam and practice answers can be saved as `Mistake` records with their subject, topic, selected answer, correct answer, and available learning notes. Resolved mistakes are kept separate from unresolved review work.
 
+Mistake records are automatically deleted after seven days without another incorrect attempt. The Mistakes page offers JSON and CSV downloads so users can keep a copy before cleanup. Supabase projects need the `add_mistake_retention.sql` migration; local-only records are pruned the next time the app reads them.
+
 ## Mistake spaced repetition
 
 The existing mistake-review feature uses the `mistakes` and `reviews` tables and the SM-2 functions defined in `supabase/schema.sql` (also available in the `add_spaced_repetition.sql` migration). `src/services/srs.ts` schedules due mistakes and stores review history. `ReviewDashboard` summarizes due work and review statistics; `ReviewSession` runs the recall session.

@@ -932,11 +932,12 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             </button>
             <button
               onClick={() => setViewMode('editorial')}
-              className="p-1.5 px-2 rounded-lg transition-all flex items-center gap-1.5 font-bold text-xs text-[var(--text-muted)] hover:text-[#B85338] hover:bg-[#B85338]/10"
+              aria-label="Editorial reading view"
+              className="p-1.5 px-2 rounded-lg transition-all flex items-center gap-1.5 font-bold text-xs border border-[#B85338]/25 bg-[#B85338]/5 text-[#9A3F2B] hover:bg-[#B85338]/10"
               title="Chapter One / Editorial Mode (Mockup Match)"
             >
-              <BookOpen size={14} className="text-[#B85338]" />
-              <span className="hidden sm:inline text-[11px]">Chapter One</span>
+              <BookOpen size={14} className="shrink-0 text-[#B85338]" />
+              <span className="text-[10px] sm:text-[11px]">Editorial</span>
             </button>
           </div>
         </div>

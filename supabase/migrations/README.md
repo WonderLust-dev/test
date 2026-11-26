@@ -8,6 +8,7 @@ This directory contains the incremental SQL scripts for existing deployments. Th
 | --- | --- | --- |
 | Paper sharing | [`add_visibility_column.sql`](add_visibility_column.sql) | Adds private/public visibility and updates paper access policies. |
 | Mistake review | [`add_spaced_repetition.sql`](add_spaced_repetition.sql) | Adds SRS fields to mistakes, creates review history, indexes, RLS policies, and review RPC functions. |
+| Mistake retention | [`add_mistake_retention.sql`](add_mistake_retention.sql) | Schedules daily deletion of mistakes inactive for more than seven days; related review history is removed by cascade. |
 | Notes | [`add_notes_table.sql`](add_notes_table.sql) | Creates the notes table, indexes, and owner-only RLS policies. |
 | Books and chapters | [`add_book_chapters.sql`](add_book_chapters.sql) | Adds chapter parent/order columns and allows book and HTML lesson record types. |
 | User-defined subjects | [`add_dynamic_note_subjects.sql`](add_dynamic_note_subjects.sql) | Removes the default subject label so new notes can use a subject the user chooses or leave it blank. |
@@ -21,6 +22,7 @@ This directory contains the incremental SQL scripts for existing deployments. Th
 - New projects should start with [`supabase/schema.sql`](../schema.sql), which is the consolidated current schema.
 - Existing projects should apply only missing migrations. Apply `add_notes_table.sql` before migrations that alter `notes`; run the notes feature migrations in the order shown above.
 - Apply `add_dynamic_note_subjects.sql` after `add_notes_table.sql` if the project already exists. It changes only the default for future records; it does not rewrite existing subject values.
+- Apply `add_mistake_retention.sql` to enable the scheduled seven-day mistake cleanup on an existing Supabase project. Users can download their mistake records as JSON or CSV from the Mistakes page before cleanup.
 - Do not rerun the full schema or migrations blindly against a database containing user data. Check the deployed schema and migration history first.
 - Keep these incremental scripts in sync with the current schema snapshot whenever a table, policy, or allowed note type changes.
 

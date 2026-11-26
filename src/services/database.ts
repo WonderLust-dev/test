@@ -596,9 +596,25 @@ export async function isBookmarked(paperId: string, questionId: number | string,
 // ============================================================
 // Mistakes Service
 // ============================================================
+const MISTAKE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+function pruneExpiredLocalMistakes(): Mistake[] {
+  const mistakes = lsGet<Mistake>(LS_KEYS.mistakes);
+  const cutoff = Date.now() - MISTAKE_RETENTION_MS;
+  const retained = mistakes.filter(mistake => {
+    const lastAttempted = Date.parse(mistake.last_attempted_at);
+    return !Number.isFinite(lastAttempted) || lastAttempted >= cutoff;
+  });
+  if (retained.length !== mistakes.length) {
+    lsSet(LS_KEYS.mistakes, retained);
+  }
+  return retained;
+}
+
 export async function getMistakes(userId?: string): Promise<Mistake[]> {
+  const localMistakes = pruneExpiredLocalMistakes();
   if (!isRemoteUser(userId)) {
-    return lsGet<Mistake>(LS_KEYS.mistakes).filter(m => !m.resolved);
+    return localMistakes.filter(m => !m.resolved);
   }
   return cachedFetch<Mistake[]>(`mistakes_${userId}`, 8000, async () => {
     const result = await sb(async () => {
@@ -606,8 +622,21 @@ export async function getMistakes(userId?: string): Promise<Mistake[]> {
       return (data || []) as Mistake[];
     });
     if (result) return result;
-    return lsGet<Mistake>(LS_KEYS.mistakes).filter(m => !m.resolved);
+    return localMistakes.filter(m => !m.resolved);
   });
+}
+
+export async function getMistakesForExport(userId?: string): Promise<Mistake[]> {
+  const localMistakes = pruneExpiredLocalMistakes();
+  if (!isRemoteUser(userId)) return localMistakes;
+
+  const { data, error } = await supabase!
+    .from('mistakes')
+    .select('*')
+    .eq('user_id', userId!)
+    .order('last_attempted_at', { ascending: false });
+  if (error) throw new Error(`Could not load mistakes for export: ${error.message}`);
+  return (data || []) as Mistake[];
 }
 
 export async function addOrUpdateMistake(mistake: Omit<Mistake, 'id' | 'incorrect_count' | 'last_attempted_at'>, userId?: string): Promise<void> {
@@ -640,7 +669,7 @@ export async function addOrUpdateMistake(mistake: Omit<Mistake, 'id' | 'incorrec
     return;
   }
 
-  const mistakes = lsGet<Mistake>(LS_KEYS.mistakes);
+  const mistakes = pruneExpiredLocalMistakes();
   const existing = mistakes.find(m =>
     m.paper_id === mistake.paper_id &&
     String(m.question_id) === String(mistake.question_id) &&

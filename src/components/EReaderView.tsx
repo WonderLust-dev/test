@@ -32,7 +32,7 @@ import {
   FileCode,
 } from 'lucide-react';
 
-export type ReaderPaperTheme = 'paper' | 'cream' | 'slate' | 'midnight';
+export type ReaderPaperTheme = 'paper' | 'cream' | 'slate' | 'midnight' | 'ocean';
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderFontSize = 'sm' | 'base' | 'lg' | 'xl';
 export type ReaderWidth = 'book' | 'comfortable' | 'wide';
@@ -97,12 +97,11 @@ export default function EReaderView({
   const [paperTheme, setPaperTheme] = useState<ReaderPaperTheme>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sscp_ereader_theme') as ReaderPaperTheme | null;
-      if (saved && (saved === 'paper' || saved === 'cream' || saved === 'slate' || saved === 'midnight')) {
+      if (saved && (saved === 'paper' || saved === 'cream' || saved === 'slate' || saved === 'midnight' || saved === 'ocean')) {
         return saved;
       }
       const isDark =
         document.documentElement.getAttribute('data-theme') === 'dark' ||
-        document.documentElement.getAttribute('data-theme') === 'high-contrast' ||
         document.documentElement.classList.contains('dark');
       return isDark ? 'slate' : 'paper';
     }
@@ -255,7 +254,7 @@ export default function EReaderView({
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme}`}
+      className={`fixed inset-0 z-[100] h-[100dvh] flex flex-col transition-colors duration-200 overflow-hidden font-sans reader-theme-${paperTheme}`}
       style={{
         backgroundColor: 'var(--reader-bg)',
         color: 'var(--reader-text)',
@@ -264,7 +263,10 @@ export default function EReaderView({
       {/* ============================================================ */}
       {/* 1. TOP HEADER (Matches Image 2: "E.reader", Back, Read nr, Bookmark) */}
       {/* ============================================================ */}
-      <header className="shrink-0 z-30 px-3 sm:px-6 py-2.5 sm:py-3 border-b flex items-center justify-between gap-2 border-[var(--reader-border,#DFD7CF)] bg-inherit/90 backdrop-blur-md">
+      <header
+        className="shrink-0 z-30 px-3 sm:px-6 py-2.5 sm:py-3 border-b flex items-center justify-between gap-2 border-[var(--reader-border,#DFD7CF)] bg-inherit/90 backdrop-blur-md"
+        style={{ paddingTop: 'calc(0.625rem + env(safe-area-inset-top))' }}
+      >
         {/* Left: Back & Brand */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
@@ -283,7 +285,7 @@ export default function EReaderView({
         </div>
 
         {/* Center: Read Number & Title preview */}
-        <div className="flex items-center gap-2 min-w-0 truncate text-center">
+        <div className="hidden md:flex items-center gap-2 min-w-0 truncate text-center">
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-[#E0564C]/30 bg-[#E0564C]/15 text-[#E0564C] shrink-0">
             Read nr. {formattedReadNr}
           </span>
@@ -293,7 +295,7 @@ export default function EReaderView({
         </div>
 
         {/* Right: Floating Controls Pill (Read Aloud 🎙️, Paper Theme 🌓, Typography Aa ▾) */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 w-max max-w-[68vw] md:max-w-none overflow-x-auto hide-scrollbar">
           {/* Read Aloud Button (Image 2 Audio Feature) */}
           {speechSupported && (
             <button
@@ -311,34 +313,51 @@ export default function EReaderView({
           )}
 
           {/* Theme Quick Switcher Pill */}
-          <div className="flex items-center p-0.5 rounded-xl border border-[var(--reader-border,#DFD7CF)] bg-black/5 dark:bg-white/5 text-xs">
+          <div className="flex items-center shrink-0 p-0.5 rounded-xl border border-[var(--reader-border,#DFD7CF)] bg-black/5 dark:bg-white/5 text-xs">
             <button
               onClick={() => handlePaperThemeChange('paper')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'paper' ? 'bg-[#F5EFEB] text-[#2C2623] shadow-xs ring-1 ring-[#DFD7CF]' : 'opacity-60 hover:opacity-100'}`}
+              aria-label="Warm paper reader theme"
+              aria-pressed={paperTheme === 'paper'}
+              className={`shrink-0 p-1.5 rounded-lg transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B85338] ${paperTheme === 'paper' ? 'bg-[#F5EFEB] text-[#2C2623] shadow-xs ring-1 ring-[#DFD7CF]' : 'opacity-60 hover:opacity-100'}`}
               title="Warm Paper Theme (Image 2 Aesthetic)"
             >
               📜
             </button>
             <button
               onClick={() => handlePaperThemeChange('cream')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'cream' ? 'bg-[#FAF8F5] text-[#1C1E21] shadow-xs ring-1 ring-[#E8E0D5]' : 'opacity-60 hover:opacity-100'}`}
+              aria-label="Editorial cream reader theme"
+              aria-pressed={paperTheme === 'cream'}
+              className={`shrink-0 p-1.5 rounded-lg transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B85338] ${paperTheme === 'cream' ? 'bg-[#FAF8F5] text-[#1C1E21] shadow-xs ring-1 ring-[#E8E0D5]' : 'opacity-60 hover:opacity-100'}`}
               title="Editorial Cream Theme"
             >
               🥛
             </button>
             <button
               onClick={() => handlePaperThemeChange('slate')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'slate' ? 'bg-[#21262D] text-[#E6EDF3] shadow-xs ring-1 ring-[#30363D]' : 'opacity-60 hover:opacity-100'}`}
+              aria-label="Slate reader theme"
+              aria-pressed={paperTheme === 'slate'}
+              className={`shrink-0 p-1.5 rounded-lg transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B85338] ${paperTheme === 'slate' ? 'bg-[#21262D] text-[#E6EDF3] shadow-xs ring-1 ring-[#30363D]' : 'opacity-60 hover:opacity-100'}`}
               title="Dark Slate Theme (Image 2 Bottom Panels)"
             >
               🌑
             </button>
             <button
               onClick={() => handlePaperThemeChange('midnight')}
-              className={`p-1.5 rounded-lg transition-all ${paperTheme === 'midnight' ? 'bg-[#0D1117] text-[#C9D1D9] shadow-xs ring-1 ring-[#21262D]' : 'opacity-60 hover:opacity-100'}`}
+              aria-label="Midnight OLED reader theme"
+              aria-pressed={paperTheme === 'midnight'}
+              className={`shrink-0 p-1.5 rounded-lg transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B85338] ${paperTheme === 'midnight' ? 'bg-[#0D1117] text-[#C9D1D9] shadow-xs ring-1 ring-[#21262D]' : 'opacity-60 hover:opacity-100'}`}
               title="Midnight OLED Theme"
             >
               🖤
+            </button>
+            <button
+              onClick={() => handlePaperThemeChange('ocean')}
+              aria-label="Ocean blue reader theme"
+              aria-pressed={paperTheme === 'ocean'}
+              className={`shrink-0 p-1.5 rounded-lg transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2276A8] ${paperTheme === 'ocean' ? 'bg-[#E6F3FA] text-[#173A52] shadow-xs ring-1 ring-[#B8D3E5]' : 'opacity-60 hover:opacity-100'}`}
+              title="Ocean Blue Reader Theme"
+            >
+              🌊
             </button>
           </div>
 
@@ -359,7 +378,7 @@ export default function EReaderView({
 
             {/* Typography Popover */}
             {showTypographyMenu && (
-              <div className="absolute right-0 top-full mt-2 w-72 p-4 rounded-2xl border shadow-2xl z-50 animate-fadeIn backdrop-blur-xl border-[var(--reader-border,#DFD7CF)] bg-[var(--reader-surface,#FAF7F2)] text-[var(--reader-text,#2C2623)]">
+              <div className="fixed right-3 top-[calc(env(safe-area-inset-top)+3.5rem)] w-[min(18rem,calc(100vw-1.5rem))] sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-72 p-4 rounded-2xl border shadow-2xl z-50 animate-fadeIn backdrop-blur-xl border-[var(--reader-border,#DFD7CF)] bg-[var(--reader-surface,#FAF7F2)] text-[var(--reader-text,#2C2623)]">
                 <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--reader-border,#DFD7CF)]">
                   <span className="text-xs font-black uppercase tracking-wider opacity-70">
                     Reading Typography
@@ -527,7 +546,15 @@ export default function EReaderView({
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Table of Contents Drawer */}
         {showToc && headings.length > 0 && (
-          <aside className="w-72 sm:w-80 shrink-0 border-r border-[var(--reader-border,#DFD7CF)] p-4 sm:p-5 overflow-y-auto custom-scrollbar bg-black/3 dark:bg-white/3 z-20 animate-fadeIn">
+          <button
+            type="button"
+            className="absolute inset-0 z-10 bg-black/35 sm:hidden"
+            aria-label="Close table of contents"
+            onClick={() => setShowToc(false)}
+          />
+        )}
+        {showToc && headings.length > 0 && (
+          <aside className="absolute inset-y-0 left-0 z-20 w-[min(85vw,20rem)] sm:relative sm:w-72 md:w-80 shrink-0 border-r border-[var(--reader-border,#DFD7CF)] p-4 sm:p-5 overflow-y-auto custom-scrollbar bg-[var(--reader-surface)] shadow-xl sm:shadow-none animate-fadeIn">
             <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--reader-border,#DFD7CF)]">
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider font-mono">Table of Contents</h4>
@@ -644,25 +671,25 @@ export default function EReaderView({
               <h4 className="text-sm font-extrabold tracking-tight">You have reached the end of Read nr. {formattedReadNr}</h4>
               <p className="text-xs opacity-60">All concepts, vocabulary, and formulas in this chapter are saved in your offline database.</p>
               
-              <div className="flex items-center justify-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3 pt-2">
                 {onPrevNote && (
                   <button
                     onClick={onPrevNote}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--reader-border,#DFD7CF)] hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold transition-all cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--reader-border,#DFD7CF)] hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold transition-all cursor-pointer"
                   >
                     <ChevronLeft size={14} /> Previous Note
                   </button>
                 )}
                 <button
                   onClick={onBack}
-                  className="px-5 py-2 rounded-xl bg-[#E0564C] text-white text-xs font-bold shadow-md hover:bg-[#d04940] transition-all cursor-pointer active:scale-95"
+                className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#E0564C] text-white text-xs font-bold shadow-md hover:bg-[#d04940] transition-all cursor-pointer active:scale-95"
                 >
                   Return to Shelf
                 </button>
                 {onNextNote && (
                   <button
                     onClick={onNextNote}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--reader-border,#DFD7CF)] hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold transition-all cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--reader-border,#DFD7CF)] hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold transition-all cursor-pointer"
                   >
                     Next Note <ChevronRight size={14} />
                   </button>
@@ -676,7 +703,10 @@ export default function EReaderView({
       {/* ============================================================ */}
       {/* 3. DOCKED BOTTOM PROGRESS BAR (Matches Image 2) */}
       {/* ============================================================ */}
-      <footer className="shrink-0 px-4 sm:px-6 py-2.5 border-t border-[var(--reader-border,#DFD7CF)] bg-inherit/90 backdrop-blur-md flex items-center justify-between text-xs font-medium z-30">
+      <footer
+        className="shrink-0 px-3 sm:px-6 py-2.5 border-t border-[var(--reader-border,#DFD7CF)] bg-inherit/90 backdrop-blur-md flex items-center justify-between gap-2 text-[10px] sm:text-xs font-medium z-30"
+        style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="flex items-center gap-2">
           <span className="font-mono font-bold text-[#E0564C]">Read nr. {formattedReadNr}</span>
           <span className="opacity-40">•</span>
@@ -685,7 +715,7 @@ export default function EReaderView({
 
         {/* Audio Player mini bar if active */}
         {isPlayingAudio && (
-          <div className="flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-[#E0564C]/15 text-[#E0564C] border border-[#E0564C]/30 animate-pulse">
+          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-[#E0564C]/15 text-[#E0564C] border border-[#E0564C]/30 animate-pulse">
             <Volume2 size={13} />
             <span>Audio reading active</span>
             <button

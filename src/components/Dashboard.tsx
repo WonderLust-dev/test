@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
-import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility, saveCustomPaper } from '../services/database';
+import { getPapers, getAttempts, getMistakes, getMistakesForExport, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility, saveCustomPaper } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
 import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, CalendarDays, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check, Loader2 } from 'lucide-react';
 
@@ -1745,6 +1745,57 @@ function MistakesTab({
   onStartCustomPractice: (paper: Paper) => void;
   effectiveUserId: string;
 }) {
+  const [exportError, setExportError] = useState('');
+
+  const handleDownload = async (format: 'json' | 'csv') => {
+    setExportError('');
+    try {
+      const records = await getMistakesForExport(effectiveUserId);
+      if (records.length === 0) {
+        setExportError('There are no mistake records available to download.');
+        return;
+      }
+
+      const date = new Date().toISOString().slice(0, 10);
+      if (format === 'json') {
+        downloadJSON(JSON.stringify(records, null, 2), `mistakes-${date}.json`);
+        return;
+      }
+
+      const columns: Array<keyof Mistake> = [
+        'id', 'user_id', 'paper_id', 'paper_title', 'question_id', 'question_text', 'subject', 'topic',
+        'selected_answer', 'correct_answer', 'options', 'solution', 'shortcut', 'hint',
+        'learning_suggestion', 'incorrect_count', 'last_attempted_at', 'resolved',
+        'next_review_date', 'interval_days', 'ease_factor', 'review_count', 'last_review_date', 'status',
+      ];
+      const escapeCsv = (value: unknown) => {
+        let text = value == null
+          ? ''
+          : typeof value === 'object'
+            ? JSON.stringify(value)
+            : String(value);
+        if (typeof value === 'string' && /^[\t\r ]*[=+\-@]/.test(text)) {
+          text = `'${text}`;
+        }
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+      const csv = [
+        columns.map(escapeCsv).join(','),
+        ...records.map(record => columns.map(column => escapeCsv(record[column])).join(',')),
+      ].join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `mistakes-${date}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not download mistakes.');
+    }
+  };
+
   const handlePracticeMistakes = () => {
     if (mistakes.length === 0) return;
     const questions: QuestionJSON[] = mistakes.map((m, idx) => ({
@@ -1791,32 +1842,40 @@ function MistakesTab({
     onStartCustomPractice(customPaper);
   };
 
-  if (mistakes.length === 0) {
-    return (
-      <div className="text-center py-20 bento-card p-10">
-        <CheckCircle size={48} className="mx-auto text-emerald-500 mb-4" />
-        <h3 className="text-lg font-extrabold text-gray-900 mb-1">Mistake Notebook Clean!</h3>
-        <p className="text-sm text-gray-500">You have no pending mistakes. Keep practicing to maintain high accuracy!</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5 animate-fadeIn">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-gray-900">My Mistake Notebook ({mistakes.length})</h2>
-          <p className="text-xs text-gray-500">Questions you missed during mock tests. Review solutions and retest anytime.</p>
+          <p className="text-xs text-gray-500">Mistakes are deleted 7 days after the last incorrect attempt. Download all retained records, including resolved ones, to keep a copy.</p>
         </div>
-        <button
-          onClick={handlePracticeMistakes}
-          className="btn btn-primary text-xs py-2.5 px-4.5 rounded-full shadow-xs self-start sm:self-auto flex items-center gap-1.5"
-        >
-          <RotateCcw size={14} /> Practice All Mistakes ({mistakes.length})
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => void handleDownload('json')} className="btn btn-outline text-xs py-2.5 px-3 rounded-full flex items-center gap-1.5">
+            <Download size={14} /> Download JSON
+          </button>
+          <button onClick={() => void handleDownload('csv')} className="btn btn-outline text-xs py-2.5 px-3 rounded-full flex items-center gap-1.5">
+            <Download size={14} /> Download CSV
+          </button>
+          {mistakes.length > 0 && (
+            <button
+              onClick={handlePracticeMistakes}
+              className="btn btn-primary text-xs py-2.5 px-4.5 rounded-full shadow-xs flex items-center gap-1.5"
+            >
+              <RotateCcw size={14} /> Practice All ({mistakes.length})
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-3">
+      {exportError && <p role="alert" className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">{exportError}</p>}
+
+      {mistakes.length === 0 ? (
+        <div className="text-center py-20 bento-card p-10">
+          <CheckCircle size={48} className="mx-auto text-emerald-500 mb-4" />
+          <h3 className="text-lg font-extrabold text-gray-900 mb-1">Mistake Notebook Clean!</h3>
+          <p className="text-sm text-gray-500">You have no pending mistakes. Keep practicing to maintain high accuracy!</p>
+        </div>
+      ) : <div className="space-y-3">
         {mistakes.map(m => (
           <div key={m.id} className="bento-card p-5 bg-white border border-gray-200/80 rounded-3xl shadow-xs">
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -1845,7 +1904,7 @@ function MistakesTab({
             </div>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
