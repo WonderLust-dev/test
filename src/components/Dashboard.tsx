@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Paper, Attempt, Mistake, Bookmark, PaperFilters, BookmarkCategory, QuestionJSON } from '../types';
 import { getPapers, getAttempts, getMistakes, getBookmarks, getNotes, deletePaper, removeBookmark, resolveMistake, exportPaperAsJSON, downloadJSON, getAttemptsByPaper, updatePaperVisibility, saveCustomPaper } from '../services/database';
 import { getAccuracyColor, getDifficultyColor, formatTime } from '../utils/grader';
-import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check } from 'lucide-react';
+import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTriangle, Bookmark as BookmarkIcon, BookmarkCheck, Target, TrendingUp, Award, Clock, BarChart3, X, CheckCircle, RotateCcw, Zap, Brain, FileText, PlusCircle, Globe, Lock, LayoutDashboard, Users, Flame, ChevronRight, ArrowUpRight, Share2, Check, Loader2 } from 'lucide-react';
 
 // ============================================================
 // Dashboard (Home)
@@ -697,6 +697,11 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
   const [showFilters, setShowFilters] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'mine' | 'public'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedPaperIds, setSelectedPaperIds] = useState<Set<string>>(() => new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkActionMessage, setBulkActionMessage] = useState<string | null>(null);
+
+  const canManagePaper = (paper: Paper) => Boolean(userId && paper.user_id === userId);
 
   const getBestScore = (paperId: string) => {
     const paperAttempts = attempts.filter(a => String(a.paper_id) === String(paperId));
@@ -708,8 +713,16 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
 
   const handleDelete = async (paperId: string) => {
     if (confirm('Delete this paper? This cannot be undone.')) {
-      await deletePaper(paperId);
-      onRefresh();
+      try {
+        const result = await deletePaper(paperId, userId);
+        if (!result.success) {
+          alert(result.error || 'Failed to delete paper.');
+          return;
+        }
+        await onRefresh();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Failed to delete paper.');
+      }
     }
   };
 
@@ -724,11 +737,15 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
 
   const handleToggleVisibility = async (paper: Paper) => {
     const newVisibility = paper.visibility === 'private' ? 'public' : 'private';
-    const result = await updatePaperVisibility(paper.id, newVisibility, userId);
-    if (result.success) {
+    try {
+      const result = await updatePaperVisibility(paper.id, newVisibility, userId);
+      if (!result.success) {
+        alert(`Visibility update: ${result.error || 'Failed to update visibility'}`);
+        return;
+      }
       await onRefresh();
-    } else {
-      alert(`Visibility update: ${result.error || 'Failed to update visibility'}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to update paper visibility.');
     }
   };
 
@@ -768,6 +785,128 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
     }
     return list;
   }, [papers, viewFilter, userId]);
+
+  const manageableDisplayedPapers = useMemo(
+    () => displayedPapers.filter(canManagePaper),
+    [displayedPapers, userId],
+  );
+  const selectedPapers = useMemo(
+    () => manageableDisplayedPapers.filter(paper => selectedPaperIds.has(paper.id)),
+    [manageableDisplayedPapers, selectedPaperIds],
+  );
+  const allManageablePapersSelected = manageableDisplayedPapers.length > 0 &&
+    manageableDisplayedPapers.every(paper => selectedPaperIds.has(paper.id));
+
+  useEffect(() => {
+    setSelectedPaperIds(new Set());
+    setBulkActionMessage(null);
+  }, [viewFilter, search, filters.exam, filters.subject, filters.difficulty, filters.status, userId]);
+
+  const togglePaperSelection = (paperId: string) => {
+    setSelectedPaperIds(previous => {
+      const next = new Set(previous);
+      if (next.has(paperId)) next.delete(paperId);
+      else next.add(paperId);
+      return next;
+    });
+    setBulkActionMessage(null);
+  };
+
+  const toggleAllVisiblePapers = () => {
+    setSelectedPaperIds(previous => {
+      const next = new Set(previous);
+      if (allManageablePapersSelected) {
+        manageableDisplayedPapers.forEach(paper => next.delete(paper.id));
+      } else {
+        manageableDisplayedPapers.forEach(paper => next.add(paper.id));
+      }
+      return next;
+    });
+    setBulkActionMessage(null);
+  };
+
+  const handleBulkVisibility = async (visibility: 'public' | 'private') => {
+    const papersToUpdate = selectedPapers.filter(paper => paper.visibility !== visibility);
+    if (papersToUpdate.length === 0) {
+      setBulkActionMessage(`All selected papers are already ${visibility}.`);
+      return;
+    }
+    if (visibility === 'public' && !confirm(`Make ${papersToUpdate.length} selected paper${papersToUpdate.length === 1 ? '' : 's'} public? Anyone with access to the public library may be able to view and take them.`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    setBulkActionMessage(null);
+    try {
+      const results: Array<{ paper: Paper; result: { success: boolean; error?: string } }> = [];
+      for (const paper of papersToUpdate) {
+        try {
+          results.push({
+            paper,
+            result: await updatePaperVisibility(paper.id, visibility, userId),
+          });
+        } catch (error) {
+          results.push({
+            paper,
+            result: { success: false, error: error instanceof Error ? error.message : 'Unexpected update error.' },
+          });
+        }
+      }
+      const failures = results.filter(item => !item.result.success);
+      const changedCount = results.length - failures.length;
+      setSelectedPaperIds(new Set(failures.map(item => item.paper.id)));
+      setBulkActionMessage(
+        failures.length
+          ? `${changedCount} paper${changedCount === 1 ? '' : 's'} updated; ${failures.length} failed. ${failures[0].result.error || ''}`
+          : `${changedCount} paper${changedCount === 1 ? '' : 's'} made ${visibility}.`,
+      );
+      await onRefresh();
+    } catch (error) {
+      setBulkActionMessage(error instanceof Error ? `Some visibility changes may have completed: ${error.message}` : 'Some visibility changes may have completed. Refresh the library to verify.');
+      await onRefresh();
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedPapers.length || !confirm(`Permanently delete ${selectedPapers.length} selected paper${selectedPapers.length === 1 ? '' : 's'}? This cannot be undone.`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    setBulkActionMessage(null);
+    try {
+      const results: Array<{ paper: Paper; result: { success: boolean; error?: string } }> = [];
+      for (const paper of selectedPapers) {
+        try {
+          results.push({
+            paper,
+            result: await deletePaper(paper.id, userId),
+          });
+        } catch (error) {
+          results.push({
+            paper,
+            result: { success: false, error: error instanceof Error ? error.message : 'Unexpected deletion error.' },
+          });
+        }
+      }
+      const failures = results.filter(item => !item.result.success);
+      const deletedCount = results.length - failures.length;
+      setSelectedPaperIds(new Set(failures.map(item => item.paper.id)));
+      setBulkActionMessage(
+        failures.length
+          ? `${deletedCount} paper${deletedCount === 1 ? '' : 's'} deleted; ${failures.length} failed. ${failures[0].result.error || ''}`
+          : `${deletedCount} paper${deletedCount === 1 ? '' : 's'} deleted.`,
+      );
+      await onRefresh();
+    } catch (error) {
+      setBulkActionMessage(error instanceof Error ? `Some deletions may have completed: ${error.message}` : 'Some deletions may have completed. Refresh the library to verify.');
+      await onRefresh();
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   const myCount = useMemo(() => papers.filter(p => p.user_id === userId || p.user_id === 'guest').length, [papers, userId]);
   const publicCount = useMemo(() => papers.filter(p => p.visibility === 'public').length, [papers]);
@@ -938,6 +1077,65 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
         </button>
       </div>
 
+      {manageableDisplayedPapers.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-gray-700">
+              <input
+                type="checkbox"
+                checked={allManageablePapersSelected}
+                onChange={toggleAllVisiblePapers}
+                disabled={isBulkProcessing}
+                className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                aria-label={`Select all ${manageableDisplayedPapers.length} of your visible papers`}
+              />
+              Select all my papers ({manageableDisplayedPapers.length})
+            </label>
+            <span className="text-xs text-gray-500">{selectedPapers.length} selected</span>
+            {selectedPaperIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => { setSelectedPaperIds(new Set()); setBulkActionMessage(null); }}
+                disabled={isBulkProcessing}
+                className="text-xs font-semibold text-gray-500 hover:text-gray-900"
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleBulkVisibility('public')}
+              disabled={!selectedPapers.length || isBulkProcessing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Globe size={13} /> Make public
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleBulkVisibility('private')}
+              disabled={!selectedPapers.length || isBulkProcessing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Lock size={13} /> Make private
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleBulkDelete()}
+              disabled={!selectedPapers.length || isBulkProcessing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isBulkProcessing ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Delete selected
+            </button>
+          </div>
+          {bulkActionMessage && (
+            <p role="status" className="text-xs font-semibold text-gray-600 sm:basis-full">{bulkActionMessage}</p>
+          )}
+        </div>
+      )}
+
       {/* Advanced Filter Options */}
       {showFilters && (
         <div className="flex flex-wrap gap-2.5 p-4 bg-white border border-gray-200/80 rounded-2xl shadow-2xs">
@@ -1029,14 +1227,28 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
           return (
             <div
               key={paper.id}
-              className="bento-card p-5 sm:p-6 flex flex-col justify-between hover:shadow-soft transition-all duration-200 group bg-white border border-gray-200/80 rounded-3xl"
+              className={`bento-card p-5 sm:p-6 flex flex-col justify-between hover:shadow-soft transition-all duration-200 group bg-white border rounded-3xl ${
+                selectedPaperIds.has(paper.id) ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200/80'
+              }`}
             >
               <div>
                 {/* Header Row: Title & Badges */}
                 <div className="flex items-start justify-between gap-3 mb-2">
-                  <h3 className="font-extrabold text-gray-900 text-sm sm:text-base leading-snug line-clamp-2 flex-1">
-                    {paper.title}
-                  </h3>
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    {canManagePaper(paper) && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaperIds.has(paper.id)}
+                        onChange={() => togglePaperSelection(paper.id)}
+                        disabled={isBulkProcessing}
+                        aria-label={`Select ${paper.title}`}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 accent-indigo-600"
+                      />
+                    )}
+                    <h3 className="font-extrabold text-gray-900 text-sm sm:text-base leading-snug line-clamp-2 flex-1">
+                      {paper.title}
+                    </h3>
+                  </div>
                   <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
                     <span
                       className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1"
@@ -1164,17 +1376,19 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
                 >
                   {copiedId === paper.id ? <Check size={13} /> : <Share2 size={13} />}
                 </button>
-                <button
-                  onClick={() => handleToggleVisibility(paper)}
-                  className={`p-2 rounded-full border transition-all shadow-2xs ${
-                    paper.visibility === 'public'
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-black hover:bg-gray-50'
-                  }`}
-                  title={paper.visibility === 'public' ? 'Make Private' : 'Publish test so colleagues can access it'}
-                >
-                  {paper.visibility === 'public' ? <Globe size={13} /> : <Lock size={13} />}
-                </button>
+                {canManagePaper(paper) && (
+                  <button
+                    onClick={() => handleToggleVisibility(paper)}
+                    className={`p-2 rounded-full border transition-all shadow-2xs ${
+                      paper.visibility === 'public'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                        : 'bg-white border-gray-200 text-gray-500 hover:text-black hover:bg-gray-50'
+                    }`}
+                    title={paper.visibility === 'public' ? 'Make Private' : 'Publish test so colleagues can access it'}
+                  >
+                    {paper.visibility === 'public' ? <Globe size={13} /> : <Lock size={13} />}
+                  </button>
+                )}
                 <button
                   onClick={() => handleExport(paper)}
                   className="p-2 rounded-full border border-gray-200 bg-white text-gray-500 hover:text-black hover:bg-gray-50 transition-colors shadow-2xs"
@@ -1182,13 +1396,15 @@ function LibraryTab({ papers, totalPapersCount = 0, attempts, search, setSearch,
                 >
                   <Download size={13} />
                 </button>
-                <button
-                  onClick={() => handleDelete(paper.id)}
-                  className="p-2 rounded-full border border-rose-200 bg-white text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors shadow-2xs"
-                  title="Delete Paper"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {canManagePaper(paper) && (
+                  <button
+                    onClick={() => handleDelete(paper.id)}
+                    className="p-2 rounded-full border border-rose-200 bg-white text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors shadow-2xs"
+                    title="Delete Paper"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             </div>
           );

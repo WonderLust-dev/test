@@ -282,28 +282,40 @@ export async function updatePaperVisibility(
 
   const localPapers = lsGet<Paper>(LS_KEYS.papers);
   const localPaper = localPapers.find(p => p.id === paperId);
+  if (!userId) {
+    return { success: false, error: 'Sign in to manage paper visibility.' };
+  }
+  if (localPaper && localPaper.user_id !== userId) {
+    return { success: false, error: 'You can only change visibility for your own papers.' };
+  }
 
   if (isSupabaseConfigured && supabase) {
     if (isRemoteUser(userId)) {
-      // Check if paper already exists in Supabase
-      const { data: existing, error: checkError } = await supabase!
+      const { data: existing, error: checkError } = await supabase
         .from('papers')
         .select('id, user_id')
         .eq('id', paperId)
         .limit(1);
 
-      if (!checkError && existing && existing.length > 0) {
-        // Exists in Supabase — update its visibility
-        const { error } = await supabase!
+      if (checkError) {
+        return { success: false, error: checkError.message };
+      }
+
+      if (existing && existing.length > 0) {
+        if (existing[0].user_id !== userId) {
+          return { success: false, error: 'You can only change visibility for your own papers.' };
+        }
+        const { data, error } = await supabase
           .from('papers')
           .update({ visibility, updated_at: new Date().toISOString() })
-          .eq('id', paperId);
-        
-        if (error) {
-          return { success: false, error: error.message };
+          .eq('id', paperId)
+          .eq('user_id', userId)
+          .select('id');
+
+        if (error || !data?.length) {
+          return { success: false, error: error?.message || 'Paper was not updated.' };
         }
       } else if (localPaper) {
-        // Exists locally only — insert into Supabase so it becomes accessible to all
         const cloudPaper: Paper = {
           ...localPaper,
           user_id: userId!,
@@ -318,11 +330,12 @@ export async function updatePaperVisibility(
           return { success: false, error: insertError.message };
         }
 
-        // Also update local storage paper to match
         localPaper.user_id = userId!;
         localPaper.visibility = visibility;
         localPaper.updated_at = new Date().toISOString();
         lsSet(LS_KEYS.papers, localPapers);
+      } else {
+        return { success: false, error: 'Paper not found or you do not have permission to change it.' };
       }
     } else if (visibility === 'public') {
       return {
@@ -343,16 +356,50 @@ export async function updatePaperVisibility(
   return { success: true };
 }
 
-export async function deletePaper(paperId: string): Promise<void> {
-  if (isSupabaseConfigured && supabase) {
-    await sb(async () => {
-      const { error } = await supabase!.from('papers').delete().eq('id', paperId);
-      if (error) throw error;
-    });
-    return;
+export async function deletePaper(
+  paperId: string,
+  userId?: string
+): Promise<{ success: boolean; error?: string }> {
+  invalidateCache('papers');
+
+  const papers = lsGet<Paper>(LS_KEYS.papers);
+  const localPaper = papers.find(paper => paper.id === paperId);
+  if (!userId || (localPaper && localPaper.user_id !== userId)) {
+    return { success: false, error: 'Paper not found or you do not have permission to delete it.' };
   }
-  const papers = lsGet<Paper>(LS_KEYS.papers).filter(p => p.id !== paperId);
-  lsSet(LS_KEYS.papers, papers);
+  if (!localPaper && !isRemoteUser(userId)) {
+    return { success: false, error: 'Paper not found or you do not have permission to delete it.' };
+  }
+
+  if (isSupabaseConfigured && supabase && isRemoteUser(userId)) {
+    const { data: existing, error: lookupError } = await supabase
+      .from('papers')
+      .select('id, user_id')
+      .eq('id', paperId)
+      .limit(1);
+
+    if (lookupError) return { success: false, error: lookupError.message };
+    if (existing?.length) {
+      if (existing[0].user_id !== userId) {
+        return { success: false, error: 'You can only delete your own papers.' };
+      }
+      const { data, error } = await supabase
+        .from('papers')
+        .delete()
+        .eq('id', paperId)
+        .eq('user_id', userId)
+        .select('id');
+      if (error) return { success: false, error: error.message };
+      if (!data?.length) return { success: false, error: 'Paper was not deleted.' };
+    } else if (!localPaper) {
+      return { success: false, error: 'Paper not found or you do not have permission to delete it.' };
+    }
+  }
+
+  if (localPaper) {
+    lsSet(LS_KEYS.papers, papers.filter(paper => paper.id !== paperId));
+  }
+  return { success: true };
 }
 
 export async function checkDuplicatePaper(title: string, userId?: string): Promise<Paper | null> {
