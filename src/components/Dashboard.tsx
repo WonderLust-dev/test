@@ -10,8 +10,9 @@ import { Search, Filter, Play, BookOpen, Trash2, Download, Copy, Eye, AlertTrian
 import ReviewDashboard from './ReviewDashboard';
 import StudyNotes from './StudyNotes';
 import StudyPlanner from './StudyPlanner';
+import Flashcards from './Flashcards';
 
-export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes' | 'planner';
+export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes' | 'planner' | 'flashcards';
 
 interface DashboardProps {
   userId?: string;
@@ -180,6 +181,7 @@ export default function Dashboard({
     { id: 'practice' as const, label: 'Practice Hub', icon: Target },
     { id: 'notes' as const, label: 'Study Notes', icon: FileText, count: notesCount },
     { id: 'planner' as const, label: 'Study Planner', icon: CalendarDays },
+    { id: 'flashcards' as const, label: 'Flashcards', icon: Brain },
     { id: 'mistakes' as const, label: 'Mistakes', icon: AlertTriangle, count: mistakes.length },
     { id: 'bookmarks' as const, label: 'Bookmarks', icon: BookmarkIcon, count: bookmarks.length },
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
@@ -268,6 +270,9 @@ export default function Dashboard({
       )}
       {activeTab === 'planner' && (
         <StudyPlanner userId={effectiveUserId} />
+      )}
+      {activeTab === 'flashcards' && (
+        <Flashcards userId={effectiveUserId} />
       )}
       {activeTab === 'mistakes' && (
         <MistakesTab

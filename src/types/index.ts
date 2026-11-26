@@ -288,7 +288,7 @@ export interface StudyNote {
   user_id: string;
   title: string;
   content: string;
-  file_type: 'md' | 'txt' | 'html' | 'book' | 'whiteboard' | 'study_plan';
+  file_type: 'md' | 'txt' | 'html' | 'book' | 'whiteboard' | 'study_plan' | 'flashcard';
   parent_id?: string | null;
   sort_order?: number;
   subject?: string;
@@ -304,6 +304,19 @@ export interface StudyNote {
   is_pinned?: boolean;
   emoji?: string; // Notion-style page icon
   font_style?: 'sans' | 'serif' | 'mono';
+}
+
+export type FlashcardRating = 'again' | 'hard' | 'good' | 'easy';
+
+export interface FlashcardContent {
+  front: string;
+  back: string;
+  intervalDays: number;
+  easeFactor: number;
+  reviewCount: number;
+  repetitions: number;
+  dueAt: string;
+  lastReviewedAt: string | null;
 }
 
 export interface NoteFilters {

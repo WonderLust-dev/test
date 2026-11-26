@@ -2,6 +2,10 @@
 
 A flexible study workspace for school subjects, university courses, certifications, and competitive exams. Create study notes and books, import or build question papers, take mock exams, review results, and practice mistakes. Exam and course names are user-defined; built-in exam templates are optional starting points.
 
+## Project documentation
+
+The maintained module guides and database setup instructions are collected in [`docs/README.md`](./docs/README.md). The Supabase SQL catalog is in [`supabase/migrations/README.md`](./supabase/migrations/README.md).
+
 ## 🚀 Quick Start
 
 ### Local Development
@@ -69,7 +73,7 @@ Execute the SQL schema in your Supabase SQL Editor:
 - File: `supabase/schema.sql`
 - This creates all necessary tables, indexes, and RLS policies
 
-For an existing deployment, run `supabase/migrations/add_book_chapters.sql`, `supabase/migrations/add_whiteboard_notes.sql`, `supabase/migrations/add_study_path_metadata.sql`, and `supabase/migrations/add_study_planner.sql` to enable books, chapters, HTML lessons, editable whiteboards, study-path metadata, and synced study plans. Subject spaces can be labeled for school, college, competitive exams, or self-study. Markdown, text, PDF, and DOCX uploads can be organized as notes or chapters; PDF and DOCX files are converted to editable text in the browser, and scanned PDFs require OCR before import. Whiteboards save strokes, shapes, and text as JSON in the notes table; PNG is only an optional export.
+For an existing deployment, run `supabase/migrations/add_book_chapters.sql`, `supabase/migrations/add_whiteboard_notes.sql`, `supabase/migrations/add_study_path_metadata.sql`, `supabase/migrations/add_study_planner.sql`, and `supabase/migrations/add_flashcards.sql` to enable books, chapters, HTML lessons, editable whiteboards, study-path metadata, synced study plans, and note-linked flashcards. Subject spaces can be labeled for school, college, competitive exams, or self-study. Markdown, text, PDF, and DOCX uploads can be organized as notes or chapters; PDF and DOCX files are converted to editable text in the browser, and scanned PDFs require OCR before import. Whiteboards save strokes, shapes, and text as JSON in the notes table; PNG is only an optional export. Flashcards are linked to chapters and schedule reviews based on recall ratings.
 
 ## 📦 GitHub Pages Deployment
 

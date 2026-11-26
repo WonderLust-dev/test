@@ -34,6 +34,7 @@ import {
   Bookmark,
   BarChart3,
   CalendarDays,
+  Brain,
   X,
   FileText,
   Menu,
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { path: '/practice', label: 'Practice Hub', icon: Target },
   { path: '/notes', label: 'Study Notes', icon: FileText, badge: 'New' },
   { path: '/planner', label: 'Study Planner', icon: CalendarDays },
+  { path: '/flashcards', label: 'Flashcards', icon: Brain },
   { path: '/mistakes', label: 'Mistakes', icon: AlertTriangle },
   { path: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -338,6 +340,7 @@ function AppContent() {
     if (p.startsWith('/practice')) return 'Practice Hub';
     if (p.startsWith('/notes')) return 'Study Notes';
     if (p.startsWith('/planner')) return 'Study Planner';
+    if (p.startsWith('/flashcards')) return 'Flashcards';
     if (p.startsWith('/mistakes')) return 'Mistakes Notebook';
     if (p.startsWith('/bookmarks')) return 'Saved Bookmarks';
     if (p.startsWith('/analytics')) return 'Analytics & Trends';
@@ -739,6 +742,7 @@ function AppContent() {
             <Route path="/practice" element={renderDashboard('practice')} />
             <Route path="/notes" element={renderDashboard('notes')} />
             <Route path="/planner" element={renderDashboard('planner')} />
+            <Route path="/flashcards" element={renderDashboard('flashcards')} />
             <Route path="/mistakes" element={renderDashboard('mistakes')} />
             <Route path="/bookmarks" element={renderDashboard('bookmarks')} />
             <Route path="/analytics" element={renderDashboard('analytics')} />
