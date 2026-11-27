@@ -29,10 +29,33 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
   const [bookSearch, setBookSearch] = useState('');
   const [bookLevelFilter, setBookLevelFilter] = useState('all');
   const [isEditingChapter, setIsEditingChapter] = useState(false);
+  const [isEditingHtml, setIsEditingHtml] = useState(false);
   const [chapterTitle, setChapterTitle] = useState('');
   const [chapterContent, setChapterContent] = useState('');
   const markdownInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
+
+  const getHtmlTitle = (html: string): string => {
+    const matches = [
+      html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i),
+      html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i),
+    ];
+    for (const match of matches) {
+      const title = match?.[1]
+        ?.replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (title) return title;
+    }
+    return '';
+  };
+
+  const getHtmlFileName = (title: string): string => {
+    const safeTitle = title.trim().replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ');
+    return `${safeTitle || 'Interactive lesson'}.html`;
+  };
 
   const refresh = async () => {
     setLoading(true);
@@ -115,6 +138,7 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
 
   const startNewChapter = () => {
     setActiveChapterId(null);
+    setIsEditingHtml(false);
     setChapterTitle('');
     setChapterContent('');
     setIsEditingChapter(true);
@@ -124,46 +148,60 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
   const editChapter = (chapter: StudyNote) => {
     setChapterTitle(chapter.title);
     setChapterContent(chapter.content);
+    setIsEditingHtml(chapter.file_type === 'html');
     setIsEditingChapter(true);
     setError(null);
   };
 
   const saveChapter = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!activeBook || !chapterTitle.trim() || !chapterContent.trim()) {
+    const isHtmlChapter = isEditingHtml || activeChapter?.file_type === 'html';
+    const title = chapterTitle.trim() || (isHtmlChapter ? getHtmlTitle(chapterContent) : '');
+    if (!activeBook || !title || !chapterContent.trim()) {
       setError('Add a chapter title and some content before saving.');
       return;
     }
     try {
       if (activeChapter) {
-        const extension = activeChapter.file_type === 'txt' ? '.txt' : '.md';
+        const extension = isHtmlChapter ? '.html' : activeChapter.file_type === 'txt' ? '.txt' : '.md';
         await updateNote(activeChapter.id, {
-          title: chapterTitle.trim(),
+          title,
           content: chapterContent,
-          file_name: `${chapterTitle.trim().replace(/[\\/:*?"<>|]/g, '_')}${extension}`,
+          file_type: isHtmlChapter ? 'html' : activeChapter.file_type,
+          file_name: isHtmlChapter ? getHtmlFileName(title) : `${title.replace(/[\\/:*?"<>|]/g, '_')}${extension}`,
         });
       } else {
         const chapter = await saveNote({
           user_id: userId,
-          title: chapterTitle.trim(),
+          title,
           content: chapterContent,
-          file_type: 'md',
+          file_type: isHtmlChapter ? 'html' : 'md',
           parent_id: activeBook.id,
           sort_order: chapters.length,
           subject: activeBook.subject || 'General Studies',
           tags: [],
-          file_name: `${chapterTitle.trim().replace(/[\\/:*?"<>|]/g, '_')}.md`,
+          file_name: isHtmlChapter ? getHtmlFileName(title) : `${title.replace(/[\\/:*?"<>|]/g, '_')}.md`,
           is_pinned: false,
         });
         setActiveChapterId(chapter.id);
       }
       setIsEditingChapter(false);
+      setIsEditingHtml(false);
       setError(null);
       await refresh();
     } catch (saveError) {
       console.error('Failed to save book chapter:', saveError);
       setError('Could not save this chapter. Please try again.');
     }
+  };
+
+  const startNewHtmlChapter = () => {
+    setActiveChapterId(null);
+    setChapterTitle('');
+    setChapterContent('');
+    setIsEditingHtml(true);
+    setIsEditingChapter(true);
+    setError(null);
   };
 
   const uploadHtmlChapter = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,7 +414,8 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button type="button" onClick={startNewChapter} className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-500/20"><Plus size={14} /> Note chapter</button>
               <button type="button" onClick={() => markdownInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-500/20"><Upload size={14} /> Import notes / docs</button>
-              <button type="button" onClick={() => htmlInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20"><Upload size={14} /> HTML chapter</button>
+              <button type="button" onClick={startNewHtmlChapter} className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20"><FileCode2 size={14} /> Paste HTML</button>
+              <button type="button" onClick={() => htmlInputRef.current?.click()} className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20"><Upload size={14} /> Upload HTML</button>
               <input ref={markdownInputRef} type="file" accept=".md,.markdown,.txt,.pdf,.docx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={uploadNoteChapter} />
               <input ref={htmlInputRef} type="file" accept=".html,.htm,text/html" className="hidden" onChange={uploadHtmlChapter} />
             </div>
@@ -401,11 +440,23 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
             {isEditingChapter ? (
               <form onSubmit={saveChapter} className="flex h-full flex-col gap-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-extrabold text-[var(--text-main)]">{activeChapter ? 'Edit chapter' : 'New note chapter'}</h3>
+                  <h3 className="text-lg font-extrabold text-[var(--text-main)]">{activeChapter ? 'Edit chapter' : isEditingHtml ? 'Paste an HTML lesson' : 'New note chapter'}</h3>
                   <button type="button" onClick={() => setIsEditingChapter(false)} aria-label="Cancel editing" className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-subcard)]"><X size={18} /></button>
                 </div>
-                <input value={chapterTitle} onChange={event => setChapterTitle(event.target.value)} placeholder="Chapter title" aria-label="Chapter title" className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <textarea value={chapterContent} onChange={event => setChapterContent(event.target.value)} placeholder="Write your chapter in Markdown..." aria-label="Chapter content" className="min-h-[280px] flex-1 resize-y rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] p-4 font-mono text-sm text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input value={chapterTitle} onChange={event => setChapterTitle(event.target.value)} placeholder={isEditingHtml ? 'Lesson title (auto-detected from HTML)' : 'Chapter title'} aria-label="Chapter title" className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <textarea
+                  value={chapterContent}
+                  onChange={event => {
+                    const content = event.target.value;
+                    setChapterContent(content);
+                    if (isEditingHtml && !chapterTitle.trim()) setChapterTitle(getHtmlTitle(content));
+                  }}
+                  placeholder={isEditingHtml ? 'Paste a complete HTML document here...' : 'Write your chapter in Markdown...'}
+                  aria-label={isEditingHtml ? 'HTML lesson source' : 'Chapter content'}
+                  spellCheck={false}
+                  className="min-h-[280px] flex-1 resize-y rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] p-4 font-mono text-sm text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {isEditingHtml && <p className="text-xs text-[var(--text-muted)]">The lesson title is read from <code>&lt;title&gt;</code> or <code>&lt;h1&gt;</code>. Preview runs in an isolated sandbox.</p>}
                 <button type="submit" className="btn btn-primary flex items-center justify-center gap-2 self-end rounded-xl px-4 py-2.5 text-sm font-bold"><Save size={16} /> Save chapter</button>
               </form>
             ) : activeChapter ? (
@@ -419,7 +470,7 @@ export default function StudyBooks({ userId }: StudyBooksProps) {
                     <h3 className="mt-1 text-xl font-black text-[var(--text-main)]">{activeChapter.title}</h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    {activeChapter.file_type !== 'html' && <button type="button" onClick={() => editChapter(activeChapter)} className="btn btn-outline flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold"><Pencil size={14} /> Edit</button>}
+                    <button type="button" onClick={() => editChapter(activeChapter)} className="btn btn-outline flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold"><Pencil size={14} /> Edit</button>
                     <button type="button" onClick={() => void removeChapter(activeChapter)} aria-label="Delete chapter" className="rounded-xl border border-rose-500/30 p-2 text-rose-400 hover:bg-rose-500/10"><Trash2 size={16} /></button>
                   </div>
                 </div>

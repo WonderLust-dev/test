@@ -50,6 +50,13 @@ function getToday(): string {
   return toDateInputValue(new Date());
 }
 
+function getSuggestedPlanDate(targetExamDate?: string): string {
+  if (targetExamDate && targetExamDate >= getToday()) return targetExamDate;
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return toDateInputValue(date);
+}
+
 function getStudyDates(targetDate: string, studyDays: number[]): string[] {
   const current = new Date();
   current.setHours(0, 0, 0, 0);
@@ -112,7 +119,15 @@ function formatPlanDate(value: string): string {
   });
 }
 
-export default function StudyPlanner({ userId }: { userId: string }) {
+export default function StudyPlanner({
+  userId,
+  targetExam,
+  targetExamDate,
+}: {
+  userId: string;
+  targetExam?: string;
+  targetExamDate?: string;
+}) {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<StudyNote[]>([]);
   const [plans, setPlans] = useState<SavedStudyPlan[]>([]);
@@ -122,12 +137,8 @@ export default function StudyPlanner({ userId }: { userId: string }) {
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [goal, setGoal] = useState('');
-  const [targetDate, setTargetDate] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return toDateInputValue(date);
-  });
+  const [goal, setGoal] = useState(() => targetExam ? `${targetExam} preparation` : '');
+  const [targetDate, setTargetDate] = useState(() => getSuggestedPlanDate(targetExamDate));
   const [studyDays, setStudyDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [minutesPerSession, setMinutesPerSession] = useState(60);
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
@@ -330,11 +341,9 @@ export default function StudyPlanner({ userId }: { userId: string }) {
   };
 
   const startNewPlan = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
     setEditingPlanId(null);
-    setGoal('');
-    setTargetDate(toDateInputValue(date));
+    setGoal(targetExam ? `${targetExam} preparation` : '');
+    setTargetDate(getSuggestedPlanDate(targetExamDate));
     setStudyDays([1, 2, 3, 4, 5]);
     setMinutesPerSession(60);
     setSelectedBookIds(books.map(book => book.id));
@@ -368,7 +377,9 @@ export default function StudyPlanner({ userId }: { userId: string }) {
             <span className="text-[11px] font-bold uppercase tracking-wider">Study Planner</span>
           </div>
           <h1 className="mt-1 text-2xl font-extrabold text-[var(--text-main)]">Make progress, one chapter at a time</h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Build a schedule from your own subjects and chapters.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {targetExam ? `Plan your ${targetExam} preparation using your own subjects and chapters.` : 'Build a schedule from your own subjects and chapters.'}
+          </p>
         </div>
         {books.length > 0 && (
           <button

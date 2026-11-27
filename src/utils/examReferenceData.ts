@@ -5,7 +5,7 @@
 export interface ExamPreset {
   id: string;
   name: string;
-  category: 'SSC' | 'Railway' | 'Banking & Insurance' | 'UPSC & Defence' | 'State PSC' | 'Teaching' | 'Custom';
+  category: 'SSC' | 'Railway' | 'Banking & Insurance' | 'UPSC & Defence' | 'State PSC' | 'Teaching' | 'Engineering & Medical Entrance' | 'University & Professional' | 'Management & Law' | 'Custom';
   badge: string;
   defaultDuration: number; // in minutes
   defaultMarks: number;
@@ -491,6 +491,158 @@ export const EXAM_PRESETS: ExamPreset[] = [
     },
     description: 'Indian Air Force officer recruitment for Flying, Ground Duty Technical & Non-Technical Branches.',
     markingRule: '+3 for correct, -1.0 for wrong',
+  },
+
+  // --- Engineering & Medical Entrance Category ---
+  {
+    id: 'jee_main',
+    name: 'JEE Main (Engineering Entrance)',
+    category: 'Engineering & Medical Entrance',
+    badge: 'Engineering',
+    defaultDuration: 60,
+    defaultMarks: 4,
+    defaultNegative: 1,
+    defaultQuestions: 25,
+    subjects: ['Physics', 'Chemistry', 'Mathematics'],
+    popularTopics: {
+      Physics: ['Mechanics', 'Electrostatics', 'Current Electricity', 'Optics', 'Modern Physics'],
+      Chemistry: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Chemical Bonding'],
+      Mathematics: ['Calculus', 'Coordinate Geometry', 'Algebra', 'Trigonometry', 'Vectors and 3D Geometry'],
+    },
+    description: 'Editable practice starter for JEE Main. Check the current official bulletin for the latest paper pattern.',
+    markingRule: 'Commonly +4 / -1; verify the current paper and question type',
+  },
+  {
+    id: 'jee_advanced',
+    name: 'JEE Advanced (Engineering Entrance)',
+    category: 'Engineering & Medical Entrance',
+    badge: 'Engineering',
+    defaultDuration: 60,
+    defaultMarks: 4,
+    defaultNegative: 1,
+    defaultQuestions: 20,
+    subjects: ['Physics', 'Chemistry', 'Mathematics'],
+    popularTopics: {
+      Physics: ['Mechanics', 'Electromagnetism', 'Thermodynamics', 'Optics', 'Modern Physics'],
+      Chemistry: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Chemical Equilibrium'],
+      Mathematics: ['Calculus', 'Algebra', 'Coordinate Geometry', 'Combinatorics', 'Vectors'],
+    },
+    description: 'Editable practice starter for JEE Advanced. The official pattern and marking can vary by paper.',
+    markingRule: 'Varies by paper and question type; edit marks and penalties before use',
+  },
+  {
+    id: 'neet_ug',
+    name: 'NEET UG (Medical Entrance)',
+    category: 'Engineering & Medical Entrance',
+    badge: 'Medical',
+    defaultDuration: 60,
+    defaultMarks: 4,
+    defaultNegative: 1,
+    defaultQuestions: 45,
+    subjects: ['Physics', 'Chemistry', 'Botany', 'Zoology'],
+    popularTopics: {
+      Physics: ['Mechanics', 'Electrodynamics', 'Optics', 'Modern Physics'],
+      Chemistry: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry'],
+      Botany: ['Plant Physiology', 'Genetics and Evolution', 'Ecology', 'Cell Biology'],
+      Zoology: ['Human Physiology', 'Human Reproduction', 'Genetics', 'Animal Diversity'],
+    },
+    description: 'Editable subject-practice starter for NEET UG. Check the current official bulletin for the latest paper pattern.',
+    markingRule: 'Commonly +4 / -1; verify the current official pattern',
+  },
+  {
+    id: 'cuet_ug',
+    name: 'CUET UG (University Entrance)',
+    category: 'University & Professional',
+    badge: 'University',
+    defaultDuration: 45,
+    defaultMarks: 5,
+    defaultNegative: 1,
+    defaultQuestions: 25,
+    subjects: ['Language', 'Domain Subject', 'General Test'],
+    popularTopics: {
+      Language: ['Reading Comprehension', 'Vocabulary', 'Grammar'],
+      'Domain Subject': ['Core Concepts', 'Application-Based Questions', 'Subject-Specific Revision'],
+      'General Test': ['General Knowledge', 'Numerical Ability', 'Logical Reasoning', 'Current Affairs'],
+    },
+    description: 'Flexible starter for CUET UG language, domain-subject, or general-test practice.',
+    markingRule: 'Confirm the current subject-specific pattern before generating a full mock',
+  },
+
+  // --- University & Professional Category ---
+  {
+    id: 'ugc_net',
+    name: 'UGC NET (Teaching & Research Eligibility)',
+    category: 'University & Professional',
+    badge: 'Teaching / Research',
+    defaultDuration: 60,
+    defaultMarks: 2,
+    defaultNegative: 0,
+    defaultQuestions: 25,
+    subjects: ['Paper I: Teaching & Research Aptitude', 'Paper II: Your Subject'],
+    popularTopics: {
+      'Paper I: Teaching & Research Aptitude': ['Teaching Aptitude', 'Research Aptitude', 'Communication', 'Logical Reasoning', 'Data Interpretation', 'Higher Education'],
+      'Paper II: Your Subject': ['Add topics from your chosen UGC NET subject'],
+    },
+    description: 'Use Paper I practice or replace Paper II with your chosen subject and syllabus.',
+    markingRule: 'Starter values only; verify the current official notification',
+  },
+  {
+    id: 'gate',
+    name: 'GATE (Graduate Aptitude Test in Engineering)',
+    category: 'University & Professional',
+    badge: 'Postgraduate',
+    defaultDuration: 60,
+    defaultMarks: 1,
+    defaultNegative: 0.25,
+    defaultQuestions: 25,
+    subjects: ['General Aptitude', 'Engineering Mathematics', 'Your GATE Paper / Discipline'],
+    popularTopics: {
+      'General Aptitude': ['Verbal Aptitude', 'Quantitative Aptitude', 'Analytical Reasoning'],
+      'Engineering Mathematics': ['Linear Algebra', 'Calculus', 'Differential Equations', 'Probability and Statistics'],
+      'Your GATE Paper / Discipline': ['Add topics from your chosen GATE paper'],
+    },
+    description: 'Flexible starter; choose the GATE paper and confirm its current syllabus and marking scheme.',
+    markingRule: 'Varies by question type; edit marks and penalties before use',
+  },
+
+  // --- Management & Law Category ---
+  {
+    id: 'cat',
+    name: 'CAT (Common Admission Test)',
+    category: 'Management & Law',
+    badge: 'Management',
+    defaultDuration: 40,
+    defaultMarks: 3,
+    defaultNegative: 1,
+    defaultQuestions: 20,
+    subjects: ['Verbal Ability & Reading Comprehension', 'Data Interpretation & Logical Reasoning', 'Quantitative Ability'],
+    popularTopics: {
+      'Verbal Ability & Reading Comprehension': ['Reading Comprehension', 'Para Jumbles', 'Para Summary', 'Verbal Ability'],
+      'Data Interpretation & Logical Reasoning': ['Charts and Tables', 'Arrangements', 'Games and Tournaments', 'Set-Based Reasoning'],
+      'Quantitative Ability': ['Arithmetic', 'Algebra', 'Geometry', 'Number Systems'],
+    },
+    description: 'Editable section-practice starter for CAT. Check the latest official pattern before creating a full mock.',
+    markingRule: 'Varies by question type; edit marks and penalties before use',
+  },
+  {
+    id: 'clat',
+    name: 'CLAT (Common Law Admission Test)',
+    category: 'Management & Law',
+    badge: 'Law',
+    defaultDuration: 25,
+    defaultMarks: 1,
+    defaultNegative: 0.25,
+    defaultQuestions: 25,
+    subjects: ['English Language', 'Current Affairs & General Knowledge', 'Legal Reasoning', 'Logical Reasoning', 'Quantitative Techniques'],
+    popularTopics: {
+      'English Language': ['Passage Comprehension', 'Vocabulary in Context', 'Inference'],
+      'Current Affairs & General Knowledge': ['National Current Affairs', 'International Current Affairs', 'Static General Knowledge'],
+      'Legal Reasoning': ['Principle and Fact', 'Constitutional Law', 'Legal Current Affairs'],
+      'Logical Reasoning': ['Arguments and Assumptions', 'Inference', 'Strengthen or Weaken'],
+      'Quantitative Techniques': ['Percentages', 'Ratios', 'Averages', 'Data Interpretation'],
+    },
+    description: 'Editable section-practice starter for CLAT. Check the latest official pattern before creating a full mock.',
+    markingRule: 'Commonly +1 / -0.25; verify the current official pattern',
   },
 
   // --- State PSC Category ---

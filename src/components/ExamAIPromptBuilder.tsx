@@ -34,6 +34,9 @@ const CATEGORIES: Array<ExamPreset['category'] | 'All'> = [
   'UPSC & Defence',
   'State PSC',
   'Teaching',
+  'Engineering & Medical Entrance',
+  'University & Professional',
+  'Management & Law',
   'Custom',
 ];
 

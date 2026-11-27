@@ -263,23 +263,43 @@ export function ChapterOneLandscapeIllustration({ className = '' }: { className?
 export function NoteCoverArtwork({
   noteId,
   title,
+  subject,
   index = 0,
   className = '',
 }: {
   noteId?: string;
   title: string;
+  subject?: string;
   index?: number;
   className?: string;
 }) {
   const t = title.toLowerCase();
-  if (t.includes('sea') || t.includes('water') || t.includes('ocean') || t.includes('quiet') || index % 4 === 0) {
-    return <QuietSeaCover className={className} title={title} subtitle="NOTES" />;
+  let artworkIndex: number;
+  if (t.includes('sea') || t.includes('water') || t.includes('ocean') || t.includes('quiet')) artworkIndex = 0;
+  else if (t.includes('bright') || t.includes('day') || t.includes('sun') || t.includes('botan')) artworkIndex = 1;
+  else if (t.includes('horizon') || t.includes('night') || t.includes('star') || t.includes('moon')) artworkIndex = 2;
+  else if (t.includes('departure') || t.includes('journey') || t.includes('travel')) artworkIndex = 3;
+  else {
+    const stableKey = `${noteId || ''}:${subject || ''}:${title}`;
+    const hash = Array.from(stableKey).reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 0);
+    artworkIndex = hash % 4;
   }
-  if (t.includes('bright') || t.includes('day') || t.includes('sun') || t.includes('botan') || index % 4 === 1) {
-    return <BrighterDayCover className={className} title={title} />;
-  }
-  if (t.includes('horizon') || t.includes('night') || t.includes('star') || t.includes('moon') || index % 4 === 2) {
-    return <LastHorizonCover className={className} title={title} />;
-  }
-  return <SmallDeparturesCover className={className} title={title} />;
+
+  const coverClass = `absolute inset-0 !aspect-auto !rounded-none ${className}`;
+  const cover = [
+    <QuietSeaCover key="sea" className={coverClass} title={title} subtitle="NOTES" />,
+    <BrighterDayCover key="day" className={coverClass} title={title} />,
+    <LastHorizonCover key="horizon" className={coverClass} title={title} />,
+    <SmallDeparturesCover key="departures" className={coverClass} title={title} />,
+  ][artworkIndex];
+
+  return (
+    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[var(--bg-subcard)]">
+      {cover}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-4 pt-12 text-white">
+        {subject && <span className="mb-1 block truncate text-[10px] font-bold uppercase tracking-[0.16em] text-white/75">{subject}</span>}
+        <span className="line-clamp-2 block font-serif text-base font-bold leading-tight drop-shadow-sm">{title}</span>
+      </div>
+    </div>
+  );
 }

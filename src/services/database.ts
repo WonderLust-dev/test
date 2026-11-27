@@ -756,6 +756,10 @@ export function getPendingSyncCount(): number {
   return pendingAttempts.length + pendingBookmarks.length + pendingNotes.length;
 }
 
+export function getPendingNoteSyncCount(): number {
+  return lsGet<StudyNote>(LS_KEYS.pendingSyncNotes).length;
+}
+
 export function isPaperAvailableOffline(paperId: string): boolean {
   const localPapers = lsGet<Paper>(LS_KEYS.papers);
   const p = localPapers.find(item => item.id === paperId);
@@ -1156,8 +1160,8 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
     invalidateCache('notes');
     // 1. Sync pending notes
     const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
+    let remainingNotes: StudyNote[] = [];
     if (pendingNotes.length > 0) {
-      const remaining: StudyNote[] = [];
       for (const note of sortNotesForSync(pendingNotes)) {
         try {
           const res = await sb(async () => {
@@ -1165,12 +1169,12 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
             if (error) throw error;
             return true;
           });
-          if (!res) remaining.push(note);
+          if (!res) remainingNotes.push(note);
         } catch {
-          remaining.push(note);
+          remainingNotes.push(note);
         }
       }
-      lsSet(LS_KEYS.pendingSyncNotes, remaining);
+      lsSet(LS_KEYS.pendingSyncNotes, remainingNotes);
     }
 
     // 2. Fetch fresh from remote
@@ -1183,8 +1187,20 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
     if (error) throw error;
 
     const freshNotes = (data || []) as StudyNote[];
-    lsSet(LS_KEYS.notes, freshNotes);
+    const localPendingNotes = remainingNotes.map(note => ({ ...note, user_id: userId! }));
+    const notesById = new Map(freshNotes.map(note => [note.id, note]));
+    localPendingNotes.forEach(note => notesById.set(note.id, note));
+    const notesToCache = Array.from(notesById.values())
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    lsSet(LS_KEYS.notes, notesToCache);
     invalidateCache('notes');
+    if (remainingNotes.length > 0) {
+      return {
+        success: false,
+        count: freshNotes.length,
+        error: `${remainingNotes.length} note${remainingNotes.length === 1 ? '' : 's'} remain saved on this device and could not sync.`,
+      };
+    }
     return { success: true, count: freshNotes.length };
   } catch (err: any) {
     return { success: false, count: 0, error: err?.message || 'Sync failed' };

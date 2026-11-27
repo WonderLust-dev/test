@@ -11,15 +11,17 @@ import {
   togglePinNote,
   downloadNote,
   syncNotesWithCloud,
+  getPendingNoteSyncCount,
   isRemoteUser,
   checkDuplicateNote,
 } from '../services/database';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { useAuthModal } from './AuthGate';
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
 import ChapterOneView from './ChapterOneView';
 import StudyBooks from './StudyBooks';
 import StudyWhiteboards from './StudyWhiteboards';
-import { useTheme } from '../hooks/useTheme';
 import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
 import { importStudyDocument } from '../utils/studyDocumentImporter';
 import {
@@ -83,13 +85,13 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [allMaterials, setAllMaterials] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const { openLogin } = useAuthModal();
 
   // Filters & Views
   const [search, setSearch] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'md' | 'txt'>('all');
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const { theme } = useTheme();
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'editorial'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sscp_notes_viewmode') as 'grid' | 'list' | 'editorial' | null;
@@ -99,13 +101,6 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     }
     return 'grid';
   });
-
-  // Automatically adapt viewMode when user selects the editorial theme
-  useEffect(() => {
-    if (theme === 'editorial') {
-      setViewMode('editorial');
-    }
-  }, [theme]);
 
   // Persist viewMode
   useEffect(() => {
@@ -186,6 +181,8 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
   const isRemote = isRemoteUser(effectiveUserId);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
+  const [syncNotificationKind, setSyncNotificationKind] = useState<'success' | 'warning' | 'error'>('success');
+  const [pendingNoteSyncCount, setPendingNoteSyncCount] = useState(getPendingNoteSyncCount);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
@@ -207,25 +204,60 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   const handleManualSync = async () => {
     if (isSyncing) return;
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      setSyncNotificationKind('warning');
+      setSyncNotification('You are offline. Notes are saved on this device and will sync when connection returns.');
+      return;
+    }
     setIsSyncing(true);
     try {
       const res = await syncNotesWithCloud(effectiveUserId);
+      setPendingNoteSyncCount(getPendingNoteSyncCount());
       if (res.success) {
         const freshNotes = await getNotes(effectiveUserId);
         setAllMaterials(freshNotes);
         const regularNotes = freshNotes.filter(n => !n.parent_id && (n.file_type === 'md' || n.file_type === 'txt'));
         setNotes(regularNotes);
+        setSyncNotificationKind('success');
         setSyncNotification(`☁️ Synced with Supabase database (${regularNotes.length} notes up to date)`);
       } else {
+        setSyncNotificationKind('warning');
         setSyncNotification(`⚠️ ${res.error || 'Sync failed'}`);
       }
     } catch (err: any) {
+      setPendingNoteSyncCount(getPendingNoteSyncCount());
+      setSyncNotificationKind('error');
       setSyncNotification(`⚠️ Sync failed: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSyncing(false);
       setTimeout(() => setSyncNotification(null), 4000);
     }
   };
+
+  const notifyNoteSave = (action: 'created' | 'updated' | 'uploaded') => {
+    const pendingCount = getPendingNoteSyncCount();
+    setPendingNoteSyncCount(pendingCount);
+    if (!isRemote) {
+      setSyncNotificationKind('warning');
+      setSyncNotification(`Note ${action} on this device. Connect an account to sync it across devices.`);
+    } else if (!navigator.onLine || pendingCount > 0) {
+      setSyncNotificationKind('warning');
+      const pendingLabel = pendingCount === 1 ? '1 note is' : pendingCount > 1 ? `${pendingCount} notes are` : 'This note is';
+      setSyncNotification(`Note ${action} on this device. ${pendingLabel} waiting for cloud sync.`);
+    } else {
+      setSyncNotificationKind('success');
+      setSyncNotification(`Note ${action} and synced to your cloud library.`);
+    }
+    window.setTimeout(() => setSyncNotification(null), 4000);
+  };
+
+  useEffect(() => {
+    setPendingNoteSyncCount(getPendingNoteSyncCount());
+    if (isRemote && navigator.onLine && getPendingNoteSyncCount() > 0) {
+      void handleManualSync();
+    }
+  }, [effectiveUserId]);
 
   // Filtered & Sorted Notes
   const filteredNotes = useMemo(() => {
@@ -459,11 +491,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setSearch('');
     setPinnedOnly(false);
 
-    const msg = overwrittenCount > 0
-      ? `✅ ${overwrittenCount} note(s) updated with new content, ${newItemsToSave.length} new note(s) added!`
-      : `✅ ${newItemsToSave.length} note${newItemsToSave.length !== 1 ? 's' : ''} uploaded and synced with database!`;
-    setSyncNotification(msg);
-    setTimeout(() => setSyncNotification(null), 4000);
+    notifyNoteSave(overwrittenCount > 0 ? 'updated' : 'uploaded');
   };
 
   useEffect(() => {
@@ -610,8 +638,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
           font_style: editingNote.font_style || 'sans',
         } as StudyNote) : null);
       }
-      setSyncNotification('✅ Note updated and saved to database!');
-      setTimeout(() => setSyncNotification(null), 3000);
+      notifyNoteSave('updated');
     } else {
       // Create new
       const saved = await saveNote({
@@ -636,8 +663,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       setSearch('');
       setSelectedType('all');
       setPinnedOnly(false);
-      setSyncNotification('✅ Note created and synced with database!');
-      setTimeout(() => setSyncNotification(null), 3000);
+      notifyNoteSave('created');
     }
 
     setEditingNote(null);
@@ -713,7 +739,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
             }
           }}
           onDownloadNote={note => downloadNote(note)}
-          onExitEditorial={() => setViewMode('grid')}
+          onChangeView={setViewMode}
         />
       ) : (
         <>
@@ -788,25 +814,36 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
               <button
                 onClick={handleManualSync}
                 disabled={isSyncing}
-                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all whitespace-nowrap shrink-0"
-                title={isOnline ? "Force sync with Supabase cloud database" : "Offline mode — changes queued for auto-sync"}
+                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold whitespace-nowrap shrink-0"
+                title={!isOnline ? 'Offline mode — changes queued for sync' : pendingNoteSyncCount ? `${pendingNoteSyncCount} note(s) waiting for cloud sync` : 'Sync notes with your cloud library'}
               >
                 {isOnline ? (
-                  <Cloud size={14} className={isSyncing ? "animate-pulse text-indigo-400" : "text-emerald-400"} />
+                  <Cloud size={14} className={isSyncing ? 'animate-pulse text-[var(--accent-color)]' : pendingNoteSyncCount ? 'text-amber-500' : 'text-[var(--accent-color)]'} />
                 ) : (
                   <CloudOff size={14} className="text-amber-400" />
                 )}
                 <span>
-                  {isSyncing ? "Syncing..." : isOnline ? "Synced" : "Offline"}
+                  {isSyncing ? 'Syncing...' : !isOnline ? 'Offline' : pendingNoteSyncCount ? `${pendingNoteSyncCount} pending` : 'Sync notes'}
                 </span>
-                <RefreshCw size={12} className={`${isSyncing ? "animate-spin" : "opacity-70 hover:opacity-100"}`} />
+                <RefreshCw size={12} className={`${isSyncing ? 'animate-spin' : 'opacity-70 hover:opacity-100'}`} />
+              </button>
+            ) : isSupabaseConfigured ? (
+              <button
+                type="button"
+                onClick={openLogin}
+                className="btn btn-outline text-xs py-2 px-3 sm:px-3.5 rounded-xl flex items-center gap-1.5 shadow-2xs font-bold whitespace-nowrap shrink-0"
+                title="Sign in or create an account to sync notes across devices"
+              >
+                <Cloud size={14} className="text-[var(--accent-color)]" />
+                <span>Connect account</span>
               </button>
             ) : (
               <div
                 className="px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-subcard)] border border-[var(--border-color)] text-[var(--text-muted)] flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                title="Notes stored locally in PWA. Sign in to sync across devices."
+                title="Cloud sync needs Supabase URL and anon key configuration."
               >
-                <span>💾 PWA Local</span>
+                <CloudOff size={14} />
+                <span>Local only · cloud not configured</span>
               </div>
             )}
           </div>
@@ -815,9 +852,15 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
       {/* Cloud Sync / Upload Notification Banner */}
       {syncNotification && (
-        <div className="p-3 sm:p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between gap-2 animate-fadeIn shadow-xs">
+        <div className={`p-3 sm:p-3.5 rounded-2xl text-xs sm:text-sm font-semibold flex items-center justify-between gap-2 animate-fadeIn shadow-xs ${
+          syncNotificationKind === 'success'
+            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-500'
+            : syncNotificationKind === 'warning'
+              ? 'bg-amber-500/15 border border-amber-500/30 text-amber-600'
+              : 'bg-rose-500/15 border border-rose-500/30 text-rose-600'
+        }`}>
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-emerald-400 shrink-0" />
+            <Sparkles size={16} className="shrink-0" />
             <span>{syncNotification}</span>
           </div>
           <button

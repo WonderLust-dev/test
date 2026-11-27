@@ -11,8 +11,45 @@ import ReviewDashboard from './ReviewDashboard';
 import StudyNotes from './StudyNotes';
 import StudyPlanner from './StudyPlanner';
 import Flashcards from './Flashcards';
+import { EXAM_PRESETS } from '../utils/examReferenceData';
 
 export type DashboardTab = 'overview' | 'library' | 'mistakes' | 'bookmarks' | 'analytics' | 'practice' | 'notes' | 'planner' | 'flashcards';
+
+interface AspirantProfile {
+  examPresetId: string;
+  examName: string;
+  targetDate: string;
+  subjects: string[];
+}
+
+function getAspirantProfileKey(userId: string): string {
+  return `sscp_aspirant_profile_${encodeURIComponent(userId)}`;
+}
+
+function readAspirantProfile(userId: string): AspirantProfile | null {
+  try {
+    const raw = localStorage.getItem(getAspirantProfileKey(userId));
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null) return null;
+    const profile = value as Partial<AspirantProfile>;
+    if (
+      typeof profile.examPresetId !== 'string'
+      || typeof profile.examName !== 'string'
+      || typeof profile.targetDate !== 'string'
+      || !Array.isArray(profile.subjects)
+      || !profile.subjects.every(subject => typeof subject === 'string')
+    ) return null;
+    return {
+      examPresetId: profile.examPresetId,
+      examName: profile.examName,
+      targetDate: profile.targetDate,
+      subjects: profile.subjects,
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface DashboardProps {
   userId?: string;
@@ -40,6 +77,9 @@ export default function Dashboard({
   onTabChange,
 }: DashboardProps) {
   const effectiveUserId = userId || 'guest';
+  const [aspirantProfile, setAspirantProfile] = useState<AspirantProfile | null>(
+    () => readAspirantProfile(effectiveUserId)
+  );
   const [papers, setPapers] = useState<Paper[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [mistakes, setMistakes] = useState<Mistake[]>([]);
@@ -53,6 +93,21 @@ export default function Dashboard({
   };
   const [filters, setFilters] = useState<PaperFilters>({});
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setAspirantProfile(readAspirantProfile(effectiveUserId));
+  }, [effectiveUserId]);
+
+  const saveAspirantProfile = (profile: AspirantProfile): boolean => {
+    try {
+      localStorage.setItem(getAspirantProfileKey(effectiveUserId), JSON.stringify(profile));
+      setAspirantProfile(profile);
+      return true;
+    } catch (error) {
+      console.error('Failed to save aspirant profile:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -219,6 +274,8 @@ export default function Dashboard({
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <OverviewBento
+          aspirantProfile={aspirantProfile}
+          onSaveAspirantProfile={saveAspirantProfile}
           papers={papers}
           attempts={completedAttempts}
           mistakes={mistakes}
@@ -269,7 +326,11 @@ export default function Dashboard({
         <StudyNotes userId={effectiveUserId} />
       )}
       {activeTab === 'planner' && (
-        <StudyPlanner userId={effectiveUserId} />
+        <StudyPlanner
+          userId={effectiveUserId}
+          targetExam={aspirantProfile?.examName}
+          targetExamDate={aspirantProfile?.targetDate}
+        />
       )}
       {activeTab === 'flashcards' && (
         <Flashcards userId={effectiveUserId} />
@@ -301,7 +362,172 @@ export default function Dashboard({
 // ============================================================
 // Overview Bento Component (Image 2 Aesthetic)
 // ============================================================
+function AspirantProfileCard({
+  profile,
+  onSave,
+}: {
+  profile: AspirantProfile | null;
+  onSave: (profile: AspirantProfile) => boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState<AspirantProfile>(profile || {
+    examPresetId: 'custom_exam',
+    examName: '',
+    targetDate: '',
+    subjects: [],
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(profile || { examPresetId: 'custom_exam', examName: '', targetDate: '', subjects: [] });
+    setIsEditing(false);
+    setError(null);
+  }, [profile]);
+
+  const remainingDays = profile?.targetDate
+    ? Math.ceil((new Date(`${profile.targetDate}T00:00:00`).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000)
+    : null;
+  const today = new Date();
+  const minTargetDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    const examName = draft.examName.trim();
+    if (!examName) {
+      setError('Enter your target exam or course.');
+      return;
+    }
+    const nextProfile = {
+      ...draft,
+      examName,
+      subjects: draft.subjects.map(subject => subject.trim()).filter(Boolean),
+    };
+    if (!onSave(nextProfile)) {
+      setError('Could not save your preparation profile on this device.');
+      return;
+    }
+    setError(null);
+    setIsEditing(false);
+  };
+
+  return (
+    <section className="bento-card rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 sm:p-5">
+      {isEditing ? (
+        <form onSubmit={save} className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2 text-[var(--accent-color)]">
+              <Target size={17} />
+              <h2 className="text-sm font-extrabold text-[var(--text-main)]">Set your preparation goal</h2>
+            </div>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Choose a preset or enter any exam, course, or certification. You can change it later.</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-bold text-[var(--text-main)]">
+              Start with an exam template
+              <select
+                value={draft.examPresetId}
+                onChange={event => {
+                  const preset = EXAM_PRESETS.find(item => item.id === event.target.value);
+                  setDraft(current => ({
+                    ...current,
+                    examPresetId: event.target.value,
+                    examName: event.target.value === 'custom_exam' ? '' : preset?.name.split(' (')[0] || '',
+                    subjects: preset?.id === 'custom_exam' ? [] : [...(preset?.subjects || [])],
+                  }));
+                }}
+                className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)]"
+              >
+                {Array.from(new Set(EXAM_PRESETS.map(preset => preset.category))).map(category => (
+                  <optgroup key={category} label={category}>
+                    {EXAM_PRESETS.filter(preset => preset.category === category).map(preset => (
+                      <option key={preset.id} value={preset.id}>{preset.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-[var(--text-main)]">
+              Your target exam or course
+              <input
+                required
+                value={draft.examName}
+                onChange={event => setDraft(current => ({ ...current, examName: event.target.value }))}
+                placeholder="e.g. UPSC CSE 2027, JEE Main, or nursing entrance"
+                className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)]"
+              />
+            </label>
+            <label className="text-xs font-bold text-[var(--text-main)]">
+              Subjects or sections <span className="font-normal text-[var(--text-muted)]">(comma-separated, optional)</span>
+              <input
+                value={draft.subjects.join(', ')}
+                onChange={event => setDraft(current => ({ ...current, subjects: event.target.value.split(',') }))}
+                placeholder="Add or replace subjects to match your syllabus"
+                className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)]"
+              />
+            </label>
+            <label className="text-xs font-bold text-[var(--text-main)]">
+              Target date <span className="font-normal text-[var(--text-muted)]">(optional)</span>
+              <input
+                type="date"
+                min={minTargetDate}
+                value={draft.targetDate}
+                onChange={event => setDraft(current => ({ ...current, targetDate: event.target.value }))}
+                className="mt-1.5 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-subcard)] px-3 py-2.5 text-sm font-normal text-[var(--text-main)]"
+              />
+            </label>
+          </div>
+
+          {error && <p role="alert" className="text-xs font-semibold text-rose-500">{error}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-[var(--text-muted)]">Profile is saved on this device.</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { if (profile) setDraft(profile); setIsEditing(false); setError(null); }} className="btn btn-outline rounded-xl px-3 py-2 text-xs font-bold">{profile ? 'Cancel' : 'Not now'}</button>
+              <button type="submit" className="btn btn-primary rounded-xl px-4 py-2 text-xs font-bold">Save preparation goal</button>
+            </div>
+          </div>
+        </form>
+      ) : profile ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[var(--accent-color)]">
+              <Target size={17} />
+              <span className="text-[11px] font-bold uppercase tracking-wider">Your preparation path</span>
+            </div>
+            <h2 className="mt-1 truncate text-lg font-extrabold text-[var(--text-main)]">{profile.examName}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+              {profile.targetDate && <span className="flex items-center gap-1"><CalendarDays size={13} /> Exam date: {new Date(`${profile.targetDate}T00:00:00`).toLocaleDateString()}</span>}
+              {remainingDays !== null && <span>{remainingDays < 0 ? 'Target date has passed' : remainingDays === 0 ? 'Target date is today' : `${remainingDays} days to go`}</span>}
+              {!profile.targetDate && <span>Add a target date whenever you know it.</span>}
+            </div>
+            {profile.subjects.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {profile.subjects.slice(0, 8).map(subject => <span key={subject} className="rounded-full border border-[var(--border-color)] bg-[var(--bg-subcard)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)]">{subject}</span>)}
+                {profile.subjects.length > 8 && <span className="px-1 py-1 text-[11px] text-[var(--text-muted)]">+{profile.subjects.length - 8} more</span>}
+              </div>
+            )}
+          </div>
+          <button type="button" onClick={() => { setDraft(profile); setIsEditing(true); }} className="btn btn-outline shrink-0 rounded-xl px-3 py-2 text-xs font-bold">Edit goal</button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <Target size={17} className="mt-0.5 shrink-0 text-[var(--accent-color)]" />
+            <div>
+              <h2 className="text-sm font-extrabold text-[var(--text-main)]">Make this your study space</h2>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Set an exam goal and customize it for any syllabus, course, or certification.</p>
+            </div>
+          </div>
+          <button type="button" onClick={() => setIsEditing(true)} className="btn btn-primary shrink-0 rounded-xl px-4 py-2 text-xs font-bold">Set preparation goal</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OverviewBento({
+  aspirantProfile,
+  onSaveAspirantProfile,
   papers,
   attempts,
   mistakes,
@@ -316,6 +542,8 @@ function OverviewBento({
   onSelectTab,
   onPracticeTopicClick,
 }: {
+  aspirantProfile: AspirantProfile | null;
+  onSaveAspirantProfile: (profile: AspirantProfile) => boolean;
   papers: Paper[];
   attempts: Attempt[];
   mistakes: Mistake[];
@@ -350,6 +578,7 @@ function OverviewBento({
 
   return (
     <div className="space-y-4 animate-fadeIn">
+      <AspirantProfileCard profile={aspirantProfile} onSave={onSaveAspirantProfile} />
       {/* Top Bento Row: Overview (2 cols) + Popular Mock Tests (1 col) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
